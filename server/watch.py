@@ -140,7 +140,7 @@ def _notify(notify, cur, alert_id, row, kind, now):
     outcome is kept against the alert and shown rather than logged and forgotten."""
     message = '%s: %s %s%s' % (KINDS[kind], 'draft' if kind == 'draftfollowup' else 'log on', L.reference(row),
                                (' (%s)' % row['registration']) if row.get('registration') else '')
-    log.warning(message)
+    log.debug(message)
     delivered, error = None, 'No delivery channel is configured'
     if notify:
         try:

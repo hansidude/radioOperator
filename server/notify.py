@@ -80,8 +80,7 @@ def deliver(config, alert):
     the caller has to catch: it is a fact recorded against the alert and shown on the page."""
     wired = channels(config)
     if not wired:
-        log.warning('%s (no delivery channel is configured: this reaches nobody who is not looking)',
-                    alert.get('message'))
+        log.debug('%s (no delivery channel is configured)', alert.get('message'))
         return [], 'No delivery channel is configured'
     sent, failures = [], []
     for name, send in wired:

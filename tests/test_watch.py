@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import logons as L
 from server import watch as W
@@ -53,7 +54,9 @@ class Watching(unittest.TestCase):
     def test_a_draft_is_chased_after_the_interval(self):              # ACC-5
         i = L.create(self.cur, 'alice', '', T0)
         self.assertEqual(self.sweep(T0 + timedelta(minutes=FOLLOWUP - 1))['raised'], [])
-        out = self.sweep(T0 + timedelta(minutes=FOLLOWUP))
+        with patch.object(W.log, 'warning') as warning:
+            out = self.sweep(T0 + timedelta(minutes=FOLLOWUP))
+        warning.assert_not_called()
         self.assertEqual(len(out['raised']), 1)
         alert = W.open_alerts(self.cur)[0]
         self.assertEqual((alert['kind'], alert['logOnId']), ('draftfollowup', i))
@@ -158,7 +161,9 @@ class Delivery(unittest.TestCase):
 
     def test_nothing_configured_is_reported_rather_than_silent(self):
         from server import notify as N
-        sent, error = N.deliver({}, {'message': 'a vessel is overdue'})
+        with patch.object(N.log, 'warning') as warning:
+            sent, error = N.deliver({}, {'message': 'a vessel is overdue'})
+        warning.assert_not_called()
         self.assertEqual(sent, [])
         self.assertIn('No delivery channel', error)
 
