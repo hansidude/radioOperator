@@ -15,7 +15,6 @@
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="contact" aria-controls="ro-contact-pane" aria-pressed="false"><i class="bi bi-telephone me-1"></i>Contact</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="vessel" aria-controls="ro-vessel-pane" aria-pressed="false"><i class="bi bi-water me-1"></i>Vessel</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="watch" aria-controls="ro-watch-pane" aria-pressed="false"><i class="bi bi-broadcast me-1"></i>Watch</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>Record</button>
   </div>
   <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if open %}Saved to the shared record{% else %}Closed: read only{% endif %}</span>
@@ -92,14 +91,6 @@
   <section class="ro-gaps mt-3" aria-label="Still to ask"><strong>Still to ask</strong><ol id="gaps">{% for g in gaps %}<li><button type="button" class="btn btn-outline-secondary {{ g.cls }}" data-focus="{{ g.field }}"><span class="me-1">{{ g.cls }}</span>{{ g.label }}</button></li>{% else %}<li class="small text-success">Nothing left to ask.</li>{% endfor %}</ol></section>
 </section>
 
-<section id="ro-watch-pane" class="ro-workspace-pane d-none" data-ro-pane="watch">
-  <div id="queuePane">
-    <div id="roLiveAlerts">{{ ui.alert_list(alerts, health, '/logon/' ~ logon.id) }}</div>
-    <div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference, logon.id) }}</div>
-    <div id="roLiveWatch">{{ ui.queue(queue, now, logon.id) }}</div>
-  </div>
-</section>
-
 <section id="ro-record-pane" class="ro-workspace-pane d-none" data-ro-pane="record">
   <h2 class="ro-section-title">Record history and actions</h2>
   {% if logon.watchStatus in ('discarded', 'cancelled') %}<div class="alert alert-warning">Discarded {{ ui.when(logon.discardedAt or logon.cancelledAt, now) }}: {{ logon.discardReason or logon.cancelReason }}. This was never a log on.</div>
@@ -112,7 +103,6 @@
   {% if identifiers %}<div class="ro-idents mt-4"><strong>Heard</strong><ul class="mb-0">{% for i in identifiers %}<li class="{{ '' if i.isActive else 'old' }}">{{ labels[i.kind] }}: <code>{{ i.raw }}</code> <span class="text-secondary">{{ i.capturedAt.strftime('%H:%M') }} {{ i.source }}{% if not i.isActive %} superseded{% endif %}</span></li>{% endfor %}</ul></div>{% endif %}
   {% if draft %}<form method="post" action="/logon/{{ logon.id }}/discard" class="ro-cancel mt-4" onsubmit="return confirm('Discard: this was never a log on?')"><input type="hidden" name="back" value="/logons"><div class="d-flex flex-wrap gap-2 align-items-center"><input name="reason" class="form-control" style="max-width:28rem" placeholder="Why this was never a log on" maxlength="255" required><button class="btn btn-outline-danger">Discard draft</button></div></form>{% endif %}
 </section>
-{{ ui.refresh_script(logon.id) }}
 {{ ui.find_script(logon.id) }}
 <script>
 (function () {
@@ -180,7 +170,6 @@
         el.setAttribute('aria-invalid', String(!!x.d.invalid));
         renderGaps(x.d.gaps);
         setStatus('Saved to the shared record ' + x.d.savedAt, 'text-success');
-        window.refreshQueue();
       })
       .catch(function (e) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); setStatus('Not saved to the shared record: ' + e.message, 'text-danger'); });
   }

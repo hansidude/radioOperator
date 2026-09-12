@@ -88,8 +88,8 @@ class Pages(unittest.TestCase):
         i = self.new()
         j = self.new()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('id="queuePane"', page)
-        self.assertIn('data-draft="%d"' % j, page)             # the other draft is visible while this one is captured
+        self.assertNotIn('id="queuePane"', page)
+        self.assertNotIn('data-draft="%d"' % j, page)          # other records belong only on /logons
         self.assertIn('data-field="eta"', page)
         self.assertIn('type="date" class="ro-native-picker" data-picker-target="callDay"', page)
         self.assertIn('type="time" class="ro-native-picker" data-picker-target="callTime"', page)
@@ -118,9 +118,11 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
         entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-contact-pane"')]
         self.assertIn('data-ro-tab="entry"', page)
-        for tab in ('contact', 'vessel', 'identity', 'watch', 'record'):
+        for tab in ('contact', 'vessel', 'identity', 'record'):
             self.assertIn('data-ro-tab="%s"' % tab, page)
             self.assertIn('id="ro-%s-pane" class="ro-workspace-pane d-none"' % tab, page)
+        self.assertNotIn('data-ro-tab="watch"', page)
+        self.assertNotIn('id="ro-watch-pane"', page)
         self.assertEqual(entry.count('class="capture-row row g-3"'), 5)
         rows = entry.split('class="capture-row row g-3"')[1:]
         for row, fields in zip(rows, (
@@ -131,8 +133,7 @@ class Pages(unittest.TestCase):
                 ('etaDay', 'eta'))):
             for field in fields:
                 self.assertIn('id="f-%s"' % field, row.split('capture-row row g-3', 1)[0])
-        self.assertNotIn('id="queuePane"', entry)
-        self.assertIn('id="queuePane"', page)
+        self.assertNotIn('id="queuePane"', page)
         self.assertIn('font-size:1.2rem', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('placeholder=', entry)
