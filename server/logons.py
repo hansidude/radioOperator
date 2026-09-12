@@ -207,12 +207,12 @@ def interpret(row, field):
     """Read a time field's day cell and time cell together: {'when', 'basis', 'warning'}."""
     day_col, raw_col, _, _ = TIME_FIELDS[field]
     ref, label = _reference(row, field)
-    day = times.parse_day(row.get(day_col), ref) if day_col else {'day': None, 'basis': '', 'warning': None}
+    day = times.parse_day(row.get(day_col), ref) if day_col else {'day': None, 'label': '', 'basis': '', 'warning': None}
     if not (row.get(raw_col) or '').strip():
         if day['day'] or day['warning']:
             return {'when': None, 'basis': day['basis'] + ' — no time yet', 'warning': day['warning'] or 'A day without a time is not a deadline.'}
         return {'when': None, 'basis': '', 'warning': None}
-    got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['basis'])
+    got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['label'])
     if day['warning'] and not got['warning']:
         got['warning'] = day['warning']
         got['basis'] += ' — ' + day['warning']

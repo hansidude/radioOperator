@@ -38,7 +38,7 @@ def parse_day(raw, reference):
     Reads today, tomorrow, a weekday name (the next one, today included), 13/9, 13/9/26, 2026-09-13."""
     text = (raw or '').strip()
     if not text:
-        return {'day': None, 'basis': '', 'warning': None}
+        return {'day': None, 'label': '', 'basis': '', 'warning': None}
     s = re.sub(r'\s+', ' ', text.lower())
     day, basis = None, ''
     if s in ('today', 'tdy'):
@@ -63,7 +63,7 @@ def parse_day(raw, reference):
             return {'day': None, 'basis': 'Not understood: not a calendar date. Kept as typed: "%s".' % text, 'warning': 'Not understood: not a calendar date'}
         basis = 'date given'
     warning = 'Before today. Check the date.' if day < reference.date() else None
-    return {'day': day, 'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' — ' + warning if warning else ''), 'warning': warning}
+    return {'day': day, 'label': basis, 'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' — ' + warning if warning else ''), 'warning': warning}
 
 
 def parse(raw, reference, reference_label='entry time', day=None, day_label=None):
