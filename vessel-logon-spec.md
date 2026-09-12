@@ -1,6 +1,6 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.8 (draft)<br>
+**Version:** 0.9 (draft)<br>
 **Revised:** 12 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
@@ -45,6 +45,7 @@
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
 - [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 0.9 — changes from 0.8](#section-version-09-changes-from-08)
     - [Version 0.8 — changes from 0.7](#section-version-08-changes-from-07)
     - [Version 0.7 — changes from 0.6](#section-version-07-changes-from-06)
     - [Version 0.6 — changes from 0.5](#section-version-06-changes-from-05)
@@ -495,11 +496,19 @@ whatever record it resolves to.
 *Rationale: the value the operator heard is evidence; overwriting it with the resolved
 value destroys the ability to detect a mis-resolution later.*
 
-**DAT-6.** The capture view and the open watch queue **shall** carry every column of the
-unit's paper radio log (A.1), under the same headings and in the paper log's order, so that a
-paper row and a system record correspond cell for cell. Fields the paper log does not have
-(Class C, and system metadata) follow after the paper columns and are visibly additional.
-The return day-or-date **shall** be its own field beside the return time, as on paper.
+**DAT-6.** The capture view and the open watch queue **shall** carry every *trip* column of the
+unit's paper radio log (A.1 columns 1 to 12), under the same headings and in the paper log's
+order, so that a paper row and a system record correspond cell for cell. Fields the paper log
+does not have (Class C, and system metadata) follow after the paper columns and are visibly
+additional. The return day-or-date **shall** be its own field beside the return time, as on paper.
+
+Columns 13 to 15 are **not** trip columns and **shall not** be reproduced as though they were.
+They record the transcription of the paper row into a separate computer system: its trip number,
+a tick that the row was entered, and an initial that the log off was entered. A system performing
+this function cannot know them about itself, and answering them with its own record number, entry
+time and operator makes three cells silently mean something other than what the heading says.
+Such a system **shall** instead show its own reference plainly, marked as its own, and **shall**
+state what those three paper columns are for. Whether they survive at all is Appendix D question 15.
 *Rationale: OC-9. The paper log is what operators already fill out and check against; a
 screen laid out the same way costs nothing to learn and makes transcription and
 reconciliation a one-to-one read. A dedicated return-day field is what makes REC-6's
@@ -770,7 +779,8 @@ within a section is not always contiguous.
 | **AC-40** | Begin a log on and populate only Class D fields. Mark capture complete. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; completion is not prevented (CAP-10 to CAP-12). |
 | **AC-41** | Begin an unclassified caller capture with no description, then receive a hull colour before an identifier. | Record retained in the owning unit's open queue; classification/description never gate creation, and the volunteered colour is retained immediately while identity remains unknown (CAP-3, CAP-14). |
 | **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
-| **AC-48** | Lay a filled paper log row (A.1) beside the capture view and the queue row for the same trip. | Every paper column has a field with the same heading, in the same order; return day-or-date and return time are separate fields; additional fields are visibly after the paper columns (DAT-6). |
+| **AC-48** | Lay a filled paper log row (A.1) beside the capture view and the queue row for the same trip. | Every trip column (1 to 12) has a field with the same heading, in the same order; return day-or-date and return time are separate fields; additional fields are visibly after the paper columns (DAT-6). |
+| **AC-49** | Look for the paper's Trip ID No., Entered in Noggin and Logged off in Noggin on the capture view. | No field claims to be them; the system's own reference, entry and closure are shown as its own, and what those three paper columns record is stated (DAT-6). |
 
 <a id="section-102-verification-and-search"></a>
 
@@ -885,8 +895,10 @@ filled out for every call (OC-9). Its columns, verbatim and in order:
 | 14 | Entered in Noggin ✓ | ticked when transcribed into the computer system (Noggin is the platform currently in use) |
 | 15 | Logged off in Noggin — Initial | operator initials when the log off is transcribed |
 
-Three things follow. First, columns 13 to 15 are decisive: **the paper log tracks the
-computer system as an outstanding task.** The operational record is paper; the computer
+Three things follow. First, columns 13 to 15 are decisive, and they are of a different kind
+from the twelve before them: those twelve record the trip, these three record **the transcription
+of the row into a separate computer system**. **The paper log tracks the computer system as an
+outstanding task.** The operational record is paper; the computer
 record is a downstream transcription, cross-referenced by the trip number written back onto
 the paper row. The computer record therefore lags the operational one; its legal status
 remains subject to confirmation under OC-7. AC-26 exists to detect when this has been
@@ -1060,6 +1072,17 @@ revisions add identifiers; they do not renumber.
 <a id="section-appendix-e-revision-history"></a>
 
 ## Appendix E — Revision history
+
+<a id="section-version-09-changes-from-08"></a>
+
+### Version 0.9 — changes from 0.8
+
+- Split A.1's fifteen columns into the twelve that record the trip and the three that record
+  transcription into a separate computer system. DAT-6 now requires only the first twelve and
+  forbids reproducing the other three, because a system cannot honestly answer them about
+  itself; answering them with its own record number and timestamps makes three cells mean
+  something other than their headings say. Added AC-49.
+- The prototype built against v0.8 had done exactly that, which is how the distinction surfaced.
 
 <a id="section-version-08-changes-from-07"></a>
 

@@ -1,11 +1,11 @@
-# Vessel Log On — Functional Specification, v0.8
+# Vessel Log On — Functional Specification, v0.9
 
 ## Table of contents
 
 - [Files](#files)
 - [Figures](#figures)
 - [Reading order](#reading-order)
-- [Revision 0.8](#revision-08)
+- [Revision 0.9](#revision-09)
 - [Updating the documents](#updating-the-documents)
 
 ## Files
@@ -38,12 +38,12 @@ practice**.
 4. §10 — acceptance criteria.
 5. Appendix A with the figures alongside, for why the requirements are as they are.
 
-## Revision 0.8
+## Revision 0.9
 
-Adds Figure 5, the unit's paper radio log, and rewrites A.1 from it: the paper log is the
-primary record and the first thing filled out for every call (OC-9). The capture view and
-queue must carry its columns under its headings in its order (DAT-6, AC-48). The earlier A.1
-transcription was wrong in several columns. Appendix E has the detail.
+Separates A.1's twelve trip columns from its three transcription columns. A system performing
+this function carries the trip columns and must not reproduce Trip ID No., Entered in Noggin or
+Logged off in Noggin, which record transcription into a different system and which it cannot
+honestly answer about itself (DAT-6, AC-49).
 
 ## Updating the documents
 
