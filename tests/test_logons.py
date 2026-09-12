@@ -50,6 +50,8 @@ class LogOns(unittest.TestCase):
         self.assertEqual(d[0]['condition'], 'notwatched')
         self.assertEqual(L.drafts(self.cur, 'unitB', T0, 30), [])
         self.assertEqual((row['dayNumber'], row['dayDate']), (1, T0.date()))       # REC-9
+        self.cur.execute("SELECT watchStatus FROM LogOns WHERE id = %s", (i,))     # written, not defaulted
+        self.assertEqual(self.cur.fetchone()['watchStatus'], 'draft')
         self.assertEqual(L.reference(row), '1')
 
     def test_numbering_counts_from_one_each_day(self):                 # AC-56, REC-9

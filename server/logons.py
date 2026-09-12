@@ -278,8 +278,11 @@ def create(cur, user, unit, now):
                     'FOR UPDATE', (unit, day))
         number = cur.fetchone()['n']
         try:
-            cur.execute('INSERT INTO LogOns (unit, dayDate, dayNumber, createdBy, createdAt, updatedBy, updatedAt) '
-                        'VALUES (%s, %s, %s, %s, %s, %s, %s)', (unit, day, number, str(user), _s(now), str(user), _s(now)))
+            # watchStatus is written, never left to the column default: a host that applied an earlier
+            # version of this schema still carries that version's default, and an ALTER that adds
+            # columns does not change one. A row must not depend on what the database happens to think.
+            cur.execute('INSERT INTO LogOns (unit, watchStatus, dayDate, dayNumber, createdBy, createdAt, updatedBy, updatedAt) '
+                        "VALUES (%s, 'draft', %s, %s, %s, %s, %s, %s)", (unit, day, number, str(user), _s(now), str(user), _s(now)))
         except Exception as e:                       # only a clash on that index is retried; anything else is a real fault
             if 'uniq' not in str(e).lower() and 'unique' not in str(e).lower() and 'duplicate' not in str(e).lower():
                 raise
