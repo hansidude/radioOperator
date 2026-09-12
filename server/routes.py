@@ -13,6 +13,7 @@ from flask import Blueprint, abort, current_app, jsonify, redirect, render_templ
 
 from . import identity as ID
 from . import logons as L
+from . import watch as W
 from .db import cursor
 
 HERE = Path(__file__).resolve().parent
@@ -66,6 +67,19 @@ def _drafts(cur, h):
     return L.drafts(cur, h.unit(), _now(), h.approaching_minutes)
 
 
+def _alerts(cur, h):
+    """What the checker has raised, and whether the checker is alive. Both are shown, because an
+    empty alert list from a dead checker looks exactly like an empty one from a quiet night."""
+    now = _now()
+    alerts = W.open_alerts(cur, h.unit())
+    for a in alerts:
+        row = L.get(cur, a['logOnId'])
+        a['reference'] = L.reference(row) if row else '#%d' % a['logOnId']
+        a['vessel'] = (row or {}).get('registration') or (row or {}).get('vesselName') or ''
+        a['overdueMinutes'] = int((now - a['dueAt']).total_seconds() // 60)
+    return alerts, W.health(cur, now, h.watch_stale_seconds)
+
+
 # ---------- pages ----------
 
 @bp.route('/logons')
@@ -74,9 +88,10 @@ def logons_page():
     rows = _queue(cur, h)
     unaccepted = _drafts(cur, h)
     closed = L.recent_closed(cur, h.unit())
+    alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('logons.html', queue=rows, drafts=unaccepted, closed=closed, window=h.approaching_minutes,
-                 reference=L.reference)
+    return _page('logons.html', queue=rows, drafts=unaccepted, closed=closed, alerts=alerts, health=health,
+                 window=h.approaching_minutes, reference=L.reference)
 
 
 @bp.route('/logons/rows')
@@ -88,9 +103,10 @@ def logons_rows():
         return redirect('/logons')
     rows = _queue(cur, h)
     unaccepted = _drafts(cur, h)
+    alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('_queue.html', queue=rows, drafts=unaccepted, current=request.args.get('current', type=int),
-                 window=h.approaching_minutes, reference=L.reference)
+    return _page('_queue.html', queue=rows, drafts=unaccepted, alerts=alerts, health=health,
+                 current=request.args.get('current', type=int), window=h.approaching_minutes, reference=L.reference)
 
 
 @bp.route('/logons/new', methods=['POST'])
@@ -112,10 +128,12 @@ def logon_page(logon_id):
     idents = L.identifiers(cur, logon_id)
     verified = ID.verify(cur, row, idents)
     unaccepted = _drafts(cur, h)
+    alerts, health = _alerts(cur, h)
     clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] == 'draft' else None
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
-    return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, identifiers=idents, gaps=L.gaps(row),
+    return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,
+                 identifiers=idents, gaps=L.gaps(row),
                  condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
                  day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
@@ -235,6 +253,33 @@ def logon_apply(logon_id):
     return jsonify(out)
 
 
+@bp.route('/logon/<int:logon_id>/alert/<int:alert_id>/ack', methods=['POST'])
+def alert_ack(logon_id, alert_id):
+    """Record that someone has seen it. It satisfies nothing and closes nothing (§2)."""
+    h, (conn, cur) = _open()
+    _logon(cur, logon_id, h, lock=True)
+    W.acknowledge(cur, alert_id, h.user(), _now())
+    conn.commit()
+    cur.close()
+    return redirect(request.form.get('back') or '/logons')
+
+
+@bp.route('/api/logons/alerts')
+def api_alerts():
+    """What is due and whether anything is watching. Served so a page can poll, but the alerts
+    exist whether or not anyone does (ACC-5, WAT-3)."""
+    h, (conn, cur) = _open()
+    alerts, health = _alerts(cur, h)
+    cur.close()
+    for a in alerts:
+        for k in ('dueAt', 'raisedAt', 'notifiedAt', 'acknowledgedAt'):
+            if a.get(k):
+                a[k] = a[k].isoformat()
+    if health.get('lastRunAt'):
+        health['lastRunAt'] = health['lastRunAt'].isoformat()
+    return jsonify({'alerts': alerts, 'health': health, 'now': _now().isoformat()})
+
+
 @bp.route('/api/logons/queue')
 def api_queue():
     h, (conn, cur) = _open()
@@ -257,8 +302,13 @@ def _to_login(_):
     return redirect(host().login_url)
 
 
-def mount(app, host):
-    """Give a Flask app the log on pages and API."""
+def mount(app, host, watch_every=30):
+    """Give a Flask app the log on pages and API, and start the thing that watches deadlines.
+
+    `watch_every=0` leaves the checker off, which means nothing is watched unless a browser is
+    open. That is a choice a host has to make deliberately, not a default."""
     app.config['RADIO_HOST'] = host
     app.register_blueprint(bp)
+    if watch_every:
+        W.start(app, host, watch_every)
     return bp

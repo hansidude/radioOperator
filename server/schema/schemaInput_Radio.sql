@@ -99,3 +99,38 @@ CREATE TABLE IF NOT EXISTS `Identifiers` (
   FOREIGN KEY (`logOnId`) REFERENCES `LogOns`(`id`)
 );
 CREATE INDEX IF NOT EXISTS `idx_identifiers_logon` ON `Identifiers`(`logOnId`, `isActive`);
+
+-- What the unit has been told, and when. An alert is a durable fact rather than a colour on a page:
+-- it is raised by the checker whether or not anyone has a browser open (ACC-5, WAT-3), it survives a
+-- restart, and acknowledging it records attention only. It is resolved when the thing that caused it
+-- is resolved, never by looking at it.
+CREATE TABLE IF NOT EXISTS `Alerts` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `unit` VARCHAR(64) NOT NULL DEFAULT '',
+  `logOnId` INT NOT NULL,
+  `kind` VARCHAR(24) NOT NULL,                                -- draftfollowup (internal) | overdue (the vessel)
+  `dueAt` DATETIME NOT NULL,                                  -- the moment it became due
+  `raisedAt` DATETIME NOT NULL,                               -- the moment the checker noticed
+  `notifiedAt` DATETIME DEFAULT NULL,                         -- last time it was put in front of someone
+  `notifyCount` INT NOT NULL DEFAULT 0,
+  `acknowledgedAt` DATETIME DEFAULT NULL,                     -- attention, not resolution
+  `acknowledgedBy` VARCHAR(255) DEFAULT NULL,
+  `resolvedAt` DATETIME DEFAULT NULL,
+  `resolvedReason` VARCHAR(64) DEFAULT NULL,                  -- accepted | discarded | loggedoff | withdrawn
+  `isActive` BOOL DEFAULT 1,
+  FOREIGN KEY (`logOnId`) REFERENCES `LogOns`(`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_alerts_open` ON `Alerts`(`unit`, `resolvedAt`, `kind`);
+
+-- Whether anything is actually watching. One row, holding the lease that keeps several web workers
+-- from each running the checker, and the last time a pass completed. A monitor that has died and a
+-- monitor with nothing to report look identical unless this is shown (WAT-3).
+CREATE TABLE IF NOT EXISTS `WatchHealth` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(32) NOT NULL DEFAULT 'checker',
+  `holder` VARCHAR(64) DEFAULT NULL,
+  `leaseUntil` DATETIME DEFAULT NULL,
+  `lastRunAt` DATETIME DEFAULT NULL,
+  `lastError` VARCHAR(255) DEFAULT NULL,
+  `runs` INT NOT NULL DEFAULT 0
+);

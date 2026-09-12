@@ -28,7 +28,7 @@ def test_app(path):
             return session.get('user')
         def unit(self):
             return session.get('unit', '')
-    mount(app, TestHost())
+    mount(app, TestHost(), watch_every=0)      # the checker has its own tests; a timer here is noise
 
     @app.teardown_appcontext
     def close(_):

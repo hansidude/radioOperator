@@ -15,7 +15,7 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-<div id="queuePane" class="mt-2">{{ ui.draft_list(drafts, now, reference) }}{{ ui.queue(queue, now) }}</div>
+<div id="queuePane" class="mt-2">{{ ui.alert_list(alerts, health) }}{{ ui.draft_list(drafts, now, reference) }}{{ ui.queue(queue, now) }}</div>
 {% if closed %}
 <details class="mt-3"><summary class="small text-secondary">Recently closed ({{ closed|length }})</summary>
 <table class="table table-sm ro-queue mt-1"><thead><tr><th>No.</th><th>Closed</th><th>How</th><th>Vessel</th><th>Return was</th><th>Going to</th><th>Reason / evidence</th><th></th></tr></thead><tbody>
