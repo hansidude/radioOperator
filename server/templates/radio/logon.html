@@ -1,7 +1,7 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% set open = logon.watchStatus in ('pending', 'watching') %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>T-{{ logon.id }}{% endblock %}
+{% block page_title %}<i class="bi bi-broadcast me-1"></i>Log on #{{ logon.id }}{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
@@ -35,7 +35,7 @@
   </section>
   <form id="capture" class="ro-form mt-2" autocomplete="off" onsubmit="return false">
     {# The paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. Shaded = the paper's mandatory columns. #}
-    <fieldset class="paper"><legend>Radio log · T-{{ logon.id }}</legend>
+    <fieldset class="paper"><legend>Radio log · record #{{ logon.id }}</legend>
       <div class="row g-2">
         {{ field('callDay', 'col-6 col-md-2') }}{{ field('callTime', 'col-6 col-md-2') }}
         <div class="col-12 col-md-8 mandatory"><label>Member No. OR Vessel Name</label><div class="row g-1">
@@ -55,20 +55,21 @@
         </div></div>
       </div>
       <div class="row g-2 mt-0 align-items-end">
-        <div class="col-12 col-md-6"><label>Time Arrived or Return</label>
-          {% if open %}<form method="post" action="/logon/{{ logon.id }}/logoff" class="d-flex gap-1" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"><input name="note" class="form-control" placeholder="Log off: contact / evidence" maxlength="255"><button class="btn btn-success btn-sm text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off now</button></form>
+        <div class="col-12 col-md-8"><label for="logoffNote">Time Arrived or Return</label>
+          {% if open %}<div class="d-flex gap-1"><input id="logoffNote" name="note" form="logoffForm" class="form-control" placeholder="Log off: contact / evidence" maxlength="255"><button form="logoffForm" class="btn btn-success btn-sm text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off now</button></div>
           {% else %}<div class="ro-ro">{{ logon.loggedOffAt.strftime('%a %d %b %H:%M') if logon.loggedOffAt else '' }}{% if logon.loggedOffNote %} · {{ logon.loggedOffNote }}{% endif %}</div>{% endif %}</div>
-        <div class="col-4 col-md-2"><label>Trip ID No.</label><div class="ro-ro">T-{{ logon.id }}</div></div>
-        <div class="col-4 col-md-2"><label>Entered</label><div class="ro-ro" title="Entry time and operator (REC-2)">{{ logon.createdAt.strftime('%H:%M') }} · {{ logon.createdBy }}</div></div>
-        <div class="col-4 col-md-2"><label>Logged off · Initial</label><div class="ro-ro">{% if logon.loggedOffAt %}{{ logon.loggedOffAt.strftime('%H:%M') }} · {{ logon.updatedBy }}{% endif %}</div></div>
       </div>
     </fieldset>
     {# Not on the paper log: visibly additional (DAT-6). #}
     {% for title, names in extra %}
     <fieldset><legend>{{ title }} <span class="fw-normal">· not on the paper log</span></legend><div class="row g-2">{% for n in names %}{{ field(n, 'col-12 col-md-6' if n == 'notes' else 'col-6 col-md-3') }}{% endfor %}</div></fieldset>
     {% endfor %}
-    <div class="ro-basis mb-2">Version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}</div>
   </form>
+  {% if open %}<form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"></form>{% endif %}
+  <div class="ro-sys mb-2">
+    <strong>This system</strong> · record #{{ logon.id }} · entered {{ logon.createdAt.strftime('%a %d %b %H:%M') }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}{% if logon.loggedOffAt %} · logged off {{ logon.loggedOffAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}
+    <div>Paper columns 13 to 15 — Trip ID No., Entered in Noggin, Logged off in Noggin — record transcription into Noggin and are marked on the paper. This system is not Noggin and cannot know them.</div>
+  </div>
   {% if open %}
   <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
     {% if logon.watchStatus == 'pending' %}<form method="post" action="/logon/{{ logon.id }}/accept"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-outline-info btn-sm"><i class="bi bi-eye me-1"></i>Accept watch</button></form>{% endif %}

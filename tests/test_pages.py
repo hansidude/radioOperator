@@ -92,6 +92,17 @@ class Pages(unittest.TestCase):
         self.assertIn('15:00', listing)
         self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
 
+    def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
+        """A form inside a form is dropped by the browser, which left the Log off button owned by
+        the capture form and its submit handler returning false: the button did nothing at all."""
+        i = self.new()
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        capture = page[page.index('<form id="capture"'):]
+        capture = capture[:capture.index('</form>')]
+        self.assertNotIn('<form', capture)                       # nothing nested inside it
+        self.assertIn('form="logoffForm"', page)                 # the button is bound to its own form
+        self.assertIn('action="/logon/%d/logoff"' % i, page)
+
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)
