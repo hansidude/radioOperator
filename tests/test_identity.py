@@ -141,6 +141,7 @@ class Identity(unittest.TestCase):
         self.trip(registration='AB123Q', memberNumber='4471', mobile='0412 345 678', destination='Facing Island')
         self.at_sea(registration='CD456R', memberNumber='4471')
         by_rego = ID.search(self.cur, '', 'ab123')
+        self.assertTrue(any(h['kind'] == 'trip' and h['label'].startswith('log on ') for h in by_rego))
         self.assertEqual(by_rego[0]['kind'], 'vessel')
         for query in ('4471', '0412345678', '0412 345', 'facing'):
             self.assertTrue(ID.search(self.cur, '', query), query)               # any identifier, same box (SRCH-2)

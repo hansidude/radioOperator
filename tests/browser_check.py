@@ -66,7 +66,9 @@ def main():
         stored = {f: page.input_value('#f-' + f) for f, _ in FIELDS}
         check('every value survived the reload', all(stored[f] for f, _ in FIELDS),
               [f for f, _ in FIELDS if not stored[f]])
-        check('the queue shows this record', page.locator('tr[data-id="%s"]' % record).count() == 1)
+        check('the drafts list shows this record, not the queue',
+              page.locator('tr[data-draft="%s"]' % record).count() == 1
+              and page.locator('tr[data-id="%s"]' % record).count() == 0)
 
         # section 7 through the real page: a host may own the bare /api/search, so this must not 404
         page.fill('#findBox', 'BROWSER')
