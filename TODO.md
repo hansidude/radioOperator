@@ -103,6 +103,9 @@ decorative container.
 
 ## Explicit draft saving
 
+Status: **built and verified**, except the two items marked below. Nothing is written until the
+operator saves, and a save that fails the minimum writes nothing.
+
 - Opening New Log On must show an unsaved form. It must not insert a draft row or a
   history event.
 - Never autosave on input, change, tab navigation, or navigation between fields.
@@ -113,11 +116,12 @@ decorative container.
 - One Save action must batch all changed fields into one insert/update and create at
   most one corresponding LogOns history event.
 - A failed validation must create or update nothing.
-- Warn before leaving a form with unsaved changes.
+- Warn before leaving a form with unsaved changes. **(not verified -- no browser check yet)**
 - After its first successful save, the draft receives its daily sequence number and
   appears in the unified list.
 - Later saves must use optimistic version checking once per batch. A stale version
-  must fail visibly; do not silently overwrite or fall back.
+  must fail visibly; do not silently overwrite or fall back. **(unit-tested: a stale version
+  returns 409; not exercised through the browser)**
 - Accept/Log on remains a separate deliberate action. It cannot silently save and
   accept incomplete or unsaved changes.
 
@@ -150,27 +154,10 @@ emits `CREATE UNIQUE INDEX` as a plain `CREATE INDEX` and the constraint may not
 Open: `tripRef` is issued state-wide in the real system and this branch allocates its own, so two
 branches will eventually collide. Needs a branch prefix or a range split. `VARCHAR(16)` leaves room.
 
-## Current working-tree handoff
+## What is built (was: working-tree handoff)
 
-The following files contain uncommitted work from the interrupted explicit-save task:
-
-- `server/logons.py`
-- `server/routes.py`
-- `server/templates/radio/_ui.html`
-- `server/templates/radio/logon.html`
-- `server/templates/radio/logons.html`
-- `tests/test_pages.py`
-- `tests/test_standalone.py`
-
-That work currently includes:
-
-- an unsaved New Log On response;
-- an explicit batch-save route;
-- draft minimum-field validation;
-- one insert/update per save;
-- a preliminary draft date filter;
-- a preliminary number column; and
-- updated unit tests.
+The explicit-save work is no longer uncommitted. Everything below is on `main` at `79b6121`
+(quackit's submodule pointer `044e25a`), working tree clean, pushed.
 
 That review is done. Resolved:
 
@@ -189,7 +176,7 @@ The New Log On page (`logon.html`) still sits inside the 120ch cap -- the same o
 override would widen it, but its layout has not been reviewed at full width.
 
 Browser checks done at 1920/900/390px: no horizontal page scroll at any width; rows are 35px in
-table mode and 236px labelled cards under 576px; empty cells drop out of the card (a sparse record
+table mode and 245px labelled cards under 576px; empty cells drop out of the card (a sparse record
 shows 9 of 14). Between 576px and ~900px the table scrolls inside its own box, which is the
 existing `.ro-paper-log{overflow-x:auto}` behaviour, not the page scrolling.
 
@@ -207,28 +194,40 @@ after the specification is corrected.
 
 ## Acceptance checks before commit/deploy
 
-- Opening New Log On creates no database or history row.
-- Call date defaults to today; call time remains blank.
-- Saving without date/time is rejected and writes nothing.
-- Saving with date/time plus member number succeeds.
-- Saving with date/time plus vessel registration succeeds.
-- Saving with date/time plus mobile phone succeeds.
-- Vessel name without one of those three identifiers is rejected.
-- One Save creates exactly one database change and one expected history event in the
-  personal MariaDB/Quackit runtime.
-- Multiple records on one date receive stable chronological numbers; oldest is 1.
-- The default view is Drafts for today, sorted newest first, with number 1 at bottom.
-- Every status uses the same record renderer and filter controls.
-- Desktop checks include a wide `1920px` layout and an intermediate viewport.
-- Mobile checks include approximately `390px` width and prove the aligned rows change
-  to readable cards without overlap or horizontal scrolling.
-- Empty states use the exact selected status count wording.
-- Filter, date, search, and sort state survive refresh.
-- Run `python3 -m unittest discover -s tests` in the supported Python 3.9 container.
-- Run the browser/runtime checks against the personal Quackit Docker stack.
-- Only after those checks pass: commit and push both affected repositories, run
-  `/home/hansi/personalDb/myUpdate`, and verify the updated personal site.
+Checked on the **port 80** stack (same MariaDB image, same generated history triggers as personal):
 
-Last known automated result before this TODO: 76 unit tests passed in the Python 3.9
-Docker test image. The current work has not been browser-verified, committed, pushed,
-or deployed.
+- [x] Opening New Log On creates no database or history row.
+- [x] Call date defaults to today; call time remains blank.
+- [x] Saving without date/time is rejected and writes nothing.
+- [x] Saving with date/time plus member number succeeds.
+- [x] Saving with date/time plus vessel registration succeeds.
+- [x] Saving with date/time plus mobile phone succeeds.
+- [x] Vessel name without one of those three identifiers is rejected.
+- [x] One Save creates exactly one database change and one history event -- measured on the live
+      stack: `LogOns_history` 6 -> 7 and `LogOns` 6 -> 7 for one save.
+- [x] Multiple records on one date receive stable chronological numbers; oldest is 1. Observed
+      across a date rollover: 12/9 numbered 1,2,3 and 13/9 restarted at 1,2,3 while `tripRef` ran
+      on T-00001..T-00006.
+- [x] The default view is Drafts for today, sorted newest first, with number 1 at bottom.
+- [x] Every status uses the same record renderer and filter controls.
+- [x] Desktop checks include a wide `1920px` layout and an intermediate viewport (2560/1920/1548/900).
+- [x] Mobile checks at 390px: labelled cards, no overlap, no horizontal page scroll; empty cells
+      drop out (a sparse record shows 9 of 14).
+- [x] Empty states use the exact selected status count wording (`0 drafts`, `0 logged on`,
+      `0 overdue`, `0 closed`, `0 records`).
+- [x] Filter, date, search, and sort state survive refresh -- driven through the UI, then reloaded:
+      all four controls and the result count identical.
+- [x] `python3 -m unittest discover -s tests` in the Python 3.9 container: **78 pass**.
+- [x] Commit and push both repositories.
+
+Still to do:
+
+- [ ] Run the browser/runtime checks against the **personal** Quackit Docker stack.
+- [ ] Run `/home/hansi/personalDb/myUpdate`, apply Admin -> Database -> Generate -> Execute for
+      `LogOns.tripRef` and its index, then verify the updated personal site.
+- [ ] Delete the existing personal records (irreversible; backup at
+      `~/personalDb/backup_2026_09_12-132334.zip` and the website's own DB backup).
+- [ ] Warn-before-leaving and the stale-version 409, exercised through a browser rather than
+      only in unit tests.
+- [ ] Resolve the CAP-19 specification conflict above.
+- [ ] The New Log On page: field order (see **Main entry tab field order**) and the 120ch width cap.
