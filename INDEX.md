@@ -1,11 +1,11 @@
-# Vessel Log On — Functional Specification, v0.9
+# Vessel Log On — Functional Specification, v1.0
 
 ## Table of contents
 
 - [Files](#files)
 - [Figures](#figures)
 - [Reading order](#reading-order)
-- [Revision 0.9](#revision-09)
+- [Revision 1.0](#revision-10)
 - [Updating the documents](#updating-the-documents)
 
 ## Files
@@ -38,12 +38,17 @@ practice**.
 4. §10 — acceptance criteria.
 5. Appendix A with the figures alongside, for why the requirements are as they are.
 
-## Revision 0.9
+## Revision 1.0
 
-Separates A.1's twelve trip columns from its three transcription columns. A system performing
-this function carries the trip columns and must not reproduce Trip ID No., Entered in Noggin or
-Logged off in Noggin, which record transcription into a different system and which it cannot
-honestly answer about itself (DAT-6, AC-49).
+Reverses the central decision of revision 0.5: **nothing is watched until the log on is
+accepted**. New §5.3 defines the mandatory set that gates acceptance, taken from the existing
+platform's observed requirements (new A.10) read against the paper row, and requires two of the
+four identity values rather than all four. Acceptance is one explicit action and is what the
+unit tells the vessel. States collapse to draft, watching, logged off; a draft can be discarded,
+an accepted log on can only be logged off; one vessel has one open log on. The cost of gating
+the watch is stated in §1.2: an unfinished call nobody is counting down, whose only mitigation
+is the draft follow-up in ACC-5 and WAT-9. New §3.5 sets out the ideal call and the twenty
+situations that are not ideal. New REC-9 numbers records from one each day.
 
 ## Updating the documents
 

@@ -1,6 +1,6 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.9 (draft)<br>
+**Version:** 1.0 (draft)<br>
 **Revised:** 12 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
@@ -19,12 +19,14 @@
 - [3. Domain model](#section-3-domain-model)
     - [3.1 Entities](#section-31-entities)
     - [3.2 Relationships](#section-32-relationships)
-    - [3.3 Capture, watch and escalation are separate](#section-33-capture-watch-and-escalation-are-separate)
+    - [3.3 Draft, log on, logged off](#section-33-draft-log-on-logged-off)
     - [3.4 Log on variants and obligations](#section-34-log-on-variants-and-obligations)
+    - [3.5 The process, ideal and otherwise](#section-35-the-process-ideal-and-otherwise)
 - [4. Operating context](#section-4-operating-context)
 - [5. Requirements — Capture (P1)](#section-5-requirements-capture-p1)
     - [5.1 Capture performance](#section-51-capture-performance)
     - [5.2 Persistence, interruption and concurrent work](#section-52-persistence-interruption-and-concurrent-work)
+    - [5.3 Acceptance — the gate between a draft and a watch](#section-53-acceptance-the-gate-between-a-draft-and-a-watch)
 - [6. Requirements — Data (P1)](#section-6-requirements-data-p1)
     - [6.1 Field priority classes](#section-61-field-priority-classes)
 - [7. Requirements — Identification, verification and search (P1)](#section-7-requirements-identification-verification-and-search-p1)
@@ -45,6 +47,7 @@
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
 - [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 1.0 — changes from 0.9](#section-version-10-changes-from-09)
     - [Version 0.9 — changes from 0.8](#section-version-09-changes-from-08)
     - [Version 0.8 — changes from 0.7](#section-version-08-changes-from-07)
     - [Version 0.7 — changes from 0.6](#section-version-07-changes-from-06)
@@ -92,6 +95,16 @@ uncertain information, detect missed obligations, and retain an accountable watc
 Conflicting requirements shall be resolved explicitly during review, with the decision
 recorded against PSO. Implementers shall not silently waive a requirement by invoking PSO.
 
+One such conflict is resolved in this version and is stated here because it is the most
+consequential decision in the document. **Nothing is watched until the log on is accepted**
+(§5.3). A vessel that gave a return time into a call that was never finished is therefore not
+being counted down. That is the unit's decision, and it is deliberate: a watch the unit cannot
+act on is not a watch, and acceptance is the moment the unit tells the vessel it is logged on.
+The cost is a new failure mode — an unfinished draft, forgotten, while the vessel believes it is
+under watch. PSO is served against that not by monitoring an incomplete record but by making an
+unaccepted draft impossible to ignore (ACC-5, WAT-9). If that chase is weak, this decision is
+unsafe, and the deployment has not met this specification.
+
 <a id="section-13-scope"></a>
 
 ### 1.3 Scope
@@ -136,7 +149,7 @@ justification. **May** — optional.
 
 | Term | Definition |
 |---|---|
-| **Log on** | A record that a vessel has departed under the unit's watch, with a stated intention to return by a stated time. |
+| **Log on** | An accepted record that a vessel has departed under the unit's watch, with a stated intention to return by a stated time. Until it is accepted there is a draft, not a log on. |
 | **Log off** | The act of closing a log on because the vessel has returned or otherwise ended its trip. |
 | **Operator** | A person, usually a volunteer, receiving log ons at a unit. |
 | **Unit** | A marine rescue base holding the watch for a geographic area. |
@@ -145,18 +158,22 @@ justification. **May** — optional.
 | **Identifier** | A captured identifying value, whether or not it resolves: member number, vessel registration, mobile number, vessel name, person name. |
 | **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
 | **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
-| **Draft** | Capture is incomplete. This does not disable watch monitoring. |
-| **Active** | An open record: watch status Pending acceptance or Watching, whatever its capture status or deadline condition. |
-| **Open watch queue** | The owning unit's list of every open record, Draft or Complete, with its deadline condition, escalation status and verification outcome. Also called the active list. |
+| **Draft** | A saved but unaccepted record: the mandatory set (ACC-1) is not yet complete. A draft preserves what was heard and nothing more. It is not a log on, it is not watched, and no time in it is monitored. The vessel has not been told it is logged on. |
+| **Accepted** | The mandatory set is complete and an operator has taken the watch. Acceptance is one explicit action, recorded against that operator and time, and is what the unit tells the vessel. |
+| **Mandatory set** | The values a log on cannot be accepted without (ACC-1). Absent, capture continues as a draft; nothing is refused or discarded. |
+| **Watched** | The unit is counting down to an accepted log on's deadlines and will raise them as approaching and then overdue. Only accepted log ons are watched. |
+| **Discard** | Throw away a draft that was never a log on: a record begun in error, or one the caller abandoned before anything identifying was given (ACC-7). An accepted log on can never be discarded; it is logged off. |
+| **Active** | An accepted log on that is being watched: the vessel is out and the unit holds it. |
+| **Open watch queue** | The owning unit's list of every accepted log on being watched, with its deadline condition, escalation status and verification outcome. Also called the active list. Unaccepted drafts appear alongside it, plainly marked as not watched, and are never mixed into it (WAT-1). |
 | **Approaching** | A usable deadline is within the approved approaching window and current time is strictly earlier than its due time (WAT-2). |
 | **Overdue** | Current time is at or after the due time of an unsatisfied effective obligation. Internal follow-up misses are labeled separately from vessel-return/report misses. |
-| **Escalated** | An open escalation exists. This is independent of capture completeness and deadline amendment. |
+| **Escalated** | An open escalation exists against an accepted log on. Independent of deadline amendment. |
 | **ETA / ETR** | A supplied expected return (or report) day-or-date and time, represented by a timed obligation. The paper radio log heads this column "ETA/ETR" (estimated time of arrival / return). |
 | **Obligation** | An expected return, position report, crossing completion, or operator follow-up, with its own status and deadline. |
 | **Watch owner** | The unit accountable for the open record, including unresolved capture and pending transfer. |
 | **Acknowledgment** | An operator records seeing an alert or accepting a transfer; neither action implies the vessel has returned. |
 | **POB** | Persons on board. |
-| **Enrichment** | Addition of detail to an existing log on after its initial creation. |
+| **Enrichment** | Addition of detail to an existing draft or log on after its initial creation. |
 | **Airtime** | Occupancy of a shared radio channel. A finite, contended resource. |
 
 ---
@@ -199,56 +216,64 @@ Automated events record a system actor and responsible unit, rather than inventi
 - Stored profile changes do not rewrite historical trip evidence. A log on retains the
   values, source and verification basis used at the time, alongside links to current profiles.
 
-<a id="section-33-capture-watch-and-escalation-are-separate"></a>
+<a id="section-33-draft-log-on-logged-off"></a>
 
-### 3.3 Capture, watch and escalation are separate
+### 3.3 Draft, log on, logged off
 
-**Capture status:** Draft or Complete. An operator may mark capture complete with missing
-or inconsistent information (CAP-12); the gaps remain visible. Complete is not a claim
-that the vessel is identified, the record is correct, or the watch is established.
+There are three states a record can be in, and one gate between the first two.
 
-**Watch status:** Pending acceptance, Watching, Logged off, or Cancelled. Every new
-record is immediately owned by the capturing unit and appears in its open watch queue,
-including an empty Draft. When shared creation is unavailable, CAP-19–20 require an
-explicit local-only/unsaved state and the approved operational fallback; a local capture
-is not falsely presented as present in the shared queue. Unit ownership begins at creation and
-never depends on acceptance. Pending acceptance means that no operator at the owning unit has
-yet explicitly taken responsibility for resolving the record; it does not claim that a completed
-log on was acknowledged to the vessel. Acceptance is an explicit operator action, records the
-accepting operator and time, and may occur before capture is complete. Who may accept, and how
-long a record may remain pending before follow-up, are unit policy (Appendix D question 8).
+**Draft.** Saved, owned by the capturing unit, and not watched. A draft exists from the first
+keystroke and holds any subset of what was heard, including nothing (CAP-1, CAP-2). It is not a
+log on. No time in it is monitored, no deadline in it can become overdue, and the interface
+shall never imply otherwise. A draft is either finished and accepted, or discarded because it
+was never a log on (ACC-7). It is never left alone: an unaccepted draft is chased under ACC-5,
+because the caller may be at sea believing the opposite.
 
-**Deadline condition:** No usable vessel deadline, Not yet due, Approaching, or Overdue.
-Conditions derive from open obligations, independently of Draft/Complete and pending
-acceptance. Approaching applies within the approved approaching window (WAT-2). A usable
-deadline on any open record is monitored immediately. Entering a
-past deadline raises the overdue condition immediately; missing POB or identity does not
-inhibit it. Missing or uninterpretable times create a conspicuous unresolved condition
-and operator follow-up, not a fabricated vessel ETA (WAT-9). Unresolved replacement input
-does not silently remove an existing effective deadline (WAT-10). At the due instant the
-condition is Overdue, not Approaching; alert delivery remains subject to WAT-3 latency.
+**Watching.** The mandatory set is complete and an operator has accepted the log on (ACC-1,
+ACC-3). This is the moment the unit takes the watch and the moment the vessel is told it is
+logged on. Deadlines are evaluated from this instant, so a return time already in the past is
+overdue immediately (ACC-4). One vessel has one open log on; a vessel already being watched
+cannot be accepted again (ACC-6).
 
-**Escalation status:** None, Open, or Closed. An open escalation remains open after an
-ETA change until an authorized operator records its disposition. Alert acknowledgment,
-record completion, and transfer do not close it.
+**Logged off.** The watch has ended, by explicit operator action with the time and the evidence
+(WAT-7). Every reason ends this way, whether the vessel returned, never departed, or the trip
+ended some other way: a log on happened, so it is logged off. There is no separate cancellation
+of an accepted log on. The reason is recorded and distinguishes a real trip from one that never
+sailed, which matters because identity is built from past trips (§7).
+
+Ownership is not a state. The capturing unit owns the record from creation, draft included, and
+keeps it until log off or an acknowledged transfer. When shared creation is unavailable, CAP-19
+and CAP-20 require an explicit local-only state and the approved fallback; a local capture shall
+never be shown as present in the shared record.
+
+**Deadline condition**, for accepted log ons only: Not yet due, Approaching, or Overdue.
+Approaching applies within the approved window and strictly before the due instant; at the due
+instant the condition is Overdue (WAT-2). Alert delivery remains subject to WAT-3 latency. An
+accepted log on always has a usable return deadline, because one is in the mandatory set, so
+"no usable deadline" is a draft condition and not a watch condition. Unresolved replacement
+input does not silently remove an existing deadline (WAT-10).
+
+**Escalation status:** None, Open, or Closed. An open escalation remains open after an ETA
+change until an authorized operator records its disposition. Alert acknowledgment, further
+capture and transfer do not close it.
 
 | Action | Preconditions and result |
 |---|---|
-| Begin capture | Create Draft + Pending acceptance; assign the capturing unit; add to the shared open queue. |
-| Accept watch | Pending acceptance → Watching; record operator/time. Missing information remains visible. |
-| Complete/reopen capture | Change Draft/Complete only; monitoring and ownership do not change. |
-| Deadline passes | Any open record becomes Overdue for the affected obligation; alert under WAT-3. |
-| Amend obligation | Retain previous deadline and reason/source; recompute deadline condition. Existing escalation requires explicit disposition. |
-| Begin escalation | Record the approved procedure and actor. May occur before a deadline where that procedure authorizes it. |
-| Log off | Explicit operator action on an open record, with contact/evidence and time. Resolve each open obligation and escalation explicitly in the closing action; do not silently mark all as fulfilled. |
-| Cancel | Explicitly establish no trip/watch was required (for example no departure, accidental entry, or duplicate); record reason and any canonical record link. Overdue/escalated records require authorized disposition, not deletion. |
-| Request transfer | Keep source ownership and monitoring; record transfer pending. |
-| Accept transfer | Change owner to receiving unit through the acknowledged transfer protocol (WAT-8); preserve all open conditions. |
-| Correct mistaken closure | Authorized reopen with reason, restoring ownership and evaluating unsatisfied deadlines immediately; preserve the closure event. |
+| Begin capture | Create a Draft owned by the capturing unit. Not watched. Visible and chased under ACC-5. |
+| Enrich | Add or amend any value on a draft or an accepted log on, in any order, at any time (CAP-3, CAP-13). |
+| Accept the log on | Requires the mandatory set (ACC-1) and no other open log on for this vessel (ACC-6). Draft → Watching; record the accepting operator and time; evaluate deadlines immediately (ACC-4). |
+| Discard | A draft only, and only one that was never a log on: begun in error, or abandoned before anything identifying was given. Record actor, time and reason (ACC-7). |
+| Deadline passes | An accepted log on becomes Overdue for that obligation; alert under WAT-3. |
+| Amend obligation | Retain the previous deadline and its reason and source; recompute the condition. An existing escalation requires explicit disposition. |
+| Begin escalation | Record the approved procedure and actor. May precede a deadline where that procedure authorizes it. |
+| Log off | Explicit operator action on an accepted log on, with the time, the evidence and the reason. Resolve each open obligation and escalation explicitly; do not silently mark them fulfilled. |
+| Request transfer | Keep source ownership and monitoring; record the transfer pending. |
+| Accept transfer | Change owner to the receiving unit through the acknowledged protocol (WAT-8); preserve every open condition. |
+| Correct a mistaken closure | Authorized reopen with a reason, restoring ownership and evaluating unsatisfied deadlines immediately; preserve the closure event. |
 
-Closed records remain searchable and auditable. Corrections are appended with an explicit
-reason; they do not silently resume or cancel monitoring. There is no terminal
-“Transferred” trip state: transfer changes ownership, not whether the trip is open.
+Closed and discarded records remain searchable and auditable. Corrections are appended with an
+explicit reason; they never silently resume or stop monitoring. There is no terminal
+"Transferred" state: transfer changes ownership, not whether the trip is open.
 
 <a id="section-34-log-on-variants-and-obligations"></a>
 
@@ -264,6 +289,49 @@ Variants use the same trip model. Each missed obligation remains independently v
 fulfilling one does not fulfill another. Report schedules, tolerance and escalation policy
 must be confirmed by the unit before operational use (Appendix D). Internal operator
 follow-up deadlines are labeled as such and are never presented as caller-supplied ETAs.
+
+---
+
+<a id="section-35-the-process-ideal-and-otherwise"></a>
+
+### 3.5 The process, ideal and otherwise
+
+The ideal call is short and this specification barely matters to it. Everything hard in the
+document is about the calls that are not ideal, and there are more of those than of the other
+kind. This section names them, so that no requirement below looks arbitrary.
+
+**The ideal call.** The vessel calls. The operator takes identity, persons on board, departure
+point, where they are going, and when they will be back. The mandatory set is complete, so the
+operator accepts the log on and tells the vessel so: *"Vessel Sea Dog, you are logged on, back
+by fifteen hundred."* The unit is now counting down. The vessel returns and calls. The operator
+logs it off. Nothing in the ideal call needs a draft, a warning or a follow-up.
+
+**Everything else.** In rough order of how often it is reported:
+
+| What happens | What the system must do |
+|---|---|
+| The caller rings off before giving everything, or the channel is lost | Keep what was heard as a draft. Do not claim a watch. Chase it (ACC-5): the caller may believe they are logged on. |
+| A priority call interrupts capture | Suspend and resume without loss; several drafts open at once (CAP-6). |
+| Identity arrives late, on this call or a later one | Accept nothing until it does; when it arrives, accept and evaluate the deadline at once, so a return time already past is overdue immediately (ACC-4, OC-6). |
+| The caller gives one identifier only | Not acceptable; the second is the unit's accuracy check (ACC-1, A.8). |
+| Two identifiers disagree | Show the conflict, do not resolve it silently, and let the operator clarify (IDV-2, IDV-3). |
+| A registration is misheard | Offer the near match with the substituted character named, never as a match (IDV-6). |
+| The return time is ambiguous, unreadable, or a day without a time | No deadline, so not acceptable. Keep the words, say why, and ask (CAP-23, REC-6). |
+| The vessel is already logged on | Refuse a second log on and take the operator to the one that is open (ACC-6). |
+| The previous trip was never logged off, and the vessel calls again | The same refusal, which is how the stale record gets found and closed. |
+| The operator begins a record by accident | Discard it; nothing was logged on (ACC-7). |
+| The trip is abandoned before departure | If it was accepted, log it off with that reason. If it was still a draft, discard it. |
+| The shift ends with drafts open | Handover presents and acknowledges every draft as well as every watch, because a draft monitors nothing and only a person carries it (WAT-6). |
+| The vessel does not return | Overdue, alert, and the approved escalation procedure (WAT-3, WAT-4). |
+| The vessel returns and does not call | Identical to the above from the unit's side, which is why escalation begins with contact rather than with search. |
+| The vessel reports in on a long trip | A report satisfies that obligation and not the return (§3.4). |
+| Nobody has a browser open | Deadline evaluation continues regardless (WAT-3). This is the requirement most easily left unbuilt and least survivable. |
+| The save fails, or the connection drops | Say so plainly, never claim a shared record that does not exist, and recover what was typed (CAP-19, CAP-20). |
+| Two operators work the same record | Preserve both, resolve conflicts explicitly, never silently overwrite (CAP-22). |
+| A closure was wrong | Reopen with a reason, keep the closure, re-evaluate the deadline (§3.3). |
+
+The pattern across all of them is the same. Keep what was heard, state what is missing, never
+invent, and never let the interface imply a watch the unit does not hold.
 
 ---
 
@@ -353,8 +421,8 @@ protect the field.*
 **shall** permit an operator to suspend and resume capture of any Draft without loss.
 *Rationale: a priority radio call may interrupt capture at any point.*
 
-**CAP-7.** The shared open watch queue, including pending acceptance, unresolved drafts,
-and overdue log ons, **shall** remain visible during capture of a new log on.
+**CAP-7.** The open watch queue, and the count of unaccepted drafts beside it, **shall** remain
+visible during capture of a new log on (WAT-1).
 *Rationale: situational awareness is the operator's primary function; capture must not
 suspend it.*
 
@@ -374,9 +442,12 @@ approved operating procedures (OC-3).*
 greatest prominence to fields serving PSO and least to vessel description.
 *Rationale: OC-4. Undifferentiated prompting spends airtime on low-value fields.*
 
-**CAP-12.** Prompting under CAP-10 and CAP-11 **shall** be advisory, and **shall not**
-prevent an operator from completing or closing a capture.
-*Rationale: the operator, not the system, judges what is worth a transmission.*
+**CAP-12.** Prompting under CAP-10 and CAP-11 **shall** be advisory. It **shall not** prevent
+anything from being captured, saved, retained or amended, and **shall not** be the mechanism by
+which acceptance is withheld. Acceptance is gated by the mandatory set alone (ACC-1), which is a
+stated rule rather than a prompt, and gates nothing else.
+*Rationale: the operator, not the system, judges what is worth a transmission. What the operator
+cannot judge away is the minimum the unit has agreed it needs before undertaking a watch.*
 
 **CAP-13.** The system **shall** permit any field of an existing log on in any open state
 to be populated or amended, with the same interaction cost as initial capture.
@@ -453,6 +524,71 @@ monitored deadline (WAT-10).
 
 ---
 
+<a id="section-53-acceptance-the-gate-between-a-draft-and-a-watch"></a>
+
+### 5.3 Acceptance — the gate between a draft and a watch
+
+**ACC-1.** A log on **shall not** be accepted until its mandatory set is complete. The mandatory
+set is: **at least two of** member number, vessel name, vessel registration and mobile number;
+**and** persons on board, departure point, where the vessel is going, and a usable return
+day and time. Two identifiers rather than all four, because agreement between two independently
+supplied values is the unit's accuracy check (A.8, IDV-1). A usable return time, because without
+one there is nothing to count down and therefore nothing to accept.
+*Rationale: this is the existing platform's mandatory set as observed (A.10) and the paper log's
+row (A.1), with the identity columns read the way the paper reads them: a couple of them, not all.*
+
+**ACC-2.** An unaccepted draft **shall not** be watched. No time in a draft shall be monitored,
+raised as approaching, or raised as overdue, and no part of the interface shall present a draft
+as being under watch. A draft **shall** be labeled as not a log on wherever it appears.
+*Rationale: a watch the unit cannot act on is not a watch, and a record that looks watched and
+is not is worse than one that plainly is not. The consequence is ACC-5, without which this
+requirement is unsafe (§1.2).*
+
+**ACC-3.** Acceptance **shall** be one explicit operator action, recording the accepting
+operator and the time. It **shall** be the point at which the unit undertakes the watch, and
+the operator's acknowledgment to the vessel corresponds to it. The system **shall not** accept
+a log on automatically on the mandatory set becoming complete.
+*Rationale: the vessel is told something by a person. That undertaking is not a side effect
+of a field being filled in.*
+
+**ACC-4.** On acceptance the system **shall** evaluate every deadline immediately. A return
+time already in the past **shall** be overdue at once, not at the next transition or refresh.
+*Rationale: OC-6. Identity arrives late, so acceptance often follows the stated return time
+by a long way, and on a late entry the trip may already be overdue before the watch begins.*
+
+**ACC-5.** Every unaccepted draft **shall** have accountable follow-up under the unit's
+approved policy: a named duty role, an interval, a reminder and an escalation if it remains
+unresolved, surviving operator interruption and shift end (WAT-6, WAT-9). The follow-up
+**shall** be labeled as internal and never presented as a vessel deadline. Drafts **shall**
+be counted and shown persistently, not only on the page where they were created.
+*Rationale: the caller may be at sea believing they are logged on. Nothing else in this
+specification is watching them. This requirement is what makes ACC-2 tolerable, and a
+deployment that implements ACC-2 without it is less safe than one that implements neither.*
+
+**ACC-6.** A vessel with an open log on **shall not** be given a second one. Where a vessel is
+identified on a draft and that vessel already holds an open log on at this unit, the system
+**shall** refuse acceptance, name the open record, and offer it to the operator instead. The
+refusal **shall not** discard what was captured.
+*Rationale: a vessel is either out or not. Two open log ons for one vessel means either the
+same call written down twice, or a previous trip never closed; both are found by refusing here.
+Cross-unit duplication is bounded by transfer (WAT-8) and remains an open question (Appendix D).*
+
+**ACC-7.** A draft **shall** be discardable: a record begun in error, or abandoned before
+anything identifying was captured, was never a log on and shall not have to be closed as
+though a vessel had sailed. Discarding **shall** record actor, time and reason, and the record
+**shall** remain searchable and auditable. An accepted log on **shall not** be discardable; it
+is logged off (WAT-7). A discarded record **shall not** count as evidence of a vessel or a
+person (§7).
+*Rationale: a log on that happened is logged off. A record that was never a log on is neither
+watched nor closed as if it had sailed; pretending otherwise puts a trip in the history that
+never took place.*
+
+**ACC-8.** Where the mandatory set is incomplete, the system **shall** say which values are
+missing and **shall not** refuse, discard or alter anything already captured (CAP-1, CAP-2).
+Acceptance is the only thing withheld.
+
+---
+
 <a id="section-6-requirements-data-p1"></a>
 
 ## 6. Requirements — Data (P1)
@@ -473,10 +609,11 @@ Going to · ETA/ETR (Return Day or Date · Time)*, Class B as the three shaded m
 *Member No. OR Vessel Name · Vessel Rego. No. · Mobile Phone Number*, Class D as *Vessel
 Details*. Class C is not on the paper log; it is additional (DAT-6).
 
-**DAT-1.** Class A fields **shall** be the preferred trip-information set, not a save or
-watch-acceptance gate. Incomplete records may still be useful. A record without a usable
-vessel deadline shall be conspicuously marked as not time-monitorable for vessel return,
-while remaining owned, visible and subject to an operator follow-up deadline (WAT-9).
+**DAT-1.** Class A fields **shall not** be a gate on saving, retaining or amending anything;
+a record holding any subset of them persists (CAP-1). Most of Class A is, however, in the
+mandatory set that gates acceptance (ACC-1): persons on board, departure point, destination and
+a usable return time. A record short of it stays a draft, is plainly not watched, and is chased
+under ACC-5. Class C and Class D gate nothing.
 
 **DAT-2.** The mobile number **shall** be treated as both a Class B identifier and a
 Class C contact, and prioritised accordingly.
@@ -594,7 +731,7 @@ Neither normalization nor profile selection shall overwrite the value as capture
 ### 7.3 Search
 
 **SRCH-1.** The system **shall** provide a single search input that returns results across
-all record types: members, public users, vessels, open log ons (Draft or Complete), and
+all record types: members, public users, vessels, drafts, accepted log ons, and
 historical log ons.
 *Rationale: cross-verification (IDV-2) requires two identifiers resolvable in one action.
 Separate searches per record type make verification cost more airtime than it saves, and
@@ -625,11 +762,15 @@ shall apply across all search types (REC-7).
 
 ## 8. Requirements — Watch and overdue (P2)
 
-**WAT-1.** The system **shall** display the persistent open watch queue, including Drafts,
-pending acceptance, missing/unusable vessel deadlines, overdue obligations and open
-escalations. Overdue/escalated and unresolved records shall not be hidden by an ETA-only
-sort; records with usable deadlines shall show the next deadline and all missed obligations.
-Age, watch owner, capture status and synchronization health shall remain visible.
+**WAT-1.** The system **shall** display the persistent open watch queue: every accepted log on
+this unit is watching, with its next deadline, every missed obligation and any open escalation.
+Overdue and escalated records **shall not** be hidden by a deadline-order sort. Age, watch owner
+and synchronization health **shall** remain visible.
+
+Unaccepted drafts **shall** be shown persistently alongside the queue and **shall not** be mixed
+into it. Their count **shall** be visible wherever the queue is, with the values each is missing
+and the age of each, so that a draft cannot be mistaken for a watch and cannot be quietly lost
+(ACC-2, ACC-5).
 
 **WAT-2.** The system **shall** indicate log ons approaching their ETA before that ETA
 passes. The approaching window is an approved configuration value, not a constant of this
@@ -639,8 +780,9 @@ when T ≥ D. An approaching indication shall be distinct from a missed-obligati
 under WAT-3. The next-deadline display shall cover report and crossing obligations as
 well as return, without hiding an already-missed obligation.
 
-**WAT-3.** A missed obligation **shall** produce an alert independent of the operator
-observing a list change. Deadline evaluation shall continue without an open capture page
+**WAT-3.** A missed obligation on an accepted log on **shall** produce an alert independent of
+the operator observing a list change. Drafts have no obligations to miss; their follow-up is
+ACC-5, which has the same independence requirement. Deadline evaluation shall continue without an open capture page
 or browser. The approved deployment shall define detection/delivery latency, notification
 recipients, acknowledgment, repeat/unacknowledged-alert behavior and monitoring-health
 failure notification. On restart or reconnect, already-missed obligations shall be
@@ -665,7 +807,7 @@ without re-keying. Unit ownership and monitoring shall persist through shift cha
 **WAT-7.** A record **shall** leave the owning unit's open queue only through explicit,
 authorized log off, cancellation or acknowledged transfer under §3.3. Record actor, time,
 reason/evidence and disposition of obligations/escalation. Alerts, refreshes, time passage
-and changes to capture completeness shall not silently remove it.
+and further capture shall not silently remove it.
 
 **WAT-8.** Transfer **shall** preserve the complete record without re-keying. The source
 unit remains responsible until the receiving unit explicitly accepts the current transfer
@@ -675,12 +817,16 @@ Stale acceptance shall require review of intervening changes. Rejected, timed-ou
 or disconnected transfer attempts shall retain source responsibility until reconciled;
 the transfer itself shall never fulfill a deadline or close escalation.
 
-**WAT-9.** Every open record without a usable vessel deadline, with an unresolved deadline
-amendment, or still pending operator acceptance **shall** have accountable follow-up under
-the owning unit's approved policy. Pending acceptance requires follow-up even when a
-usable future vessel deadline exists. The policy shall name the responsible duty role,
-interval, recipient, reminder and escalation, including interruption or shift end. Unit
-responsibility must not depend on the absent operator accepting a record.
+**WAT-9.** Every unaccepted draft, and every accepted log on with an unresolved deadline
+amendment, **shall** have accountable follow-up under the owning unit's approved policy (ACC-5).
+The policy **shall** name the responsible duty role, the interval, the recipient, the reminder
+and the escalation, including operator interruption and shift end. Unit responsibility
+**shall not** depend on the operator who began the record coming back to it.
+
+A draft's follow-up is the only thing standing between an unfinished call and a vessel nobody
+is counting down. It **shall** therefore be treated as a safety function and not as a tidiness
+reminder: its interval, its escalation and its delivery are subject to the same approval and the
+same demonstrated reliability as WAT-3.
 
 Label the follow-up and any missed follow-up alert as internal, not as a caller-supplied
 ETA or evidence that the vessel has failed to return. Vessel deadlines continue to be
@@ -748,6 +894,14 @@ recovery-time and data-loss limits shall be documented, including reconciliation
 made during outage. Restored missed deadlines shall be evaluated before resuming live watch;
 a backup file existing is not evidence that recovery works.
 
+**REC-9.** Each record **shall** carry a number that counts from one for each day, unique
+within the unit and that day, assigned when the record is created and never reused or
+renumbered. It **shall** be what the interface shows and what reports and exports quote. Any
+internal identifier **shall not** be the thing an operator is asked to read out.
+*Rationale: operators talk about "log on fifty yesterday", not about a database key. The paper
+log is a page per day and rows run down it in order, so the number is what a paper row and a
+system record have in common when someone is reading one to the other over a radio.*
+
 ---
 
 <a id="section-10-acceptance-criteria"></a>
@@ -776,11 +930,18 @@ within a section is not always contiguous.
 | **AC-10** | Measure eligible known-caller captures under the approved peak-load protocol. | 95th percentile ≤ 30 seconds; sample, maximum, errors and exclusions reported (CAP-16, CAP-18). |
 | **AC-11** | Measure eligible unknown-caller captures under the approved peak-load protocol. | 95th percentile ≤ 90 seconds with the same reporting (CAP-17, CAP-18). |
 | **AC-12** | Add a registration to a log on created an hour earlier. | Same interaction cost as initial capture. |
-| **AC-40** | Begin a log on and populate only Class D fields. Mark capture complete. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; completion is not prevented (CAP-10 to CAP-12). |
+| **AC-40** | Begin a log on and populate only Class D fields. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; nothing captured is refused; the record stays a draft because the mandatory set is short, and says which values are missing (CAP-10 to CAP-12, ACC-8). |
 | **AC-41** | Begin an unclassified caller capture with no description, then receive a hull colour before an identifier. | Record retained in the owning unit's open queue; classification/description never gate creation, and the volunteered colour is retained immediately while identity remains unknown (CAP-3, CAP-14). |
 | **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
 | **AC-48** | Lay a filled paper log row (A.1) beside the capture view and the queue row for the same trip. | Every trip column (1 to 12) has a field with the same heading, in the same order; return day-or-date and return time are separate fields; additional fields are visibly after the paper columns (DAT-6). |
 | **AC-49** | Look for the paper's Trip ID No., Entered in Noggin and Logged off in Noggin on the capture view. | No field claims to be them; the system's own reference, entry and closure are shown as its own, and what those three paper columns record is stated (DAT-6). |
+| **AC-50** | Complete every mandatory value except one, repeatedly, one value at a time. | Acceptance is refused each time and names what is missing; nothing captured is refused, altered or lost; acceptance succeeds only when the set is complete (ACC-1, ACC-8). |
+| **AC-51** | Accept a log on. | It is one explicit action, recorded against that operator and time; the system never accepts one by itself when the last value is filled (ACC-3). |
+| **AC-52** | Capture a return time that has already passed, then complete the mandatory set and accept. | The log on is overdue at the moment of acceptance, without waiting for a refresh, a state change or another edit (ACC-4). |
+| **AC-53** | Identify, on a new draft, a vessel that already holds an open log on at this unit. | Acceptance is refused, the open record is named and offered, and nothing captured on the draft is discarded (ACC-6). |
+| **AC-54** | Discard a draft begun in error; then attempt to discard an accepted log on. | The draft is discarded with actor, time and reason, remains searchable, and counts as evidence of no vessel or person; the accepted log on refuses and must be logged off (ACC-7). |
+| **AC-55** | View the queue on a screen other than the one that created a draft, with several drafts open. | Every draft is counted and visible, each with the values it is missing and its age, plainly separate from the watched log ons (WAT-1, ACC-5). |
+| **AC-56** | Create records across a day boundary and read the numbers. | Numbering counts from one for each day, is unique within the unit and day, is never reused or renumbered, and is what every page, report and export quotes (REC-9). |
 
 <a id="section-102-verification-and-search"></a>
 
@@ -831,8 +992,8 @@ of workflow, policy and trust rather than assuming operator resistance.
 
 | # | Test | Pass condition |
 |---|---|---|
-| **AC-27** | Capture ETA/POB/destination, leave Draft and pending acceptance, then pass ETA. | Record stays owned and visible; overdue alert occurs despite incomplete capture. |
-| **AC-28** | Begin an empty Draft; interrupt operator until the approved follow-up deadline passes. | Unresolved record has an owner; internal follow-up alerts without fabricating a vessel ETA. |
+| **AC-27** | Capture a return time, POB and destination but only one identifier, so the mandatory set is short. Let the return time pass. | No deadline is monitored and no overdue is raised; the record is plainly shown as a draft and not a log on; its ACC-5 follow-up fires and is labeled internal (ACC-1, ACC-2). |
+| **AC-28** | Begin an empty draft; interrupt the operator until the approved follow-up deadline passes. | The draft has a named owner; internal follow-up alerts without fabricating a vessel deadline; the draft is counted and visible away from the page that created it (ACC-5, WAT-9). |
 | **AC-29** | Fail a save, disconnect, close/reopen the browser, reconnect and retry. | Status never falsely claims shared persistence; recovery meets the approved envelope; no duplicate trip or silent loss/overwrite. |
 | **AC-30** | Two operators amend ETA or identity from the same version; one closes the record while the other is editing. | Stale/conflicting changes require explicit resolution; both evidence histories remain; closure is not silently undone. |
 | **AC-31** | Test one exact identifier, two independently supplied identifiers with one exact/unmatched, two exact but ambiguous, uniquely corroborating exact evidence, and incompatible exact evidence; include shared phones/multi-vessel members. | Respectively Unverified, Partial, Partial, Verified and Conflict; exactly one outcome per current evidence set; candidate detail and raw inputs retained (IDV-2). |
@@ -844,7 +1005,7 @@ of workflow, policy and trust rather than assuming operator resistance.
 | **AC-37** | Expire a session, attempt cross-unit/private search/export without permission, and submit through self-service. | Capture recovery and shared monitoring persist; access boundaries enforced; submission does not falsely acknowledge watch acceptance. |
 | **AC-38** | Restore a backup and reconcile outage records in isolation. | REC-8 recovery limits met; audit and ownership preserved; pending/missed obligations recovered without duplicate actions. |
 | **AC-39** | Change a vessel/person profile after a completed call. | Historical identifiers, applied details and verification evidence remain as known at the call; current profile changes are distinguishable. |
-| **AC-45** | Leave a saved record pending acceptance with a valid ETA well after its acceptance follow-up deadline. | Owning duty role receives internal follow-up on time without implying vessel-return failure; operator acceptance resolves that follow-up but neither removes the vessel deadline nor unrelated unresolved follow-ups (WAT-9). |
+| **AC-45** | Leave a draft whose only missing value is the second identifier, well past its ACC-5 follow-up deadline. | The owning duty role is followed up on time, without implying a vessel-return failure; supplying the identifier and accepting resolves that follow-up and starts the watch, and does not resolve unrelated follow-ups (ACC-5, WAT-9). |
 | **AC-46** | Amend an effective ETA with blank, `25:70`, or ambiguous text; let the original deadline pass. Then explicitly withdraw it without a replacement while escalation is open. | Raw proposal and warning saved; original deadline still monitored/alerted until explicit withdrawal; withdrawal reason/history retained, no-usable-deadline follow-up starts, and escalation remains open (CAP-23, WAT-9, WAT-10). |
 
 <a id="section-106-operational-release-gate"></a>
@@ -920,6 +1081,12 @@ the entry stays on paper until there is time to complete it — and the backlog 
 fastest precisely under peak load (OC-8), when it is least affordable. CAP-1 and CAP-2
 address this directly.
 
+The draft is the answer to it, and the draft is why this specification needs §5.3. Allowing a
+half-finished record to be saved removes the reason to keep it on paper, but it creates a
+record that looks like a log on and is not one. The unit's decision is that such a record is
+not watched (ACC-2), which means the draft solves the backlog and hands back a new problem:
+an unfinished call nobody is counting down. ACC-5 is that problem's only answer.
+
 **A.3 Mandatory fields are the fields that arrive last.** Registration and mobile number
 are required before a record can be saved, and are the two fields that typically arrive
 last in a call or on a later call (OC-6). The form demands first what the conversation
@@ -966,6 +1133,37 @@ IDV-1 to IDV-5 formalise it.
 a transmission on a contended channel. Local observations report that repeats are sometimes omitted under load.
 IDV-6 supports recovery from plausible mishearing; it does not justify abandoning approved
 radio procedures or necessary clarification.
+
+**A.10 The existing platform's mandatory set, and its own disagreement about it.** Figures 2
+and 3 are its new log on form. Its first tab is headed *Vessel Log On details (mandatory)*, and
+these fields carry its asterisk:
+
+| Section | Marked mandatory |
+|---|---|
+| Log on details | Radio channel · known vessel or existing member · Vessel |
+| Trip details | Number of persons on board · Departure date and time · Estimated date and time of arrival/return · Returning to the same location as departure |
+
+Four observations follow.
+
+**The asterisks and the validation disagree.** *Departure point* and *Going to* carry no
+asterisk, and the validation block in Figure 2 nonetheless rejects the save with "Departure
+point should be entered" and "Going to field should be entered". The form states one minimum and
+enforces a larger one, which is most of why the error block is a surprise at the point of save
+(A.5). ACC-1 therefore states the mandatory set once, plainly, as a rule rather than as a
+scattering of marks, and ACC-8 requires the missing values to be named before the save is tried.
+
+**The observed mandatory set is close to the paper row.** Identity, persons on board, departure
+point, destination and a return time, which is the paper log's trip columns (A.1). This is the
+evidence for ACC-1, and for reading the paper's shaded identity columns the way the paper reads
+them: a couple of them, not all.
+
+**Departure point is a picker**, labelled "list of popular locations", not a free text field.
+Callers name places that are in local usage and in no list, which CAP-9 requires be accepted.
+
+**Its Vessel field is already one search input**, covering public user name, phone, membership
+ID, vessel registration and vessel name. So the platform can match on any identifier within
+that one field. What it cannot do is search across record types, which is the actual failure in
+A.7; SRCH-1 is about the partition, not about typing a registration.
 
 ---
 
@@ -1066,12 +1264,67 @@ revisions add identifiers; they do not renumber.
 15. Does the paper radio log (A.1) remain the primary record after a replacement system is
     trusted, become the contingency record, or be retired? Who decides, and what does the
     system need to show before that decision (AC-26)?
+16. **Is the mandatory set in ACC-1 the unit's set?** In particular: are two identifiers enough,
+    and which two; does departure time belong in it, as the existing platform requires and the
+    paper log does not; does the monitored radio channel belong in it, as the existing platform
+    requires; and is "returning to the same location" wanted at all.
+17. **What follow-up does an unaccepted draft get** (ACC-5)? Interval, duty role, recipient,
+    reminder, escalation, and what happens at shift end. This is the answer on which the safety
+    of ACC-2 rests, so it is the single most important unresolved item in this document.
+18. Who may accept a log on, and what exactly is said to the vessel at that moment (ACC-3)?
+    Is the acknowledgment scripted, and is it recorded?
+19. When an operator discards a draft (ACC-7), what reasons are permitted, who may do it, and
+    is any authority needed beyond being on watch?
+20. How is ACC-6 applied across units? A vessel logged on at one unit and calling another is
+    not a duplicate within a unit; whether it is permitted at all, and how it is reconciled,
+    depends on the transfer answers (question 10).
+21. Does the daily number in REC-9 reset at midnight or at a watch boundary, and is it taken
+    from the date of the call or the date of entry when the two differ?
 
 ---
 
 <a id="section-appendix-e-revision-history"></a>
 
 ## Appendix E — Revision history
+
+<a id="section-version-10-changes-from-09"></a>
+
+### Version 1.0 — changes from 0.9
+
+This version reverses the central decision of version 0.5. It is a unit decision, recorded as
+such, and the reasoning and the cost are in §1.2 rather than buried here.
+
+- **Nothing is watched until the log on is accepted** (§5.3 ACC-2). Versions 0.5 to 0.9 held
+  that capture completeness must never gate monitoring, so that a draft carrying a return time
+  was counted down. The unit's position is that a log on is a log on once the required details
+  are there, and that a half-finished record is saved paperwork rather than a watch. Accepted.
+- **Section 5.3 is new**: the mandatory set (ACC-1), the gate (ACC-2), acceptance as one
+  explicit operator action and as what is said to the vessel (ACC-3), immediate evaluation on
+  acceptance so a late entry is overdue at once (ACC-4), the draft chase (ACC-5), one open log
+  on per vessel (ACC-6), discarding a draft that was never a log on (ACC-7), and naming what is
+  missing without refusing anything (ACC-8).
+- **The mandatory set is stated from evidence**, not asserted: the existing platform's observed
+  requirements plus its own validation, transcribed in the new A.10, read against the paper
+  row in A.1. Two of the four identity values rather than all four, because that is how the
+  paper's shaded block reads and it is the two-identifier check operators already perform.
+- **The cost is stated.** ACC-2 creates a failure mode the earlier versions did not have: an
+  unfinished call, forgotten, while the vessel believes it is logged on. ACC-5 and WAT-9 are
+  that mode's only mitigation, and WAT-9 now says plainly that a draft's follow-up is a safety
+  function held to the same standard as WAT-3. A deployment that gates the watch without
+  building the chase is less safe than one that does neither.
+- **The states collapse to three**: draft, watching, logged off. Pending acceptance is gone,
+  because acceptance is now the transition out of draft rather than a state beside it. The
+  separate cancellation of an accepted log on is gone too: a log on that happened is logged off,
+  with the reason recorded, and only a draft can be discarded (§3.3, ACC-7).
+- **§3.5 is new**: the ideal call in a paragraph, and a table of the twenty situations that are
+  not ideal, which is where every requirement in the document comes from.
+- **REC-9 is new**: a number counting from one each day, because operators say "log on fifty
+  yesterday" and not a database key.
+- Revised for the gate: CAP-12 (prompting is advisory and is not the gate), DAT-1 (Class A gates
+  nothing, though most of it is in the mandatory set), WAT-1 (drafts shown beside the queue and
+  never in it), WAT-3 (scoped to accepted log ons), WAT-9 (the draft chase). AC-27, AC-28 and
+  AC-45 inverted; AC-50 to AC-56 added. Appendix D gains questions 16 to 21, of which 17 is the
+  one this version's safety depends on.
 
 <a id="section-version-09-changes-from-08"></a>
 
