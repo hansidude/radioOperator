@@ -47,8 +47,6 @@
 .ro-alert{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font-size:.85rem;border-left:4px solid var(--bs-danger);background:rgba(220,53,69,.12);padding:.3rem .6rem;margin:.2rem 0;border-radius:.2rem}
 .ro-alert .who{font-weight:600}
 .ro-alert form{margin-left:auto}
-.ro-health{font-size:.75rem;color:var(--bs-secondary-color)}
-.ro-health.bad{color:var(--bs-danger);font-weight:600}
 .ro-alert .undelivered{color:var(--bs-danger);font-weight:600}
 @keyframes ro-flash{0%,100%{background:rgba(220,53,69,.12)}50%{background:rgba(220,53,69,.45)}}
 .ro-alert.unseen{animation:ro-flash 1.6s ease-in-out infinite}
@@ -125,13 +123,10 @@
     <a href="/logon/{{ a.logOnId }}" class="fw-semibold">log on {{ a.reference }}</a>
     <span>{{ a.vessel }}</span>
     <span class="text-secondary">due {{ a.dueAt.strftime('%H:%M') }}, {{ minutes(a.overdueMinutes) }} ago{% if a.notifyCount > 1 %} · raised {{ a.notifyCount }} times{% endif %}</span>
-    {% if a.deliveryError %}<span class="undelivered" title="{{ a.deliveryError }}">reached nobody off this screen</span>{% elif a.deliveredAt %}<span class="text-secondary">sent {{ a.deliveredAt.strftime('%H:%M') }}</span>{% endif %}
     {% if a.acknowledgedAt %}<span class="text-secondary">seen {{ a.acknowledgedAt.strftime('%H:%M') }} by {{ a.acknowledgedBy }}</span>
     {% else %}<form method="post" action="/logon/{{ a.logOnId }}/alert/{{ a.id }}/ack"><input type="hidden" name="back" value="{{ back }}"><button class="btn btn-outline-light btn-sm py-0" title="Records that you have seen it. It does not resolve anything.">Seen</button></form>{% endif %}
   </div>
   {% endfor %}
-  {% if not health.ok %}<div class="ro-health bad" title="Deadlines are evaluated by a checker that runs whether or not this page is open">{{ health.message }}</div>{% endif %}
-  <span id="roAlarmState" class="ro-health"></span>
 </div>
 {% set unseen = overdue_alerts|rejectattr('acknowledgedAt')|list %}
 <script>
@@ -140,7 +135,7 @@
   // This is delivery to whoever is present and to nobody else, which is why the page says so.
   var unseen = {{ unseen|length }}, overdue = {{ unseen|length }};
   var word = 'OVERDUE';
-  var state = document.getElementById('roAlarmState'), title = document.title, on = false, ctx = null;
+  var title = document.title, on = false, ctx = null;
   if (!unseen) return;
   function beep() {
     try {
@@ -150,10 +145,8 @@
       o.type = 'square'; o.frequency.value = overdue ? 880 : 560;
       g.gain.value = 0.05; o.connect(g); g.connect(ctx.destination);
       o.start(); o.stop(ctx.currentTime + 0.18);
-      if (state) { state.textContent = ''; }
       return true;
     } catch (e) {
-      if (state) { state.textContent = 'This screen cannot sound an alarm: ' + e.message; state.className = 'text-danger'; }
       return false;
     }
   }
@@ -161,7 +154,6 @@
   setInterval(flash, 1000);
   var audible = beep();
   if (audible) { setInterval(beep, overdue ? 4000 : 15000); }
-  else if (state) { state.textContent = 'Sound is blocked until you click the page. The alarm is visual only.'; state.className = 'text-warning'; }
   document.addEventListener('click', function once() { document.removeEventListener('click', once); beep(); });
 })();
 </script>

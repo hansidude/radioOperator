@@ -172,6 +172,9 @@ class Pages(unittest.TestCase):
         self.assertIn('data-ro-tab="overdue"', page)
         self.assertNotIn('btn-outline-danger', page)
         self.assertNotIn('class="ro-status-count overdue"', page)
+        self.assertNotIn('No delivery channel', page)
+        self.assertNotIn('reached nobody', page)
+        self.assertNotIn('roAlarmState', page)
 
     def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
         i = self.new()
