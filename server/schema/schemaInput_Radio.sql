@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `make` VARCHAR(64) DEFAULT NULL,
   `model` VARCHAR(64) DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
+  `verifyOutcome` VARCHAR(16) DEFAULT NULL,                   -- verified | conflict | partial | unverified (IDV-2)
+  `verifyBasis` VARCHAR(255) DEFAULT NULL,                    -- the reason in words, recomputed from current evidence (IDV-3)
   `loggedOffAt` DATETIME DEFAULT NULL,
   `loggedOffNote` VARCHAR(255) DEFAULT NULL,
   `version` INT NOT NULL DEFAULT 0,                           -- +1 per saved change; a save sends the version it saw (CAP-22)

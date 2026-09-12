@@ -20,6 +20,17 @@
 .ro-form .paper-col{min-width:0}
 .ro-ro{font-size:.85rem;padding:.2rem 0;color:var(--bs-secondary-color)}
 .ro-sys{font-size:.75rem;color:var(--bs-secondary-color)}
+.ro-verify{font-size:.82rem;border-left:3px solid var(--bs-border-color);padding:.2rem .6rem;margin:.5rem 0}
+.ro-verify.conflict{border-color:var(--bs-danger)}
+.ro-verify.verified{border-color:var(--bs-success)}
+.ro-verify.partial{border-color:var(--bs-warning)}
+.ro-verify ul{margin:.2rem 0 0;padding-left:1.1rem}
+.ro-verify li{margin:.1rem 0}
+.ro-find{position:relative}
+.ro-hits{position:absolute;z-index:1030;right:0;top:100%;width:min(34rem,92vw);max-height:60vh;overflow:auto;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.4rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.3);font-size:.8rem}
+.ro-hits table{margin:0;width:100%}
+.ro-hits td{padding:.25rem .45rem;vertical-align:middle;border-bottom:1px solid var(--bs-border-color)}
+.ro-hits .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--bs-secondary-color)}
 .ro-form legend{float:none;width:auto;font-size:.72rem;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
 .ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
 .ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
@@ -43,11 +54,93 @@
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
 
+{% set VERIFY = {'verified': ['text-bg-success', 'Verified'], 'conflict': ['text-bg-danger', 'CONFLICT'],
+                 'partial': ['text-bg-warning', 'Partial'], 'unverified': ['border text-secondary', 'Unverified']} %}
+
+{# The outcome alone means little, so it is never shown alone: IDV-2 asks for the evidence too. #}
+{% macro outcome(name, title='') %}{% set v = VERIFY.get(name or 'unverified') %}<span class="badge {{ v[0] }}" title="{{ title }}">{{ v[1] }}</span>{% endmacro %}
+
+{% macro verification(v) %}
+<section class="ro-verify {{ v.outcome }}" aria-label="Identity">
+  <strong>Identity</strong> {{ outcome(v.outcome) }} <span>{{ v.basis }}</span>
+  {% if v.evidence %}<ul>
+  {% for e in v.evidence %}<li>
+    {{ {'memberNumber': 'Member No.', 'registration': 'Rego', 'mobile': 'Mobile', 'vesselName': 'Vessel name'}[e.kind] }}
+    <code>{{ e.raw }}</code>
+    {% if not e.independent %}<span class="text-secondary">— applied from an earlier trip, so it does not corroborate</span>
+    {% elif not e.match %}<span class="text-secondary">— nothing logged before matches it</span>
+    {% elif e.match.how == 'exact' %}<span class="text-success">— exact match on {{ e.trips|length }} earlier trip{{ '' if e.trips|length == 1 else 's' }}</span>
+    {% else %}<span class="text-warning">— no exact match; <code>{{ e.match.suggests }}</code> differs only by
+      <code>{{ e.match.from }}</code>&rarr;<code>{{ e.match.to }}</code>, which sound alike on radio. Ask the caller rather than assuming.</span>{% endif %}
+  </li>{% endfor %}
+  </ul>{% endif %}
+  <div class="text-secondary">Verified means two things the caller said agree with earlier trips. It does not prove who is calling, or anything about this trip.</div>
+</section>
+{% endmacro %}
+
+{# SRCH-1 to SRCH-6: one input, every record type, partial input, one action to apply what it finds. #}
+{% macro find(current=None) %}
+<div class="ro-find">
+  <input class="form-control form-control-sm" style="width:15rem;font-size:.8rem" type="search" id="findBox" autocomplete="off"
+         placeholder="Find a boat, member, mobile or trip" aria-label="Find a boat, member, mobile or trip">
+  <div class="ro-hits" id="findHits" hidden></div>
+</div>
+{% endmacro %}
+
+{% macro find_script(current=None) %}
+<script>
+(function () {
+  var box = document.getElementById('findBox'), pane = document.getElementById('findHits'), timer, current = {{ current or 'null' }};
+  if (!box) return;
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var KIND = { vessel: 'boat', person: 'member', trip: 'trip' };
+  function render(d) {
+    if (!d.hits.length) { pane.innerHTML = '<table><tr><td class="text-secondary">Nothing matches “' + esc(d.query) + '”.</td></tr></table>'; pane.hidden = false; return; }
+    pane.innerHTML = '<table>' + d.hits.map(function (h) {
+      var offers = (h.offers || []).length ? '<div class="text-secondary">fills ' + esc(h.offers.join(', ')) + '</div>' : '';
+      var state = h.kind === 'trip' ? esc(h.state) : (h.trips + ' trip' + (h.trips === 1 ? '' : 's'));
+      return '<tr><td><span class="k">' + KIND[h.kind] + '</span></td>' +
+        '<td><strong>' + esc(h.label) + '</strong>' + (h.sublabel ? ' <span class="text-secondary">' + esc(h.sublabel) + '</span>' : '') +
+        (h.detail ? '<div class="text-secondary">' + esc(h.detail) + '</div>' : '') + offers + '</td>' +
+        '<td class="text-secondary">' + state + (h.atSea ? ' <span class="badge text-bg-info">at sea</span>' : '') + '</td>' +
+        '<td>' + (current ? '<button class="btn btn-outline-primary btn-sm py-0" data-apply="' + esc(h.key) + '">Use</button>'
+                          : '<a class="btn btn-outline-secondary btn-sm py-0" href="/logon/' + (h.lastTrip || '') + '">Open</a>') + '</td></tr>';
+    }).join('') + '</table>';
+    pane.hidden = false;
+  }
+  box.addEventListener('input', function () {
+    var q = this.value.trim();
+    clearTimeout(timer);
+    if (q.length < 2) { pane.hidden = true; return; }
+    timer = setTimeout(function () {
+      fetch('/api/search?q=' + encodeURIComponent(q) + (current ? '&for=' + current : ''), { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('Search failed (' + r.status + ')'); return r.json(); })
+        .then(render)
+        .catch(function (e) { pane.innerHTML = '<table><tr><td class="text-danger">' + esc(e.message) + '</td></tr></table>'; pane.hidden = false; });
+    }, 180);
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-apply]');
+    if (b) {
+      b.disabled = true;
+      fetch('/logon/' + current + '/apply', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ key: b.dataset.apply }) })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (x) { if (!x.ok) { b.disabled = false; alert(x.d.error || 'Could not apply that'); return; } location.reload(); })
+        .catch(function (e) { b.disabled = false; alert(e.message); });
+      return;
+    }
+    if (!ev.target.closest('.ro-find')) pane.hidden = true;
+  });
+})();
+</script>
+{% endmacro %}
+
 {# The queue is the paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. The
    deadline condition comes first because it is what the watch is for; it is not a paper cell. #}
 {% macro queue(rows, now, current=None) %}
 <table class="table table-sm ro-queue" id="queueTable">
-  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>Record</th><th>Capture</th><th>Watch</th><th></th></tr></thead>
+  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>Record</th><th>Identity</th><th>Capture</th><th>Watch</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
     <td>{{ cond(r) }}</td>
@@ -63,10 +156,11 @@
     <td>{% if r.etaDayBox %}<span title="{{ r.etaDayRaw }}">{{ r.etaDayBox }}</span>{% endif %}</td>
     <td>{% if r.eta %}<span title="{{ r.etaBasis }}">{{ when(r.eta, now) }}</span>{% elif r.etaRaw %}<span class="text-danger" title="{{ r.etaBasis }}">{{ r.etaRaw }}</span>{% endif %}</td>
     <td class="text-secondary">#{{ r.id }}</td>
+    <td>{{ outcome(r.verifyOutcome, r.verifyBasis or '') }}</td>
     <td>{{ 'Complete' if r.captureStatus == 'complete' else 'Draft' }}{% if r.gaps %} <span class="badge text-bg-secondary" title="Fields still to ask">{{ r.gaps }}</span>{% endif %}</td>
     <td>{% if r.watchStatus == 'pending' %}<span class="text-warning">Pending</span>{% else %}Watching{% endif %} <span class="text-secondary" title="Age">{{ minutes(r.ageMinutes) }}</span></td>
     <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td>
-  </tr>{% else %}<tr><td colspan="16" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
+  </tr>{% else %}<tr><td colspan="17" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
   </tbody>
 </table>
 {% endmacro %}

@@ -18,7 +18,7 @@ beside the date as what was heard (REC-6).
 import re
 from datetime import date, datetime, timedelta
 
-from . import times
+from . import identity, times
 
 DT = '%Y-%m-%d %H:%M:%S'
 OPEN = ('pending', 'watching')          # watch statuses that are on the open queue (§2 Active)
@@ -143,13 +143,7 @@ def box(row, field):
     return row.get(column(field)) or ''
 
 
-def normalize(kind, raw):
-    """The comparable form of an identifier (IDV-9): formatting only, never a character substitution."""
-    if kind == 'mobile':
-        return re.sub(r'\D', '', raw)
-    if kind == 'vesselName':
-        return re.sub(r'\s+', ' ', raw).strip().lower()
-    return re.sub(r'[\s\-]', '', raw).upper()
+normalize = identity.normalize      # one definition of "the same value", shared with resolution (IDV-9)
 
 
 # ---------- reading ----------
@@ -272,15 +266,27 @@ def interpret(row, field, resolve_day=False):
     return got
 
 
-def _record_identifier(cur, logon_id, kind, value, previous, user, now):
-    """Every distinct value heard for an identifier is its own row (DAT-5); a change supersedes the last one (IDV-3)."""
+def _record_identifier(cur, logon_id, kind, value, previous, user, now, source=None):
+    """Every distinct value heard for an identifier is its own row (DAT-5); a change supersedes the last one (IDV-3).
+    `source` says where it came from, because a value applied from an earlier trip corroborates nothing (IDV-1)."""
     if (value or None) == (previous or None):
         return
     cur.execute('UPDATE Identifiers SET isActive = 0 WHERE logOnId = %s AND kind = %s AND isActive = 1', (logon_id, kind))
     if value:
         cur.execute('INSERT INTO Identifiers (logOnId, kind, raw, normalized, source, capturedBy, capturedAt, isActive) '
                     'VALUES (%s, %s, %s, %s, %s, %s, %s, 1)',
-                    (logon_id, kind, value, normalize(kind, value), 'corrected' if previous else 'call', str(user), _s(now)))
+                    (logon_id, kind, value, normalize(kind, value), source or ('corrected' if previous else 'call'), str(user), _s(now)))
+
+
+def verification(cur, row):
+    """Recomputed from the evidence as it stands now, never edited by hand (IDV-3)."""
+    return identity.verify(cur, row, identifiers(cur, row['id']))
+
+
+def _verify_sets(cur, row, sets):
+    """The stored outcome that goes with this change (IDV-4). Verification follows the evidence."""
+    got = verification(cur, dict(row, **sets))
+    return {'verifyOutcome': got['outcome'], 'verifyBasis': got['basis'][:255]}
 
 
 def set_field(cur, logon_id, field, value, user, now, version=None):
@@ -317,6 +323,7 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
             out['warning'] = 'Not a %s; kept as heard.' % NUMBER_FIELDS[field]
         if field in IDENT_FIELDS:
             _record_identifier(cur, logon_id, field, value, row[field], user, now)
+            sets.update(_verify_sets(cur, row, sets))
     out['version'] = _bump(cur, row, sets, user, now)
     out['gaps'] = gaps(dict(row, **sets))
     return out
@@ -343,3 +350,26 @@ def log_off(cur, logon_id, user, now, note, version=None):
     if len(note) > 255:
         raise Refused('Log off note: too long to store')
     return _bump(cur, row, {'watchStatus': 'loggedoff', 'loggedOffAt': _s(now), 'loggedOffNote': note or None}, user, now)
+
+
+def apply_profile(cur, logon_id, key, user, now, version=None):
+    """Put what the unit already knew about this boat or person onto the call in progress (SRCH-6).
+
+    Only empty fields are filled, so nothing the caller just said is overwritten, and no trip fact
+    is ever taken from an earlier trip. Applied identifiers are marked as coming from a profile, so
+    they cannot corroborate the ones the caller supplied (IDV-1)."""
+    row = _open_row(cur, logon_id, version)
+    fields, trips = identity.profile(cur, row['unit'], key, logon_id)
+    if not fields:
+        raise Refused('Nothing known about that yet')
+    sets, filled = {}, []
+    for field, value in fields.items():
+        if field in FIELDS and not row.get(field):
+            sets[field] = value
+            filled.append(LABELS.get(field, field))
+            if field in IDENT_FIELDS:
+                _record_identifier(cur, logon_id, field, value, row[field], user, now, source='profile')
+    if not sets:
+        raise Refused('Everything it knows is already on this record')
+    sets.update(_verify_sets(cur, row, sets))
+    return {'version': _bump(cur, row, sets, user, now), 'filled': filled, 'fromTrips': trips[:5]}

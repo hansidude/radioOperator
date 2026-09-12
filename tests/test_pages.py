@@ -104,6 +104,49 @@ class Pages(unittest.TestCase):
         self.assertIn('form="logoffForm"', page)                 # the button is bound to its own form
         self.assertIn('action="/logon/%d/logoff"' % i, page)
 
+    def test_search_and_apply_through_the_routes(self):          # SRCH-1 to SRCH-6, IDV-4
+        first = self.new()
+        for f, v in [('registration', 'AB123Q'), ('memberNumber', '4471'), ('mobile', '0412 345 678'),
+                     ('vesselDetails', '6m white Quintrex'), ('destination', 'Facing Island')]:
+            self.assertEqual(self.a.post('/api/logon/%d' % first, json={'field': f, 'value': v}).status_code, 200)
+        self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
+
+        self.assertEqual(self.a.get('/api/search?q=a').json['hits'], [])          # one letter is not a search
+        hits = self.a.get('/api/search?q=ab123').json['hits']
+        self.assertEqual(hits[0]['kind'], 'vessel')
+        for q in ('4471', '0412 345', 'facing', 'AB12'):                          # any identifier, partial, same box
+            self.assertTrue(self.a.get('/api/search?q=' + q).json['hits'], q)
+
+        second = self.new()
+        offered = self.a.get('/api/search?q=ab123&for=%d' % second).json['hits'][0]
+        self.assertIn('Member No.', offered['offers'])                            # says what it would fill
+        r = self.a.post('/logon/%d/apply' % second, json={'key': offered['key']})
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertIn('Mobile Phone Number', r.json['filled'])
+        page = self.a.get('/logon/%d' % second).get_data(as_text=True)
+        self.assertIn('0412 345 678', page)
+        self.assertNotIn('Facing Island', page)                                   # a past trip is not this trip
+        self.assertIn('does not corroborate', page)                               # IDV-1, said plainly
+        self.assertIn('Unverified', page)                                         # applied values prove nothing
+        self.assertEqual(self.a.post('/logon/%d/apply' % second, json={'key': 'rego:NOPE'}).status_code, 400)
+
+    def test_a_conflict_is_visible_on_the_record_and_the_queue(self):             # IDV-2, IDV-3, IDV-4
+        for rego, member in (('AB123Q', '4471'), ('ZZ999X', '8802')):
+            i = self.new()
+            self.a.post('/api/logon/%d' % i, json={'field': 'registration', 'value': rego})
+            self.a.post('/api/logon/%d' % i, json={'field': 'memberNumber', 'value': member})
+            self.a.post('/logon/%d/logoff' % i, data={'note': 'back'})
+        mixed = self.new()
+        self.a.post('/api/logon/%d' % mixed, json={'field': 'registration', 'value': 'AB123Q'})
+        r = self.a.post('/api/logon/%d' % mixed, json={'field': 'memberNumber', 'value': '8802'})
+        self.assertEqual(r.status_code, 200)
+        page = self.a.get('/logon/%d' % mixed).get_data(as_text=True)
+        self.assertIn('CONFLICT', page)
+        self.assertIn('different boats or people', page)
+        self.assertIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))   # and on the queue
+        self.assertEqual(self.a.post('/logon/%d/capture' % mixed, data={'complete': '1'}).status_code, 302)  # IDV-5: blocks nothing
+        self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)
+
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)

@@ -9,8 +9,10 @@
     {{ ui.cond({'condition': condition, 'minutes': minutes, 'etaRaw': logon.etaRaw}) }}
     <span class="badge text-bg-secondary">{{ 'Complete' if logon.captureStatus == 'complete' else 'Draft' }}</span>
     <span class="badge {% if logon.watchStatus == 'pending' %}text-bg-warning{% elif logon.watchStatus == 'watching' %}text-bg-info{% else %}text-bg-dark{% endif %}">{{ {'pending': 'Pending acceptance', 'watching': 'Watching', 'loggedoff': 'Logged off', 'cancelled': 'Cancelled'}[logon.watchStatus] }}</span>
+    {{ ui.outcome(verified.outcome, verified.basis) }}
     <span id="queueNote" class="small text-secondary"></span>
   </div>
+  {{ ui.find(logon.id) }}
   <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if open %}Saved to the shared record{% else %}Closed: read only{% endif %}</span>
 </div>
 {% endblock %}
@@ -29,6 +31,7 @@
 <div class="col-12 col-xxl-8">
   <div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
   {% if not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
+  {{ ui.verification(verified) }}
   <section class="ro-gaps mt-2" aria-label="Still to ask">
     <strong>Still to ask</strong> <span class="text-secondary">— advisory, ranked A to D; nothing here blocks saving or completing</span>
     <ol id="gaps">{% for g in gaps %}<li><button type="button" class="btn btn-outline-secondary {{ g.cls }}" data-focus="{{ g.field }}"><span class="me-1">{{ g.cls }}</span>{{ g.label }}</button></li>{% else %}<li class="small text-success">Nothing left to ask.</li>{% endfor %}</ol>
@@ -87,6 +90,7 @@
 </div>
 </div>
 {{ ui.refresh_script(logon.id) }}
+{{ ui.find_script(logon.id) }}
 <script>
 (function () {
   var id = {{ logon.id }}, version = {{ logon.version }}, open = {{ 'true' if open else 'false' }};

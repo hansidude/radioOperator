@@ -5,9 +5,17 @@ caller says in any order while the open watch queue stays on screen, a passed ET
 without anyone pressing anything, and the vessel is logged off when it is back.
 
 The specification is `vessel-logon-spec.md` (index: `INDEX.md`). Requirement ids (CAP-n, WAT-n, ...)
-are cited in code comments where code exists because of them. This is slice 1: capture and the open
-queue, laid out as the paper radio log's row under its headings in its order (DAT-6), with what the
-system adds after it. Vessels, people, cross-verification, search and obligations are later slices.
+are cited in code comments where code exists because of them. Slice 1 was capture and the open queue, laid out as the paper radio log's row under its headings in
+its order (DAT-6). Slice 2 is section 7: cross-verification, tolerant matching and one search box.
+Obligations, alerts that run without a browser, transfer and handover are later slices.
+
+**Identity comes from the unit's own trip history**, not a membership register: the unit's vessel and
+member records live in a system this app cannot reach, and §3.1 allows a conceptual model rather than
+tables per entity. A vessel is every past trip carrying the same registration; a person is every past
+trip carrying the same member number, or the same mobile without one; an association is the two on one
+trip. That is weaker than a register in one way worth stating: a value misheard the same way twice
+looks corroborated, so every match says how many earlier trips it rests on. Putting a real register
+behind it changes two functions in `server/identity.py` and nothing else.
 
 ## Its own app, mounted by quackit
 
@@ -23,8 +31,9 @@ server/
   db.py            cursor with @user_id for the host's history triggers
   sqlite.py        the SQLite adapter standalone and the tests use
   times.py         1500 · 3pm · +2h, read against the call time; never guessed
+  identity.py      who is this: resolution, Appendix B tolerant matching, the IDV-2 outcome, search
   logons.py        the data layer: pure SQL over LogOns / Identifiers
-  routes.py        the blueprint: /logons, /logon/<id>, /api/logon/<id>
+  routes.py        the blueprint: /logons, /logon/<id>, /api/logon/<id>, /api/search
   schema/schemaInput_Radio.sql
   templates/radio/ logons.html · logon.html · _queue.html · _ui.html · _base.html
 standalone/        the app on its own (SQLite by default, MariaDB with RADIO_DB=mysql://...)

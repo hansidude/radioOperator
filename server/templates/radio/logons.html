@@ -9,6 +9,7 @@
     {% set unusable = queue|selectattr('condition', 'equalto', 'nodeadline')|list|length %}{% if unusable %}<span class="badge text-bg-secondary">{{ unusable }} without a usable ETA</span>{% endif %}
     <span id="queueNote" class="small text-secondary">approaching = {{ window }} min</span>
   </div>
+  {{ ui.find() }}
   <form method="post" action="/logons/new"><button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New log on</button></form>
 </div>
 {% endblock %}
@@ -22,4 +23,5 @@
 </tbody></table></details>
 {% endif %}
 {{ ui.refresh_script(None) }}
+{{ ui.find_script() }}
 {% endblock %}

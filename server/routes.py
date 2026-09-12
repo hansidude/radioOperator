@@ -11,6 +11,7 @@ from pathlib import Path
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request
 
+from . import identity as ID
 from . import logons as L
 from .db import cursor
 
@@ -100,9 +101,11 @@ def logon_page(logon_id):
     row = _logon(cur, logon_id, h)
     rows = _queue(cur, h)
     idents = L.identifiers(cur, logon_id)
+    verified = ID.verify(cur, row, idents)
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, identifiers=idents, gaps=L.gaps(row), condition=cond, minutes=minutes,
+                 verified=verified,
                  extra=L.EXTRA, mandatory=L.MANDATORY, labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS,
                  column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, window=h.approaching_minutes)
 
@@ -160,6 +163,41 @@ def api_set_field(logon_id):
     cur.close()
     out['when'] = out['when'].isoformat() if out['when'] else None
     out['savedAt'] = now.strftime('%H:%M:%S')
+    return jsonify(out)
+
+
+@bp.route('/api/search')
+def api_search():
+    """One input, every record type (SRCH-1 to SRCH-5). `for` is the record being captured, so each
+    result can say what applying it would fill in."""
+    h, (conn, cur) = _open()
+    hits = ID.search(cur, h.unit(), request.args.get('q'))
+    current = request.args.get('for', type=int)
+    if current:
+        for hit in hits:
+            fields, _ = ID.profile(cur, h.unit(), hit['key'], current)
+            hit['offers'] = [L.LABELS.get(f, f) for f in (fields or {}) if f in L.FIELDS]
+    cur.close()
+    for hit in hits:
+        if hit.get('lastSeen'):
+            hit['lastSeen'] = hit['lastSeen'].isoformat()
+    return jsonify({'hits': hits, 'query': request.args.get('q', '')})
+
+
+@bp.route('/logon/<int:logon_id>/apply', methods=['POST'])
+def logon_apply(logon_id):
+    """Put a search result's known detail onto this capture, in one action (SRCH-6)."""
+    h, (conn, cur) = _open()
+    _logon(cur, logon_id, h, lock=True)
+    body = request.get_json(silent=True) or request.form
+    try:
+        out = L.apply_profile(cur, logon_id, body.get('key'), h.user(), _now(), body.get('version'))
+    except (L.Refused, L.Stale, ValueError) as e:
+        conn.rollback()
+        cur.close()
+        return jsonify({'error': str(e)}), 409 if isinstance(e, L.Stale) else 400
+    conn.commit()
+    cur.close()
     return jsonify(out)
 
 
