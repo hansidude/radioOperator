@@ -54,6 +54,16 @@ class LogOns(unittest.TestCase):
         self.assertEqual(self.cur.fetchone()['watchStatus'], 'draft')
         self.assertEqual(L.reference(row), '1')
 
+    def test_a_record_left_in_a_state_this_version_forgot_is_chased(self):
+        """An earlier version's state, or a hand-edited row, must not vanish: anything neither
+        watched nor closed is a draft and gets chased."""
+        i = L.create(self.cur, 'alice', '', T0)
+        self.cur.execute("UPDATE LogOns SET watchStatus = 'pending' WHERE id = %s", (i,))
+        self.assertEqual([r['id'] for r in L.drafts(self.cur, '', T0, 30)], [i])
+        self.assertEqual(L.queue(self.cur, '', T0, 30), [])
+        L.discard(self.cur, i, 'alice', T0, 'left by an earlier version')
+        self.assertEqual(L.drafts(self.cur, '', T0, 30), [])
+
     def test_numbering_counts_from_one_each_day(self):                 # AC-56, REC-9
         a = L.create(self.cur, 'alice', '', T0)
         b = L.create(self.cur, 'alice', '', T0 + timedelta(hours=1))

@@ -26,7 +26,11 @@ from . import identity, times
 
 DT = '%Y-%m-%d %H:%M:%S'
 OPEN = ('draft', 'watching')            # a record still on someone's hands: unaccepted, or being watched
-CLOSED = ('loggedoff', 'discarded')
+CLOSED = ('loggedoff', 'discarded', 'cancelled')     # cancelled is superseded; rows written under it remain
+# Anything that is neither watched nor closed is treated as a draft and chased. A state this version
+# does not know about, left by an earlier one or by a hand-edited row, must be conspicuous rather
+# than invisible: a record in limbo is exactly the thing nobody is counting down.
+NOT_CLOSED = "watchStatus NOT IN ('watching', 'loggedoff', 'discarded', 'cancelled')"
 CHANNELS = ('radio', 'phone', 'person', 'self')
 # Why a log on ended. A trip that never sailed is still a log on that happened, so it is logged
 # off like any other; only the reason differs (§3.3).
@@ -248,7 +252,7 @@ def queue(cur, unit, now, approaching_minutes):
 def drafts(cur, unit, now, approaching_minutes):
     """Unaccepted drafts, oldest first (WAT-1, ACC-5). Shown beside the queue and never in it: the
     caller may be at sea believing otherwise, so the oldest needs chasing first."""
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'draft'", (unit,))
+    cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND ' + NOT_CLOSED, (unit,))
     rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
     rows.sort(key=lambda r: -r['ageMinutes'])
     return rows
@@ -295,7 +299,7 @@ def _open_row(cur, logon_id, version):
     row = get(cur, logon_id, lock=True)
     if not row:
         raise Refused('No such log on')
-    if row['watchStatus'] not in OPEN:
+    if row['watchStatus'] in CLOSED:
         raise Refused('This log on is closed (%s). Reopening is an authorised action, not an edit.' % row['watchStatus'])
     if version is not None and int(version) != row['version']:
         raise Stale('Changed by someone else since you loaded it (now version %d, you had %s). Reload to see the current values.' % (row['version'], version))
@@ -448,7 +452,7 @@ def discard(cur, logon_id, user, now, reason, version=None):
     anything identifying was given. An accepted log on can never be discarded; it is logged off.
     The record stays, searchable and auditable, and counts as evidence of no vessel or person."""
     row = _open_row(cur, logon_id, version)
-    if row['watchStatus'] != 'draft':
+    if row['watchStatus'] == 'watching':
         raise Refused('This is an accepted log on. A log on that happened is logged off, not discarded.')
     reason = (reason or '').strip()
     if not reason:

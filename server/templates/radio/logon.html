@@ -1,7 +1,7 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
-{% set open = logon.watchStatus in ('draft', 'watching') %}
-{% set draft = logon.watchStatus == 'draft' %}
+{% set open = logon.watchStatus not in ('loggedoff', 'discarded', 'cancelled') %}
+{% set draft = logon.watchStatus not in ('watching', 'loggedoff', 'discarded', 'cancelled') %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">

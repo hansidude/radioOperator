@@ -129,7 +129,7 @@ def logon_page(logon_id):
     verified = ID.verify(cur, row, idents)
     unaccepted = _drafts(cur, h)
     alerts, health = _alerts(cur, h)
-    clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] == 'draft' else None
+    clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] != 'watching' else None
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,

@@ -45,7 +45,7 @@ def due_draft_followups(cur, now, minutes):
     """Drafts that have gone unresolved past the unit's follow-up interval (ACC-5).
     Measured from creation: the caller rang off then, not when someone last typed."""
     cutoff = now - timedelta(minutes=int(minutes))
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND watchStatus = 'draft' AND createdAt <= %s", (_s(cutoff),))
+    cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND createdAt <= %s AND ' + L.NOT_CLOSED, (_s(cutoff),))
     return [(L._row(r), r['createdAt'] + timedelta(minutes=int(minutes))) for r in cur.fetchall() or []]
 
 
