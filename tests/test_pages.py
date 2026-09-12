@@ -108,7 +108,7 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 2}).status_code, 200)
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Sea Dog', listing)
-        self.assertIn('2 drafts not logged on', listing)
+        self.assertIn('data-ro-count="drafts">2</span>', listing)
         self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
@@ -137,11 +137,13 @@ class Pages(unittest.TestCase):
         draft = self.new()
         watching = self.accepted(rego='CD456Q', member='7788')
         page = self.a.get('/logons').get_data(as_text=True)
-        for tab in ('watch', 'drafts', 'closed', 'find'):
+        for tab in ('loggedon', 'overdue', 'drafts', 'closed', 'find'):
             self.assertIn('data-ro-tab="%s"' % tab, page)
         self.assertIn('data-id="%d"' % watching, page)
         self.assertIn('data-draft="%d"' % draft, page)
         self.assertIn('class="ro-record-card', page)
+        self.assertIn('class="ro-status-counts"', page)
+        self.assertIn('data-ro-count="loggedon">1</span><span class="label">Logged on</span>', page)
         self.assertNotIn('<table', page)
 
     def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
@@ -154,11 +156,12 @@ class Pages(unittest.TestCase):
         self.assertIn('Still needed', body)
         self.assertIn('Member No.', body)
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('NOT WATCHED', page)
-        self.assertNotIn('OVERDUE', page)                                 # the return time passed hours ago
+        self.assertIn('DRAFT', page)
+        self.assertNotIn('NOT WATCHED', page)
+        self.assertNotIn('ro-record-card overdue', page)                  # the return time passed hours ago
         listing = self.a.get('/logons').get_data(as_text=True)
-        self.assertNotIn('OVERDUE', listing)
-        self.assertIn('Nobody is counting these down', listing)
+        self.assertNotIn('ro-record-card overdue', listing)
+        self.assertNotIn('not watched', listing.lower())
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])
         self.assertEqual(len(self.a.get('/api/logons/queue').json['drafts']), 1)
 
@@ -280,12 +283,6 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,
                                      data={'reason': 'notdeparted', 'note': 'never sailed'}).status_code, 302)
-
-    def test_the_channel_test_says_plainly_when_it_reached_nobody(self):
-        r = self.a.post('/logons/alerts/test')
-        self.assertEqual(r.status_code, 200)
-        self.assertFalse(r.json['ok'])
-        self.assertIn('reached nobody', r.json['message'])          # never dressed up as good news
 
     def test_units_do_not_see_each_others_records(self):
         i = self.new()

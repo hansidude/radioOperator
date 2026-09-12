@@ -264,29 +264,6 @@ def alert_ack(logon_id, alert_id):
     return redirect(request.form.get('back') or '/logons')
 
 
-@bp.route('/logons/alerts/test', methods=['POST'])
-def alerts_test():
-    """Send a test alert through whatever is configured, and say plainly what happened.
-
-    A delivery channel nobody has ever proved is a delivery channel nobody should rely on, so this
-    exists to be pressed before the unit trusts any of this."""
-    h, (conn, cur) = _open()
-    cur.close()
-    now = _now()
-    alert = {'alertId': None, 'kind': 'test', 'unit': h.unit(), 'logOnId': None, 'reference': 'test',
-             'vessel': None, 'at': now,
-             'message': 'Test alert from the vessel log on, sent by %s. Nothing is wrong.' % h.user()}
-    try:
-        sent, error = h.notify(alert) or ([], None)
-    except Exception as e:
-        sent, error = [], str(e)
-    # Answered here rather than flashed through the host: a host's flash styling is its own, and a
-    # delivery that reached nobody must not be rendered as good news.
-    return jsonify({'ok': bool(sent), 'sent': sent, 'error': error,
-                    'message': ('Test alert accepted by %s.%s' % (', '.join(sent), (' Not by %s.' % error) if error else ''))
-                               if sent else ('Test alert reached nobody. %s' % (error or 'No delivery channel is configured.'))})
-
-
 @bp.route('/api/logons/alerts')
 def api_alerts():
     """What is due and whether anything is watching. Served so a page can poll, but the alerts

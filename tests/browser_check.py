@@ -49,7 +49,8 @@ def main():
 
         check('a new record starts as a draft, not a log on',
               'This is a draft, not a log on' in page.content())
-        check('and nothing about it is watched', 'NOT WATCHED' in page.content())
+        check('the draft status is clear without watch jargon',
+              'DRAFT' in page.content() and 'NOT WATCHED' not in page.content())
         check('the main view is the five operator rows', page.locator('#ro-entry-pane .capture-row').count() == 5)
         check('the watch queue starts on its own hidden tab', not page.locator('#queuePane').is_visible())
         size = float(page.locator('#f-callDay').evaluate("el => parseFloat(getComputedStyle(el).fontSize)"))
@@ -57,8 +58,8 @@ def main():
         check('the radio page uses cards and no tables', page.locator('table').count() == 0)
         page.click('[data-ro-tab="contact"]')
         check('supporting details have a focused tab', page.locator('#captureContact').is_visible())
-        page.click('[data-ro-tab="watch"]')
-        check('Watch shows card collections', page.locator('#queuePane').is_visible())
+        page.click('[data-ro-tab="drafts"]')
+        check('Drafts has its own card collection', page.locator('#ro-drafts-pane').is_visible())
         page.click('[data-ro-tab="entry"]')
 
         # type the way an operator does: every field, one after another, without waiting
