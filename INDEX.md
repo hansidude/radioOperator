@@ -1,20 +1,20 @@
-# Vessel Log On — Functional Specification, v0.7
+# Vessel Log On — Functional Specification, v0.8
 
 ## Table of contents
 
 - [Files](#files)
 - [Figures](#figures)
 - [Reading order](#reading-order)
-- [Revision 0.7](#revision-07)
+- [Revision 0.8](#revision-08)
 - [Updating the documents](#updating-the-documents)
 
 ## Files
 
 | File | Description |
 |---|---|
-| `vessel-logon-spec.pdf` | The specification, formatted, with linked contents and all four evidence figures. |
+| `vessel-logon-spec.pdf` | The specification, formatted, with linked contents and all five evidence figures. |
 | `vessel-logon-spec.md` | The same document in Markdown source. |
-| `figures/` | Screen captures of the current system, evidencing Appendix A. |
+| `figures/` | Screen captures of the current system and the paper radio log, evidencing Appendix A. |
 
 ## Figures
 
@@ -28,6 +28,7 @@ practice**.
 | `figure-2-validation-error-block.png` | New log on form. Four validation errors presented as a block at the top of the form, referring to fields in other sections and tabs. | **A.3** (mandatory fields), **A.4** (initial state fails validation), **A.5** (errors remote from their fields) |
 | `figure-3-capture-form-scrolled.png` | Same form scrolled: "Known Public User" and "Trip Details" sections, each field a picker control. Full-screen modal with Cancel/Save. | **A.4**, **A.6** (modal conceals the active list) |
 | `figure-4-trip-details-defaults.png` | Trip Details with departure time and estimated return time pre-populated to the identical value. | **A.4** (identical departure/return defaults and associated validation errors; runtime overdue behavior is not established by the screenshot) |
+| `figure-5-paper-radio-log-blank-form.jpeg` | The unit's blank Limited Coast Station Radio Log: 15 columns, three shaded mandatory, trip number and transcription columns at the right. The primary record. | **OC-9**, **A.1** (columns transcribed verbatim), **A.3**, **A.8**, **DAT-6** |
 
 ## Reading order
 
@@ -37,15 +38,12 @@ practice**.
 4. §10 — acceptance criteria.
 5. Appendix A with the figures alongside, for why the requirements are as they are.
 
-## Revision 0.7
+## Revision 0.8
 
-Accepts the v0.6 direction and retains its added acceptance coverage. This review makes
-verification outcomes mutually exclusive, preserves free-order capture, and keeps an
-existing deadline monitored while an invalid replacement is retained for clarification.
-Pending acceptance now requires follow-up even with a usable ETA. AC-45–47 cover those
-cases and the exact approaching/overdue boundaries. A.4 no longer claims the screenshots
-prove that both time fields must be edited. Appendix E records the review decisions;
-Appendix D still holds the operational questions. This remains a specification draft.
+Adds Figure 5, the unit's paper radio log, and rewrites A.1 from it: the paper log is the
+primary record and the first thing filled out for every call (OC-9). The capture view and
+queue must carry its columns under its headings in its order (DAT-6, AC-48). The earlier A.1
+transcription was wrong in several columns. Appendix E has the detail.
 
 ## Updating the documents
 

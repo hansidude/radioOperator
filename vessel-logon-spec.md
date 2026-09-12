@@ -1,6 +1,6 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.7 (draft)<br>
+**Version:** 0.8 (draft)<br>
 **Revised:** 12 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
@@ -45,6 +45,7 @@
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
 - [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 0.8 — changes from 0.7](#section-version-08-changes-from-07)
     - [Version 0.7 — changes from 0.6](#section-version-07-changes-from-06)
     - [Version 0.6 — changes from 0.5](#section-version-06-changes-from-05)
     - [Version 0.5 — changes from 0.4](#section-version-05-changes-from-04)
@@ -53,6 +54,7 @@
     - [Figure 2 — Validation error block](#section-figure-2-validation-error-block)
     - [Figure 3 — Capture form scrolled](#section-figure-3-capture-form-scrolled)
     - [Figure 4 — Trip-detail defaults](#section-figure-4-trip-detail-defaults)
+    - [Figure 5 — Paper radio log](#section-figure-5-paper-radio-log)
 <!-- contents:end -->
 
 ---
@@ -148,7 +150,7 @@ justification. **May** — optional.
 | **Approaching** | A usable deadline is within the approved approaching window and current time is strictly earlier than its due time (WAT-2). |
 | **Overdue** | Current time is at or after the due time of an unsatisfied effective obligation. Internal follow-up misses are labeled separately from vessel-return/report misses. |
 | **Escalated** | An open escalation exists. This is independent of capture completeness and deadline amendment. |
-| **ETA** | A supplied expected return or report date/time, represented by a timed obligation. |
+| **ETA / ETR** | A supplied expected return (or report) day-or-date and time, represented by a timed obligation. The paper radio log heads this column "ETA/ETR" (estimated time of arrival / return). |
 | **Obligation** | An expected return, position report, crossing completion, or operator follow-up, with its own status and deadline. |
 | **Watch owner** | The unit accountable for the open record, including unresolved capture and pending transfer. |
 | **Acknowledgment** | An operator records seeing an alert or accepting a transfer; neither action implies the vessel has returned. |
@@ -305,6 +307,13 @@ before claiming compliance. Immediate durable capture is justified operationally
 **OC-8.** Calls arrive in bursts. Peak load is a period of good weather, which is also
 when the greatest number of vessels are at sea.
 
+**OC-9.** The unit's paper radio log (Figure 5, transcribed in A.1) is the primary operational
+record and the first thing filled out for every call. A paper row exists from the first pen
+stroke with whatever cells are known, is completed across the call in whatever order the
+caller supplies, and is the reference a system record is checked against. Any system that
+performs this function shall fit the paper log, not the other way round: its columns, their
+headings and their order are the unit's standard (DAT-6).
+
 ---
 
 <a id="section-5-requirements-capture-p1"></a>
@@ -458,6 +467,11 @@ monitored deadline (WAT-10).
 | **C** | Reach the vessel | Radio channel monitored, onboard/shore contact, AIS identifier |
 | **D** | Describe the vessel | Length, hull colour, type, make, model |
 
+The paper log (A.1) already holds classes A, B and D: Class A as *POB · Departure Point ·
+Going to · ETA/ETR (Return Day or Date · Time)*, Class B as the three shaded mandatory columns
+*Member No. OR Vessel Name · Vessel Rego. No. · Mobile Phone Number*, Class D as *Vessel
+Details*. Class C is not on the paper log; it is additional (DAT-6).
+
 **DAT-1.** Class A fields **shall** be the preferred trip-information set, not a save or
 watch-acceptance gate. Incomplete records may still be useful. A record without a usable
 vessel deadline shall be conspicuously marked as not time-monitorable for vessel return,
@@ -480,6 +494,16 @@ standing record, and associate it with the vessel for reuse.
 whatever record it resolves to.
 *Rationale: the value the operator heard is evidence; overwriting it with the resolved
 value destroys the ability to detect a mis-resolution later.*
+
+**DAT-6.** The capture view and the open watch queue **shall** carry every column of the
+unit's paper radio log (A.1), under the same headings and in the paper log's order, so that a
+paper row and a system record correspond cell for cell. Fields the paper log does not have
+(Class C, and system metadata) follow after the paper columns and are visibly additional.
+The return day-or-date **shall** be its own field beside the return time, as on paper.
+*Rationale: OC-9. The paper log is what operators already fill out and check against; a
+screen laid out the same way costs nothing to learn and makes transcription and
+reconciliation a one-to-one read. A dedicated return-day field is what makes REC-6's
+day-rollover clarification a normal question rather than an exception.*
 
 ---
 
@@ -746,6 +770,7 @@ within a section is not always contiguous.
 | **AC-40** | Begin a log on and populate only Class D fields. Mark capture complete. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; completion is not prevented (CAP-10 to CAP-12). |
 | **AC-41** | Begin an unclassified caller capture with no description, then receive a hull colour before an identifier. | Record retained in the owning unit's open queue; classification/description never gate creation, and the volunteered colour is retained immediately while identity remains unknown (CAP-3, CAP-14). |
 | **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
+| **AC-48** | Lay a filled paper log row (A.1) beside the capture view and the queue row for the same trip. | Every paper column has a field with the same heading, in the same order; return day-or-date and return time are separate fields; additional fields are visibly after the paper columns (DAT-6). |
 
 <a id="section-102-verification-and-search"></a>
 
@@ -838,15 +863,44 @@ Evidence that the requirements above address real conditions rather than hypothe
 ones. Recorded from a unit operating a commercial resilience-management platform
 alongside a handwritten radio log.
 
-**A.1 The paper log is the working record.** Its columns are: date/time of call; member
-number or vessel registration; contact mobile; POB; departure point; destination; return
-date; return time; *entered into the computer system*; *system record ID*; logged off.
+**A.1 The paper radio log is the working record.** Figure 5 is the unit's blank *Limited
+Coast Station Radio Log*, a spiral-bound pad kept on the radio desk. It is the first thing
+filled out for every call (OC-9). Its columns, verbatim and in order:
 
-The presence of the last-but-two and last-but-one columns is decisive. **The paper log
-tracks the computer system as an outstanding task.** The operational record is paper; the
-computer record is a downstream transcription. The computer record therefore lags the
-operational one; its legal status remains subject to confirmation under OC-7. AC-26 exists
-to detect when this has been reversed.
+| # | Column heading | Notes |
+|---|---|---|
+| 1 | Date __/__ | date of the call |
+| 2 | Time 00:00 | time of the call, 24-hour |
+| 3 | Member No. OR Vessel Name | **shaded: mandatory** |
+| 4 | Vessel Rego. No. | **shaded: mandatory** |
+| 5 | Mobile Phone Number | **shaded: mandatory** |
+| 6 | Vessel Details | free text |
+| 7 | POB | persons on board |
+| 8 | Departure Point | free text |
+| 9 | Going to | free text |
+| 10 | ETA/ETR — Return Day or Date | one column of a two-column group |
+| 11 | ETA/ETR — Time 00:00 | the other |
+| 12 | Time Arrived or Return | the log off time |
+| 13 | Trip ID No. | pre-printed "T-"; the computer system's trip number is written in after transcription |
+| 14 | Entered in Noggin ✓ | ticked when transcribed into the computer system (Noggin is the platform currently in use) |
+| 15 | Logged off in Noggin — Initial | operator initials when the log off is transcribed |
+
+Three things follow. First, columns 13 to 15 are decisive: **the paper log tracks the
+computer system as an outstanding task.** The operational record is paper; the computer
+record is a downstream transcription, cross-referenced by the trip number written back onto
+the paper row. The computer record therefore lags the operational one; its legal status
+remains subject to confirmation under OC-7. AC-26 exists to detect when this has been
+reversed.
+
+Second, a paper row is a record from the first pen stroke, with any subset of cells filled,
+completed across the call in whatever order the caller gives the information. That is
+CAP-1, CAP-2 and CAP-3 as the unit already practises them.
+
+Third, the form's three mandatory columns are exactly the Class B identifiers (§6.1). On
+paper, *mandatory* means "obtain this before the call ends", and the row exists and is
+watched regardless. The existing computer system reads the same word as "required before
+the record can be saved" (A.3). The difference between those two readings is most of this
+specification.
 
 **A.2 All-or-nothing saving produces the backlog.** The current system cannot persist an
 incomplete log on. An operator who has captured half the detail has nothing to save, so
@@ -857,7 +911,8 @@ address this directly.
 **A.3 Mandatory fields are the fields that arrive last.** Registration and mobile number
 are required before a record can be saved, and are the two fields that typically arrive
 last in a call or on a later call (OC-6). The form demands first what the conversation
-surrenders last. CAP-2, CAP-13 and CAP-14 address this.
+surrenders last. The paper log marks the same fields mandatory and yet accepts the row
+without them (A.1); the software does not. CAP-2, CAP-13 and CAP-14 address this.
 
 **A.4 Default values that fail validation.** The observed new-log-on form pre-populates
 departure time and ETA with the same value, then rejects the record on the grounds that
@@ -888,7 +943,8 @@ this.
 
 **A.8 Two identifiers are the existing accuracy practice.** Operators routinely request
 two identifying values — member number and registration, or registration and mobile
-number. Agreement provides corroboration; disagreement signals a possible error. This is
+number. The paper log institutionalises this: its three shaded mandatory columns are member
+number or vessel name, registration and mobile (A.1). Agreement provides corroboration; disagreement signals a possible error. This is
 not a guarantee of identity, and shared, stale or correlated identifiers require the
 ambiguity rules in §7. The practice is undocumented and unsupported by
 software, and is performed by eye across the partitioned searches described in A.7.
@@ -995,12 +1051,33 @@ revisions add identifiers; they do not renumber.
     integration remains authoritative, and how will its acknowledgment/failure be shown?
 14. What access, retention, disposal, export and contingency-record policies apply?
     Identify the document/authority and approver for each release-affecting answer.
+15. Does the paper radio log (A.1) remain the primary record after a replacement system is
+    trusted, become the contingency record, or be retired? Who decides, and what does the
+    system need to show before that decision (AC-26)?
 
 ---
 
 <a id="section-appendix-e-revision-history"></a>
 
 ## Appendix E — Revision history
+
+<a id="section-version-08-changes-from-07"></a>
+
+### Version 0.8 — changes from 0.7
+
+- Added Figure 5, the unit's blank paper radio log, and rewrote A.1 from it. The previous
+  transcription was wrong: the log has member number *or vessel name*, registration and
+  mobile as three shaded mandatory columns, a Vessel Details column, ETA/ETR as return
+  day-or-date plus time, a Time Arrived column, a pre-printed trip number, and separate
+  entered and logged-off columns for the computer system.
+- Stated the paper log as the primary record and the first thing filled out (OC-9), and
+  required the capture view and queue to carry its columns under its headings in its
+  order (DAT-6, AC-48), with return day-or-date as its own field.
+- Mapped the paper columns to the §6.1 classes; noted that Class C is not on paper.
+- Recorded that "mandatory" on paper means obtained before the call ends, while the
+  existing system reads it as required before saving (A.1, A.3), and that the paper log
+  institutionalises the two-identifier practice (A.8).
+- Added Appendix D question 15 on the paper log's future.
 
 <a id="section-version-07-changes-from-06"></a>
 
@@ -1068,7 +1145,8 @@ revisions add identifiers; they do not renumber.
 
 ## Appendix F — Evidence figures
 
-These are supplied screenshots of the existing platform, not proposed interface designs.
+Figures 1 to 4 are supplied screenshots of the existing platform, not proposed interface
+designs. Figure 5 is the paper radio log itself.
 Static images evidence visible layout/defaults; search exclusions, persistence behavior,
 and overdue behavior require observations or runtime checks beyond a screenshot.
 
@@ -1105,3 +1183,12 @@ Supports A.4 and A.6: trip fields/defaults and capture occupying the screen.
 
 Supports A.4: identical displayed departure/return values. No claim about the actual
 runtime overdue calculation can be established from this image alone.
+
+<a id="section-figure-5-paper-radio-log"></a>
+
+### Figure 5 — Paper radio log
+
+![The unit's blank Limited Coast Station Radio Log](figures/figure-5-paper-radio-log-blank-form.jpeg)
+
+The primary record (OC-9), transcribed column by column in A.1. Shading marks the three
+mandatory columns; the last three columns track transcription into the computer system.

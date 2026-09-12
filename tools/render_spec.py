@@ -49,7 +49,8 @@ def main():
     body = re.sub(r'<table>.*?</table>', table_style, body, flags=re.S)
     def embed(match):
         path = ROOT / html.unescape(match.group(1))
-        return 'src="data:image/png;base64,' + base64.b64encode(path.read_bytes()).decode() + '"'
+        mime = 'image/jpeg' if path.suffix.lower() in ('.jpg', '.jpeg') else 'image/png'
+        return 'src="data:' + mime + ';base64,' + base64.b64encode(path.read_bytes()).decode() + '"'
     body = re.sub(r'src="(figures/[^"]+)"', embed, body)
     body = re.sub(r'<p>(<img alt="([^"]*)"[^>]+>)</p>', r'<figure>\1<figcaption>\2</figcaption></figure>', body)
     # Keep contents and evidence figures in dedicated print sections.
@@ -96,14 +97,14 @@ def main():
         page = browser.new_page()
         page.set_content(doc, wait_until='load')
         page.evaluate('document.fonts.ready')
-        assert page.locator('img').count() == 4, 'Expected all four evidence figures'
+        assert page.locator('img').count() == 5, 'Expected all five evidence figures'
         assert page.evaluate('Array.from(document.images).every(i => i.complete && i.naturalWidth > 0)')
         assert page.evaluate('Array.from(document.querySelectorAll(\'a[href^="#"]\')).every(a => document.getElementById(a.hash.slice(1)))'), 'Broken contents link'
         page.pdf(path=str(ROOT / 'vessel-logon-spec.pdf'), format='A4', print_background=True,
                  display_header_footer=True, header_template='<span></span>',
                  footer_template=f'<div style="font-family:Arial;font-size:8px;color:#64748b;width:100%;text-align:center;">Vessel Log On · v{version} draft · <span class="pageNumber"></span> / <span class="totalPages"></span></div>')
         browser.close()
-    print(f'Rendered {ROOT / "vessel-logon-spec.pdf"}; contents links and 4 images verified.')
+    print(f'Rendered {ROOT / "vessel-logon-spec.pdf"}; contents links and 5 images verified.')
 
 
 if __name__ == '__main__':
