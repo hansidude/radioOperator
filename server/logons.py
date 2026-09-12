@@ -126,11 +126,18 @@ def column(field):
     return field
 
 
+def resolved_day(row, field):
+    """The date a day cell settled on: the stored date, or for a row written before that column
+    existed, the date of the instant it already produced. Never the words read again."""
+    day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[DAY_FIELDS.get(field, field)]
+    return row.get(day_date_col) or (row[when_col].date() if row.get(when_col) else None)
+
+
 def box(row, field):
-    """What the input shows. A day cell shows its resolved date once it has one ('Sun 13/9'), so the
-    relative word the operator typed is never what anyone reads back; unresolved, it shows the words."""
+    """What the input shows. A day cell shows the date it settled on ('Sun 13/9'), so the relative
+    word the operator typed is never what anyone reads back; unresolved, it shows the words."""
     if field in DAY_FIELDS:
-        day = row.get(TIME_FIELDS[DAY_FIELDS[field]][1])
+        day = resolved_day(row, field)
         if day:
             return times.fmt_day(day, (row.get('createdAt') or datetime.now()).year)
     return row.get(column(field)) or ''
@@ -242,11 +249,13 @@ def interpret(row, field, resolve_day=False):
     day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[field]
     ref, label = _reference(row, field)
     written = (row.get(day_raw_col) or '').strip()
-    stored = row.get(day_date_col)
-    if resolve_day or (written and not stored):
+    settled = row.get(day_date_col) or (row[when_col].date() if row.get(when_col) else None)
+    if resolve_day:
         day = times.parse_day(written, ref)
-    elif stored:
-        day = {'day': stored, 'label': 'as entered', 'basis': times.fmt_day(stored, ref.year) + ' (as entered)', 'warning': None}
+    elif settled:
+        day = {'day': settled, 'label': 'day cell', 'basis': times.fmt_day(settled, ref.year) + ' (day cell)', 'warning': None}
+    elif written:
+        day = times.parse_day(written, ref)          # written but never resolved: read it now, once
     else:
         day = {'day': None, 'label': '', 'basis': '', 'warning': None}
     if not (row.get(raw_col) or '').strip():

@@ -108,6 +108,12 @@ class LogOns(unittest.TestCase):
         self.assertEqual(L.get(self.cur, i)['eta'], datetime(2026, 9, 13, 6, 0))
         out = L.set_field(self.cur, i, 'eta', '0700', 'alice', T0 + timedelta(days=1))
         self.assertEqual(out['when'], datetime(2026, 9, 13, 7, 0))
+        # a row written before etaDate existed keeps the day its instant already settled on
+        self.cur.execute('UPDATE LogOns SET etaDate = NULL WHERE id = %s', (i,))
+        row = L.get(self.cur, i)
+        self.assertEqual(L.box(row, 'etaDay'), 'Sun 13/9')
+        out = L.set_field(self.cur, i, 'eta', '0800', 'alice', T0 + timedelta(days=3))
+        self.assertEqual(out['when'], datetime(2026, 9, 13, 8, 0))       # not three days later
         # a date typed into the time cell fills the day cell
         j = L.create(self.cur, 'alice', '', T0)
         out = L.set_field(self.cur, j, 'eta', '14/9 0800', 'alice', T0)
