@@ -1,0 +1,34 @@
+# The log on app on its own: MariaDB + the app on port 8091, on quackit's Python/Flask versions. Run from the repo root:
+#   docker compose -f standalone/docker-compose.yml up --build
+name: radio-logon
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: standalone/Dockerfile
+    ports:
+      - "8091:8091"
+    environment:
+      - RADIO_DB=mysql://radio:radio@db/radio
+      - SECRET_KEY=change-me
+      - TZ=Australia/Brisbane
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: mariadb:10.11
+    command: --default-time-zone=+10:00
+    environment:
+      - MYSQL_ROOT_PASSWORD=radio-root
+      - MYSQL_DATABASE=radio
+      - MYSQL_USER=radio
+      - MYSQL_PASSWORD=radio
+    volumes:
+      - radio_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  radio_db:

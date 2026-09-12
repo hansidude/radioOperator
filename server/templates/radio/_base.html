@@ -1,0 +1,42 @@
+{# Standalone base. A host passes its own layout as `base_template`; it only has to offer these blocks
+   and the two navbar-row classes below (quackit's live in static/css/navbar_controls.css). #}
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ brand }}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css">
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; padding-top: var(--app-navh, 56px); }
+    .navbar > .container-fluid { flex-wrap: wrap; }
+    .navbar.fixed-top { padding-top: 2px; padding-bottom: 2px; }
+    .navbar-brand { font-size: 1rem; }
+    .entity-nav { order: 98; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .4rem; }
+    .entity-nav .btn { font-size: .75rem; }
+    .entity-nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-right: auto; }
+  </style>
+</head>
+<body>
+  <nav class="navbar fixed-top bg-dark" data-bs-theme="dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/logons"><i class="bi bi-broadcast me-1"></i>{{ brand }}</a>
+      <span class="text-light">{% block page_title %}{% endblock %}</span>
+      {% block navbar_buttons %}{% endblock %}
+    </div>
+  </nav>
+  <div class="{% block body_wrap_class %}container-fluid{% endblock %}">{% block body %}{% endblock %}</div>
+  <script>
+    (function () {
+      function fit() {
+        var nav = document.querySelector('.navbar.fixed-top');
+        if (nav) document.documentElement.style.setProperty('--app-navh', nav.offsetHeight + 'px');
+      }
+      window.addEventListener('load', fit); window.addEventListener('resize', fit);
+      if (window.ResizeObserver) new ResizeObserver(fit).observe(document.querySelector('.navbar.fixed-top'));
+      fit();
+    })();
+  </script>
+</body>
+</html>

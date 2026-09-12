@@ -1,0 +1,104 @@
+{% extends base_template %}
+{% import 'radio/_ui.html' as ui %}
+{% set open = logon.watchStatus in ('pending', 'watching') %}
+{% block page_title %}<i class="bi bi-broadcast me-1"></i>Log on #{{ logon.id }}{% endblock %}
+{% block navbar_buttons %}
+<div class="entity-nav" role="navigation" aria-label="Log on">
+  <div class="entity-nav-links">
+    <a class="btn btn-outline-success btn-sm" href="/logons"><i class="bi bi-list-ul me-1"></i>Open watch queue</a>
+    {{ ui.cond({'condition': condition, 'minutes': minutes, 'etaRaw': logon.etaRaw}) }}
+    <span class="badge text-bg-secondary">{{ 'Complete' if logon.captureStatus == 'complete' else 'Draft' }}</span>
+    <span class="badge {% if logon.watchStatus == 'pending' %}text-bg-warning{% elif logon.watchStatus == 'watching' %}text-bg-info{% else %}text-bg-dark{% endif %}">{{ {'pending': 'Pending acceptance', 'watching': 'Watching', 'loggedoff': 'Logged off', 'cancelled': 'Cancelled'}[logon.watchStatus] }}</span>
+    <span id="queueNote" class="small text-secondary"></span>
+  </div>
+  <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if open %}Saved to the shared record{% else %}Closed: read only{% endif %}</span>
+</div>
+{% endblock %}
+{% block body %}
+{{ ui.styles() }}
+<div class="row g-3 mt-0">
+<div class="col-12 col-xl-7">
+  <div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
+  {% if not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
+  <section class="ro-gaps mt-2" aria-label="Still to ask">
+    <strong>Still to ask</strong> <span class="text-secondary">— advisory, ranked A to D; nothing here blocks saving or completing</span>
+    <ol id="gaps">{% for g in gaps %}<li><button type="button" class="btn btn-outline-secondary {{ g.cls }}" data-focus="{{ g.field }}"><span class="me-1">{{ g.cls }}</span>{{ g.label }}</button></li>{% else %}<li class="small text-success">Nothing left to ask.</li>{% endfor %}</ol>
+  </section>
+  <form id="capture" class="ro-form mt-2" autocomplete="off" onsubmit="return false">
+    {% macro field(name, cols='col-6 col-md-4') %}
+    {% set raw = logon[time_fields[name][0]] if name in time_fields else logon[name] %}
+    {% set basis = logon[time_fields[name][2]] if name in time_fields else '' %}
+    <div class="{{ cols }}"><label for="f-{{ name }}">{{ labels[name] }}</label>
+      {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
+      {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+      {% else %}<input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if name in time_fields %}placeholder="1500 · 3pm · +2h"{% endif %} {% if not open %}disabled{% endif %}>{% endif %}
+      <div class="ro-basis" id="b-{{ name }}">{{ basis or '' }}</div><div class="ro-warn" id="w-{{ name }}"></div></div>
+    {% endmacro %}
+    {% for cls, title, names in classes %}
+    <fieldset><legend>{{ cls }} · {{ title }}</legend><div class="row g-2">{% for n in names %}{{ field(n) }}{% endfor %}</div></fieldset>
+    {% endfor %}
+    <fieldset><legend>Call</legend><div class="row g-2">{{ field('channel', 'col-4 col-md-3') }}{{ field('callTime', 'col-8 col-md-3') }}{{ field('notes', 'col-12 col-md-6') }}</div>
+      <div class="ro-basis mt-1">Entered {{ logon.createdAt.strftime('%a %d %b %H:%M') }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}</div></fieldset>
+  </form>
+  {% if open %}
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    {% if logon.watchStatus == 'pending' %}<form method="post" action="/logon/{{ logon.id }}/accept"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-outline-info btn-sm"><i class="bi bi-eye me-1"></i>Accept watch</button></form>{% endif %}
+    <form method="post" action="/logon/{{ logon.id }}/capture"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="complete" value="{{ '0' if logon.captureStatus == 'complete' else '1' }}"><button class="btn btn-outline-secondary btn-sm">{% if logon.captureStatus == 'complete' %}<i class="bi bi-pencil me-1"></i>Reopen capture{% else %}<i class="bi bi-check2 me-1"></i>Mark capture complete{% endif %}</button></form>
+    <form method="post" action="/logon/{{ logon.id }}/logoff" class="d-flex gap-1 ms-auto" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"><input name="note" class="form-control form-control-sm" placeholder="Log off: contact / evidence" maxlength="255" style="width:16rem"><button class="btn btn-success btn-sm"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></form>
+  </div>
+  {% endif %}
+  {% if identifiers %}
+  <div class="ro-idents mb-2"><strong>Heard</strong> <span class="text-secondary">(every value as captured, DAT-5)</span>
+    <ul class="mb-0">{% for i in identifiers %}<li class="{{ '' if i.isActive else 'old' }}">{{ labels[i.kind] }}: <code>{{ i.raw }}</code> <span class="text-secondary">{{ i.capturedAt.strftime('%H:%M') }} {{ i.source }}{% if not i.isActive %} superseded{% endif %}</span></li>{% endfor %}</ul></div>
+  {% endif %}
+</div>
+<div class="col-12 col-xl-5">
+  <div class="small text-secondary mt-2">Open watch queue · approaching = {{ window }} min</div>
+  <div id="queuePane">{{ ui.queue(queue, now, logon.id) }}</div>
+</div>
+</div>
+{{ ui.refresh_script(logon.id) }}
+<script>
+(function () {
+  var id = {{ logon.id }}, version = {{ logon.version }}, open = {{ 'true' if open else 'false' }};
+  var status = document.getElementById('saveStatus'), stale = document.getElementById('stale');
+  var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function setStatus(text, cls) { status.textContent = text; status.className = 'small ' + cls; }
+  function renderGaps(gaps) {
+    var ol = document.getElementById('gaps');
+    ol.innerHTML = gaps.length ? gaps.map(function (g) { return '<li><button type="button" class="btn btn-outline-secondary ' + g.cls + '" data-focus="' + g.field + '"><span class="me-1">' + g.cls + '</span>' + esc(g.label) + '</button></li>'; }).join('') : '<li class="small text-success">Nothing left to ask.</li>';
+  }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-focus]');
+    if (b) { var el = document.getElementById('f-' + b.dataset.focus); if (el) { el.focus(); el.select && el.select(); } }
+  });
+  function save(el) {
+    var field = el.dataset.field;
+    setStatus('Saving…', 'text-secondary');
+    fetch('/api/logon/' + id, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ field: field, value: el.value, version: version }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { return { ok: false, status: r.status, d: {} }; }); })
+      .then(function (x) {
+        if (x.status === 409) { stale.hidden = false; setStatus('Not saved to the shared record: changed elsewhere', 'text-danger'); return; }
+        if (!x.ok) { setStatus('Not saved to the shared record: ' + (x.d.error || ('HTTP ' + x.status)), 'text-danger'); return; }
+        version = x.d.version;
+        var b = document.getElementById('b-' + field), w = document.getElementById('w-' + field);
+        if (b) b.textContent = x.d.basis || '';
+        if (w) w.textContent = x.d.warning || '';
+        renderGaps(x.d.gaps);
+        setStatus('Saved to the shared record ' + x.d.savedAt, 'text-success');
+        window.refreshQueue();
+      })
+      .catch(function (e) { setStatus('Not saved to the shared record: ' + e.message, 'text-danger'); });
+  }
+  if (open) inputs.forEach(function (el, i) {
+    el.addEventListener('change', function () { save(el); });
+    el.addEventListener('keydown', function (ev) {          // Enter = next field, so a call is keyboard only (CAP-3)
+      if (ev.key === 'Enter' && el.tagName !== 'TEXTAREA') { ev.preventDefault(); var n = inputs[i + 1]; if (n) { n.focus(); n.select && n.select(); } }
+    });
+  });
+  if (open && !document.activeElement.matches('[data-field]')) { var first = inputs[0]; if (first) first.focus(); }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{# Shared pieces for every log on page. Hosted, the pages wear the host's Bootstrap, icons and navbar rows;
+   standalone, _base.html provides the same. Only what is log-on-specific is styled here. #}
+
+{% macro styles() %}
+<style>
+.ro-queue{--bs-table-bg:transparent;font-size:.82rem;font-variant-numeric:tabular-nums;margin:0}
+.ro-queue th,.ro-queue td{padding:.15rem .35rem;white-space:nowrap;vertical-align:middle;border-width:0 0 1px 0}
+.ro-queue th{font-weight:600;font-size:.72rem;color:var(--bs-secondary-color)}
+.ro-queue tr.ro-current td{outline:2px solid var(--bs-primary);outline-offset:-2px}
+.ro-queue td.wrap{white-space:normal;min-width:8rem}
+.ro-cond{font-size:.72rem;letter-spacing:.02em}
+.ro-gaps{font-size:.82rem}
+.ro-gaps ol{display:flex;flex-wrap:wrap;gap:.3rem;padding:0;margin:.2rem 0 0;list-style:none}
+.ro-gaps button{font-size:.75rem;padding:.05rem .45rem}
+.ro-gaps .A{--bs-btn-border-color:var(--bs-danger);--bs-btn-color:var(--bs-danger)}
+.ro-gaps .B{--bs-btn-border-color:var(--bs-warning);--bs-btn-color:var(--bs-warning)}
+.ro-form fieldset{border:1px solid var(--bs-border-color);border-radius:.4rem;padding:.4rem .6rem .5rem;margin:0 0 .6rem}
+.ro-form legend{float:none;width:auto;font-size:.72rem;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
+.ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
+.ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
+.ro-basis{font-size:.72rem;color:var(--bs-secondary-color);min-height:1em}
+.ro-warn{font-size:.72rem;color:var(--bs-warning)}
+.ro-warn:empty,.ro-basis:empty{display:none}
+.ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
+</style>
+{% endmacro %}
+
+{% macro when(dt, now) %}{% if dt %}{% if dt.date() != now.date() %}{{ dt.strftime('%d %b ') }}{% endif %}{{ dt.strftime('%H:%M') }}{% endif %}{% endmacro %}
+
+{% macro minutes(m) %}{% if m|abs < 60 %}{{ m|abs }} min{% elif m|abs < 1440 %}{{ (m|abs // 60) }} h {{ (m|abs % 60) }} min{% else %}{{ (m|abs // 1440) }} d {{ ((m|abs % 1440) // 60) }} h{% endif %}{% endmacro %}
+
+{% macro cond(r) %}
+{% if r.condition == 'overdue' %}<span class="badge text-bg-danger ro-cond">OVERDUE {{ minutes(r.minutes) }}</span>
+{% elif r.condition == 'approaching' %}<span class="badge text-bg-warning ro-cond">Due in {{ minutes(r.minutes) }}</span>
+{% elif r.condition == 'nodeadline' %}<span class="badge text-bg-secondary ro-cond" title="Not time-monitorable for vessel return (DAT-1)">{% if r.etaRaw %}ETA not understood{% else %}No ETA{% endif %}</span>
+{% else %}<span class="badge border text-secondary ro-cond">Due in {{ minutes(r.minutes) }}</span>{% endif %}
+{% endmacro %}
+
+{% macro queue(rows, now, current=None) %}
+<table class="table table-sm ro-queue" id="queueTable">
+  <thead><tr><th>Status</th><th>ETA</th><th>Vessel</th><th>POB</th><th>Destination</th><th>Mobile</th><th>Capture</th><th>Watch</th><th>Age</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
+    <td>{{ cond(r) }}</td>
+    <td>{{ when(r.eta, now) }}{% if not r.eta and r.etaRaw %}<span class="text-danger" title="Kept as typed">{{ r.etaRaw }}</span>{% endif %}</td>
+    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.vesselName or r.registration or ('#' ~ r.id) }}</a>{% if r.vesselName and r.registration %} <span class="text-secondary">{{ r.registration }}</span>{% endif %}</td>
+    <td>{{ r.pob or '' }}</td>
+    <td class="wrap">{{ r.destination or '' }}</td>
+    <td>{{ r.mobile or '' }}</td>
+    <td>{{ 'Complete' if r.captureStatus == 'complete' else 'Draft' }}{% if r.gaps %} <span class="badge text-bg-secondary" title="Fields still to ask">{{ r.gaps }}</span>{% endif %}</td>
+    <td>{% if r.watchStatus == 'pending' %}<span class="text-warning">Pending acceptance</span>{% else %}Watching{% endif %}</td>
+    <td class="text-secondary">{{ minutes(r.ageMinutes) }}</td>
+    <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td>
+  </tr>{% else %}<tr><td colspan="10" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% macro refresh_script(current) %}
+<script>
+// The queue re-fetches itself so a passed deadline shows without anyone pressing anything (WAT-3, minimal).
+window.refreshQueue = function () {
+  var pane = document.getElementById('queuePane');
+  if (!pane) return;
+  fetch('/logons/rows?partial=1{% if current %}&current={{ current }}{% endif %}', { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('Queue refresh failed (' + r.status + ')'); return r.text(); })
+    .then(function (html) { pane.innerHTML = html; })
+    .catch(function (e) { var n = document.getElementById('queueNote'); if (n) { n.textContent = e.message; n.className = 'small text-danger'; } });
+};
+setInterval(window.refreshQueue, 30000);
+</script>
+{% endmacro %}
