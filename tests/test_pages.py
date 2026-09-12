@@ -248,6 +248,12 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,
                                      data={'reason': 'notdeparted', 'note': 'never sailed'}).status_code, 302)
 
+    def test_the_channel_test_says_plainly_when_it_reached_nobody(self):
+        r = self.a.post('/logons/alerts/test')
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json['ok'])
+        self.assertIn('reached nobody', r.json['message'])          # never dressed up as good news
+
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)

@@ -9,7 +9,7 @@ liftable.
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request
+from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request
 
 from . import identity as ID
 from . import logons as L
@@ -280,11 +280,11 @@ def alerts_test():
         sent, error = h.notify(alert) or ([], None)
     except Exception as e:
         sent, error = [], str(e)
-    if sent:
-        flash('Test alert accepted by: %s.%s' % (', '.join(sent), (' Not by: %s.' % error) if error else ''))
-    else:
-        flash('Test alert reached nobody. %s' % (error or 'No delivery channel is configured.'))
-    return redirect(request.form.get('back') or '/logons')
+    # Answered here rather than flashed through the host: a host's flash styling is its own, and a
+    # delivery that reached nobody must not be rendered as good news.
+    return jsonify({'ok': bool(sent), 'sent': sent, 'error': error,
+                    'message': ('Test alert accepted by %s.%s' % (', '.join(sent), (' Not by %s.' % error) if error else ''))
+                               if sent else ('Test alert reached nobody. %s' % (error or 'No delivery channel is configured.'))})
 
 
 @bp.route('/api/logons/alerts')

@@ -93,11 +93,27 @@
   {% endfor %}
   <div class="ro-health{{ '' if health.ok else ' bad' }}" title="Deadlines are evaluated by a checker that runs whether or not this page is open">{{ health.message }}</div>
   <div class="ro-health">
-    <form method="post" action="/logons/alerts/test" style="display:inline"><input type="hidden" name="back" value="{{ back }}"><button class="btn btn-outline-secondary btn-sm py-0" style="font-size:.7rem" title="Sends a real alert through whatever is configured, so you know whether it reaches anyone">Test the alert channel</button></form>
+    <button type="button" id="roTestChannel" class="btn btn-outline-secondary btn-sm py-0" style="font-size:.7rem" title="Sends a real alert through whatever is configured, so you know whether it reaches anyone">Test the alert channel</button>
+    <span id="roTestResult"></span>
     <span id="roAlarmState"></span>
   </div>
 </div>
 {% set unseen = alerts|rejectattr('acknowledgedAt')|list %}
+<script>
+(function () {
+  var button = document.getElementById('roTestChannel'), result = document.getElementById('roTestResult');
+  if (!button) return;
+  button.addEventListener('click', function () {
+    button.disabled = true;
+    result.textContent = 'Sending\u2026'; result.className = 'text-secondary';
+    fetch('/logons/alerts/test', { method: 'POST', credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { result.textContent = d.message; result.className = d.ok ? 'text-success' : 'text-danger'; })
+      .catch(function (e) { result.textContent = 'Could not send: ' + e.message; result.className = 'text-danger'; })
+      .then(function () { button.disabled = false; });
+  });
+})();
+</script>
 <script>
 (function () {
   // In the room: while a page is open and something is unacknowledged, make it impossible to miss.
