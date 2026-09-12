@@ -2,63 +2,39 @@
 {% import 'radio/_ui.html' as ui %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>Radio log{% endblock %}
 {% block navbar_buttons %}
-{% set overdue = queue|selectattr('condition', 'equalto', 'overdue')|list %}
-<div class="entity-nav" role="navigation" aria-label="Radio log views">
+<div class="entity-nav" role="navigation" aria-label="Radio log">
   <span id="queueNote" class="small text-danger me-auto" role="alert" hidden></span>
-  <div class="btn-group btn-group-sm ro-view-tabs" id="queueViewTabs" role="group" aria-label="Radio log views">
-    <button type="button" class="btn btn-outline-secondary active" data-ro-tab="overview" aria-controls="ro-overview-pane" aria-pressed="true"><i class="bi bi-grid me-1"></i>Overview</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="loggedon" aria-controls="ro-loggedon-pane" aria-pressed="false"><i class="bi bi-broadcast me-1"></i>Logged on <span class="badge text-bg-secondary">{{ queue|length }}</span></button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="overdue" aria-controls="ro-overdue-pane" aria-pressed="false"><i class="bi bi-alarm me-1"></i>Overdue <span class="badge {{ 'text-bg-danger' if overdue else 'text-bg-secondary' }}">{{ overdue|length }}</span></button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="drafts" aria-controls="ro-drafts-pane" aria-pressed="false"><i class="bi bi-pencil-square me-1"></i>Drafts <span class="badge text-bg-secondary">{{ drafts|length }}</span></button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="closed" aria-controls="ro-closed-pane" aria-pressed="false"><i class="bi bi-check2-circle me-1"></i>Closed</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="find" aria-controls="ro-find-pane" aria-pressed="false"><i class="bi bi-search me-1"></i>Find</button>
-  </div>
-  <form method="post" action="/logons/new"><button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New log on</button></form>
+  <a class="btn btn-primary btn-sm" href="/logons/new"><i class="bi bi-plus-lg me-1"></i>New log on</a>
 </div>
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-{% set overdue = queue|selectattr('condition', 'equalto', 'overdue')|list %}
-<div id="queuePane">
-  <section id="ro-overview-pane" class="ro-workspace-pane" data-ro-pane="overview">
-    {{ ui.status_counts(queue, drafts) }}
-  </section>
-  <section id="ro-loggedon-pane" class="ro-workspace-pane d-none" data-ro-pane="loggedon">
-    <div id="roLiveWatch">{{ ui.queue(queue, now, heading=False) }}</div>
-  </section>
-  <section id="ro-overdue-pane" class="ro-workspace-pane d-none" data-ro-pane="overdue">
-    <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
-    <div id="roLiveOverdue">{{ ui.queue(overdue, now, heading=False, empty='0 overdue') }}</div>
-  </section>
-  <section id="ro-drafts-pane" class="ro-workspace-pane d-none" data-ro-pane="drafts">
-    <div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference, heading=False) }}</div>
-  </section>
-  <section id="ro-closed-pane" class="ro-workspace-pane d-none" data-ro-pane="closed">{{ ui.closed_list(closed, now, reference) }}</section>
-  <section id="ro-find-pane" class="ro-workspace-pane d-none" data-ro-pane="find">
-    <h2 class="ro-section-title">Find a previous vessel, member or trip</h2>
-    {{ ui.find() }}
-  </section>
-</div>
+{# One collection, four filters. There are no per-status tabs and no per-status renderers: the same
+   rows, narrowed. Counts are not shown beside the filters -- a number on a filter you have not
+   chosen is noise, and a red zero is worse (see the abnormal-situation note in _ui.html). #}
+<form class="ro-toolbar" method="get" action="/logons">
+  <input type="hidden" name="f" value="1">
+  <label for="roStatus">Status</label>
+  <select class="form-select form-select-sm" id="roStatus" name="status">
+    {% for value, label in [('all', 'All'), ('draft', 'Drafts'), ('loggedon', 'Logged on'), ('overdue', 'Overdue'), ('closed', 'Closed')] %}
+    <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <div class="form-check ro-toolbar-tick">
+    <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
+    <label class="form-check-label" for="roDayOn">Date</label>
+  </div>
+  <input class="form-control form-control-sm ro-toolbar-date" type="date" id="roDay" name="day" value="{{ filters.day.isoformat() }}" aria-label="Call date">
+  <label for="roSort">Sort</label>
+  <select class="form-select form-select-sm" id="roSort" name="sort">
+    <option value="newest"{% if filters.sort == 'newest' %} selected{% endif %}>Newest first</option>
+    <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
+  </select>
+  <input class="form-control form-control-sm ro-toolbar-search" type="search" name="q" value="{{ filters.search }}"
+         placeholder="Trip, number, member, vessel, rego, mobile, going to" aria-label="Find">
+  <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+</form>
+{{ ui.alert_list(alerts, health) }}
+<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>
 {{ ui.refresh_script(None) }}
-{{ ui.find_script() }}
-<script>
-(function () {
-  var group = document.getElementById('queueViewTabs');
-  if (!group) return;
-  var buttons = Array.prototype.slice.call(group.querySelectorAll('[data-ro-tab]'));
-  function show(name, updateHash) {
-    if (!buttons.some(function (button) { return button.dataset.roTab === name; })) name = 'overview';
-    buttons.forEach(function (button) {
-      var active = button.dataset.roTab === name;
-      button.classList.toggle('active', active);
-      button.setAttribute('aria-pressed', String(active));
-      var pane = document.getElementById(button.getAttribute('aria-controls'));
-      if (pane) pane.classList.toggle('d-none', !active);
-    });
-    if (updateHash && window.history && window.history.replaceState) window.history.replaceState(null, '', '#' + name);
-  }
-  buttons.forEach(function (button) { button.addEventListener('click', function () { show(button.dataset.roTab, true); }); });
-  show(window.location.hash.slice(1) || 'overview', false);
-})();
-</script>
 {% endblock %}

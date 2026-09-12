@@ -1,7 +1,4 @@
+{# The refresh partial: the same alerts and the same one list the page renders, nothing else. #}
 {% import 'radio/_ui.html' as ui %}
-{% set overdue = queue|selectattr('condition', 'equalto', 'overdue')|list %}
-{{ ui.status_counts(queue, drafts) }}
 <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
-<div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference, current, heading=False) }}</div>
-<div id="roLiveWatch">{{ ui.queue(queue, now, current, heading=False) }}</div>
-<div id="roLiveOverdue">{{ ui.queue(overdue, now, current, heading=False, empty='0 overdue') }}</div>
+<div id="roLiveRecords">{{ ui.record_list(records, now, reference, current, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>

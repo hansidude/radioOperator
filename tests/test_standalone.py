@@ -15,9 +15,11 @@ class Standalone(unittest.TestCase):
             c = app.test_client()
             self.assertEqual(c.get('/').status_code, 302)
             self.assertEqual(c.get('/logons').status_code, 200)
-            r = c.post('/logons/new')
-            self.assertEqual(r.status_code, 302)
-            i = int(r.location.rsplit('/', 1)[-1])
+            self.assertEqual(c.get('/logons/new').status_code, 200)
+            r = c.post('/logons/new', json={'fields': {
+                'callDay': '2026-09-12', 'callTime': '09:00', 'registration': 'AB123Q'}})
+            self.assertEqual(r.status_code, 200)
+            i = r.json['id']
             self.assertEqual(c.get('/logon/%d' % i).status_code, 200)
             self.assertEqual(c.post('/api/logon/%d' % i, json={'field': 'destination', 'value': 'Moreton'}).status_code, 200)
             again = create_app('sqlite:///' + str(Path(tmp) / 'radio.sqlite')).test_client()   # the schema is IF NOT EXISTS

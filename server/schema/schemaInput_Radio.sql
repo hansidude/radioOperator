@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | watching | loggedoff | discarded
   `dayNumber` INT DEFAULT NULL,                               -- counts from 1 each day: what operators say out loud (REC-9)
   `dayDate` DATE DEFAULT NULL,                                -- the day that number belongs to
+  -- Paper column 'Trip ID No.', pre-printed 'T-' (spec A.1). One running sequence, not per day:
+  -- this is the record's key, the day number is only what the operator says out loud. The state-wide
+  -- system issues these across every unit; this branch allocates its own and the width leaves room
+  -- to re-key behind a branch prefix if the ranges are ever divided up.
+  `tripRef` VARCHAR(16) DEFAULT NULL,                         -- 'T-00042'; NULL until the first save that passes the draft minimum
   `acceptedAt` DATETIME DEFAULT NULL,                         -- the moment the unit took the watch (ACC-3)
   `acceptedBy` VARCHAR(255) DEFAULT NULL,
   `channel` VARCHAR(16) DEFAULT NULL,                         -- radio | phone | person | self (OC-1)
@@ -83,6 +88,10 @@ CREATE INDEX IF NOT EXISTS `idx_logons_open` ON `LogOns`(`unit`, `watchStatus`, 
 -- CREATE INDEX, dropping the uniqueness, so the allocation in logons.create() locks rather than
 -- relying on this constraint. Standalone on SQLite does get the constraint.
 CREATE UNIQUE INDEX IF NOT EXISTS `uniq_logons_daynumber` ON `LogOns`(`unit`, `dayDate`, `dayNumber`);
+-- One trip reference, ever (REC-9). Same caveat as above: on quackit this arrives as a plain index,
+-- so logons._next_number() locks and retries rather than trusting it. NULL repeats freely, which is
+-- what an unsaved draft needs.
+CREATE UNIQUE INDEX IF NOT EXISTS `uniq_logons_tripref` ON `LogOns`(`tripRef`);
 
 -- Every identifying value as the operator heard it, kept whatever it later resolves to (DAT-5, IDV-1).
 -- A corrected value supersedes the previous row for that kind; the old row stays, inactive (IDV-3).

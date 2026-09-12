@@ -98,6 +98,14 @@ class Refused(Exception):
     """A write the app will not store, with the reason. Hosts turn it into 400 / a message."""
 
 
+class InvalidDraft(Refused):
+    """A draft save missing the unit's minimum identifying call details."""
+
+    def __init__(self, fields):
+        self.fields = fields
+        super().__init__('A draft needs a valid date, time, and one of member number, vessel rego or mobile')
+
+
 class Stale(Exception):
     """The row changed since the caller last saw it (CAP-22). Hosts turn it into 409."""
 
@@ -240,59 +248,261 @@ def _decorate(rows, now, approaching_minutes):
     return rows
 
 
+# One collection, four filters. A status is a property of a record, not a reason to keep four
+# queries, four sorts and four renderers. Overdue is the exception that has to be applied after the
+# fetch: it is not a column but a reading of the deadline against now (see condition()).
+STATUS_WHERE = {
+    'draft': NOT_CLOSED,
+    'loggedon': "watchStatus = 'watching'",
+    'overdue': "watchStatus = 'watching'",
+    'closed': 'watchStatus IN (' + ', '.join("'%s'" % state for state in CLOSED) + ')',
+}
+# What Find searches. The trip reference and the day number are how an operator refers to a record
+# out loud, so both have to be findable alongside the vessel's identifying values.
+SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination')
+
+
+def records(cur, unit, now, approaching_minutes, status=None, day=None, search=None, newest_first=True):
+    """The radio log, filtered. `status` is one of STATUS_WHERE or None for every record; `day` limits
+    to one call date; `search` matches any of SEARCH_FIELDS.
+
+    Newest first by default, which is the paper log read from the bottom up: the call that just came
+    in is the one being worked on. Order is by the call time, never by the entry time, so a delayed
+    paper record entered tonight sits where it was called, not at the top (REC-2)."""
+    if status is not None and status not in STATUS_WHERE:
+        raise Refused('No such status filter: %r' % status)
+    where = 'SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s'
+    args = [unit]
+    if status is not None:
+        where += ' AND ' + STATUS_WHERE[status]
+    if day is not None:
+        where += ' AND callDate = %s'
+        args.append(_sd(day))
+    cur.execute(where, tuple(args))
+    rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
+    if status == 'overdue':
+        rows = [r for r in rows if r['condition'] == 'overdue']
+    if search:
+        needle = str(search).strip().lower()
+        rows = [r for r in rows
+                if any(needle in str(r[field]).lower() for field in SEARCH_FIELDS if r.get(field) is not None)]
+    rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=bool(newest_first))
+    return rows
+
+
 def queue(cur, unit, now, approaching_minutes):
     """The open watch queue (WAT-1): the accepted log ons this unit is watching, overdue first, then
-    approaching, then by deadline. Drafts are not in it, because a draft is not a watch (ACC-2)."""
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'watching'", (unit,))
-    rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
+    approaching, then by deadline. Drafts are not in it, because a draft is not a watch (ACC-2).
+
+    The watch order is the queue's own: it is a worklist, not the log. The log's own order is
+    records()."""
+    rows = records(cur, unit, now, approaching_minutes, status='loggedon')
     rows.sort(key=lambda r: (RANK[r['condition']], r['eta'] or r['createdAt']))
     return rows
 
 
-def drafts(cur, unit, now, approaching_minutes):
-    """Unaccepted drafts, oldest first (WAT-1, ACC-5). Shown beside the queue and never in it: the
-    caller may be at sea believing otherwise, so the oldest needs chasing first."""
-    cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND ' + NOT_CLOSED, (unit,))
-    rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
-    rows.sort(key=lambda r: -r['ageMinutes'])
-    return rows
+def drafts(cur, unit, now, approaching_minutes, day=None):
+    """Saved drafts, oldest first: the oldest unaccepted call is the one that needs chasing."""
+    return records(cur, unit, now, approaching_minutes, status='draft', day=day, newest_first=False)
 
 
-def recent_closed(cur, unit, limit=20):
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus IN ('loggedoff', 'discarded', 'cancelled') "
-                'ORDER BY id DESC LIMIT %s', (unit, int(limit)))
-    return [_row(r) for r in cur.fetchall() or []]
+def recent_closed(cur, unit, now, approaching_minutes, limit=20):
+    """The most recently closed records, newest first. Decorated like every other row -- the old
+    version was not, which is why a closed record had no callDayBox or etaDayBox to render."""
+    rows = records(cur, unit, now, approaching_minutes, status='closed')
+    rows.sort(key=lambda r: r['id'], reverse=True)
+    return rows[:int(limit)]
 
 
 # ---------- writing ----------
+
+TRIP_PREFIX = 'T-'
+TRIP_DIGITS = 5
+
+
+def _clash(e):
+    """A unique-index rejection, which is retried, as opposed to a real fault, which is not."""
+    text = str(e).lower()
+    return 'uniq' in text or 'unique' in text or 'duplicate' in text
+
+
+def _next_day_number(cur, unit, day):
+    """The next day number for that unit and that call date (REC-9): what the operator says out
+    loud, counting from 1 each day.
+
+    Two operators saving at the same moment must not be handed the same number, so the read of the
+    highest so far takes a row lock and the caller retries if a unique index rejects the write
+    anyway. Both are needed: the lock is the real defence, because a host may apply this schema with
+    the uniqueness dropped (quackit's migration generator emits CREATE INDEX for a CREATE UNIQUE
+    INDEX), and the retry covers the hosts where the constraint does exist."""
+    cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s '
+                'FOR UPDATE', (unit, day))
+    return cur.fetchone()['n']
+
+
+def _next_trip_ref(cur):
+    """The next trip reference: the paper log's 'Trip ID No.', one running sequence across every
+    unit and every day, and the record's key.
+
+    Zero-padded to a fixed width so the text order is the number order, which is what lets MAX()
+    find the highest without the database having to know the format. Locked and retried like the day
+    number above. The state-wide system issues these across all units; this branch allocates its own,
+    so two branches will eventually meet in the middle -- that is a reconciliation to do with a
+    branch prefix, not something to paper over here."""
+    cur.execute('SELECT MAX(tripRef) AS m FROM LogOns FOR UPDATE')
+    highest = (cur.fetchone() or {}).get('m')
+    if highest is None:
+        nxt = 1
+    else:
+        if not highest.startswith(TRIP_PREFIX) or not highest[len(TRIP_PREFIX):].isdigit():
+            raise Refused('The highest trip reference in the database is %r, which is not %s plus digits. '
+                          'Refusing to guess the next one.' % (highest, TRIP_PREFIX))
+        nxt = int(highest[len(TRIP_PREFIX):]) + 1
+    if nxt >= 10 ** TRIP_DIGITS:
+        raise Refused('Trip references have run past %s%s. The width has to grow before another can be issued.'
+                      % (TRIP_PREFIX, '9' * TRIP_DIGITS))
+    return '%s%0*d' % (TRIP_PREFIX, TRIP_DIGITS, nxt)
+
 
 def create(cur, user, unit, now):
     """An empty draft, owned by the unit from this moment and chased until it is accepted or
     discarded (CAP-1, CAP-2, ACC-5). It is not watched and it is not a log on.
 
-    The day number counts from one for each day (REC-9). Two operators creating at the same moment
-    must not be handed the same number, so the read of the highest number so far takes a row lock
-    and the insert is retried if a unique index rejects it anyway. Both are needed: the lock is the
-    real defence, because a host may apply this schema with the uniqueness dropped (quackit's
-    migration generator emits CREATE INDEX for a CREATE UNIQUE INDEX), and the retry covers the
-    hosts where the constraint does exist."""
+    The operator's path is create_saved(): nothing is stored until an explicit save passes the draft
+    minimum. This remains for tests and for any host that wants a bare row."""
     day = now.date().isoformat()
     for _ in range(5):
-        cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s '
-                    'FOR UPDATE', (unit, day))
-        number = cur.fetchone()['n']
+        number = _next_day_number(cur, unit, day)
+        trip = _next_trip_ref(cur)
         try:
             # watchStatus is written, never left to the column default: a host that applied an earlier
             # version of this schema still carries that version's default, and an ALTER that adds
             # columns does not change one. A row must not depend on what the database happens to think.
-            cur.execute('INSERT INTO LogOns (unit, watchStatus, dayDate, dayNumber, createdBy, createdAt, updatedBy, updatedAt) '
-                        "VALUES (%s, 'draft', %s, %s, %s, %s, %s, %s)", (unit, day, number, str(user), _s(now), str(user), _s(now)))
+            cur.execute('INSERT INTO LogOns (unit, watchStatus, dayDate, dayNumber, tripRef, createdBy, createdAt, updatedBy, updatedAt) '
+                        "VALUES (%s, 'draft', %s, %s, %s, %s, %s, %s, %s)",
+                        (unit, day, number, trip, str(user), _s(now), str(user), _s(now)))
         except Exception as e:                       # only a clash on that index is retried; anything else is a real fault
-            if 'uniq' not in str(e).lower() and 'unique' not in str(e).lower() and 'duplicate' not in str(e).lower():
+            if not _clash(e):
                 raise
             continue
         return cur.lastrowid
     raise Refused('Could not allocate a number for today after several attempts')
+
+
+def blank(now, unit='', call_day=None):
+    """An unsaved browser form. It is deliberately not a database record."""
+    row = {field: None for field in FIELDS}
+    for columns in TIME_FIELDS.values():
+        for column_name in columns:
+            row[column_name] = None
+    row.update(id=None, unit=unit, watchStatus='draft', dayNumber=None, dayDate=call_day,
+               callDayRaw=_sd(call_day), callDate=call_day, version=0, createdAt=now, updatedAt=now,
+               createdBy='', updatedBy='', verifyOutcome='unverified', verifyBasis='')
+    return row
+
+
+def _prepare_fields(row, values):
+    """Validate and interpret one explicit form save without writing anything."""
+    if not isinstance(values, dict):
+        raise Refused('expected fields')
+    unknown = sorted(set(values) - set(FIELDS))
+    if unknown:
+        raise Refused('No such field: %s' % unknown[0])
+
+    clean, sets, after, invalid, displays = {}, {}, dict(row), [], {}
+    for field, raw in values.items():
+        value = raw.strip() if isinstance(raw, str) else ('' if raw is None else str(raw))
+        if len(value) > (65535 if field == 'notes' else 255):
+            raise Refused('%s: too long to store' % LABELS[field])
+        if field == 'channel' and value and value not in CHANNELS:
+            raise Refused('Channel must be one of: ' + ', '.join(CHANNELS))
+        clean[field] = value
+        col = column(field)
+        sets[col] = value or None
+        after[col] = value or None
+        if field in NUMBER_FIELDS and value and not re.match(r'^\d+(\.\d+)?$', value):
+            invalid.append(field)
+
+    day_for = {target: source for source, target in DAY_FIELDS.items()}
+    for time_field in ('callTime', 'departureTime', 'eta'):
+        day_field = day_for[time_field]
+        if time_field not in clean and day_field not in clean:
+            continue
+        got = interpret(after, time_field, resolve_day=day_field in clean)
+        day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[time_field]
+        parsed = {day_date_col: _sd(got['day']), when_col: _s(got['when']), basis_col: got['basis'] or None}
+        sets.update(parsed)
+        after.update({day_date_col: got['day'], when_col: got['when'], basis_col: got['basis'] or None})
+        displays[day_field] = times.fmt_day(got['day'], row['createdAt'].year) if got['day'] else clean.get(day_field, '')
+        if got['invalid']:
+            invalid.extend(f for f in (day_field, time_field) if f in clean)
+
+    required = []
+    if row['watchStatus'] == 'draft':
+        if not after.get('callDate'):
+            required.append('callDay')
+        if not after.get('callTime'):
+            required.append('callTime')
+        if not any(after.get(field) for field in ('memberNumber', 'registration', 'mobile')):
+            required.extend(('memberNumber', 'registration', 'mobile'))
+    if required:
+        raise InvalidDraft(required)
+    return sets, after, sorted(set(invalid)), displays
+
+
+def save_fields(cur, logon_id, values, user, now, version=None):
+    """Save one whole operator form as one LogOns update and therefore one host history event."""
+    row = _open_row(cur, logon_id, version)
+    sets, after, invalid, displays = _prepare_fields(row, values)
+    for field in IDENT_FIELDS:
+        if field in values:
+            _record_identifier(cur, logon_id, field, after.get(field), row.get(field), user, now)
+    sets.update(_verify_sets(cur, row, sets))
+    if row['watchStatus'] == 'draft' and after['callDate'] != row.get('dayDate'):
+        # The day number follows the call date, not the entry date, so a delayed paper record entered
+        # tonight still numbers against the day it was called in (REC-9). The trip reference does not
+        # move: it was issued once and it is the record's key.
+        sets.update(dayDate=_sd(after['callDate']),
+                    dayNumber=_next_day_number(cur, row['unit'], _sd(after['callDate'])))
+    saved_version = _bump(cur, row, sets, user, now)
+    return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after)}
+
+
+def create_saved(cur, values, user, unit, now):
+    """Create the first durable draft only after the explicit form save passes its minimum."""
+    row = blank(now, unit)
+    sets, after, invalid, displays = _prepare_fields(row, values)
+    day = after['callDate']
+
+    synthetic = [{'kind': field, 'raw': after[field], 'normalized': normalize(field, after[field]),
+                  'source': 'call', 'isActive': 1}
+                 for field in IDENT_FIELDS if after.get(field)]
+    verification_result = identity.verify(cur, dict(after, id=0, unit=unit), synthetic)
+    sets.update(unit=unit, watchStatus='draft', dayDate=_sd(day),
+                verifyOutcome=verification_result['outcome'], verifyBasis=verification_result['basis'][:255],
+                createdBy=str(user), createdAt=_s(now), updatedBy=str(user), updatedAt=_s(now), version=0)
+
+    # This is the moment the record gets its numbers: the save passed the draft minimum, so it is a
+    # real record now. Both are read under a lock and the insert is retried on a unique clash.
+    logon_id = None
+    for _ in range(5):
+        attempt = dict(sets, dayNumber=_next_day_number(cur, unit, _sd(day)), tripRef=_next_trip_ref(cur))
+        columns = list(attempt)
+        try:
+            cur.execute('INSERT INTO LogOns (' + ', '.join(columns) + ') VALUES (' + ', '.join(['%s'] * len(columns)) + ')',
+                        tuple(attempt[column_name] for column_name in columns))
+        except Exception as e:
+            if not _clash(e):
+                raise
+            continue
+        logon_id = cur.lastrowid
+        break
+    if logon_id is None:
+        raise Refused('Could not allocate a day number and trip reference after several attempts')
+    for field in IDENT_FIELDS:
+        if after.get(field):
+            _record_identifier(cur, logon_id, field, after[field], None, user, now)
+    return {'id': logon_id, 'version': 0, 'invalid': invalid, 'displays': displays}
 
 
 def _open_row(cur, logon_id, version):

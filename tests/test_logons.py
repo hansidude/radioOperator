@@ -290,7 +290,7 @@ class LogOns(unittest.TestCase):
         row = L.get(self.cur, i)
         self.assertEqual((row['watchStatus'], row['loggedOffNote']), ('loggedoff', 'radio call, alongside'))
         self.assertEqual(L.queue(self.cur, '', T0, 30), [])
-        self.assertEqual([r['id'] for r in L.recent_closed(self.cur, '')], [i])
+        self.assertEqual([r['id'] for r in L.recent_closed(self.cur, '', T0, 30)], [i])
         with self.assertRaises(L.Refused):
             L.set_field(self.cur, i, 'pob', '4', 'alice', T0)
         with self.assertRaises(L.Refused):

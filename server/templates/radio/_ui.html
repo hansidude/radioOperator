@@ -23,6 +23,7 @@
 .ro-record-card.draft{border-left-color:var(--bs-warning)}
 .ro-record-card.overdue{border-left-color:var(--bs-danger)}
 .ro-record-card.approaching{border-left-color:var(--bs-warning)}
+.ro-record-card.watching{border-left-color:var(--bs-primary)}
 .ro-record-card.closed{border-left-color:var(--bs-success)}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 .ro-card-top{display:contents}
@@ -32,8 +33,13 @@
 .ro-card-field{display:flex;align-items:baseline;gap:.2rem;min-width:0;white-space:nowrap}
 .ro-card-field .k{color:var(--bs-secondary-color);font-size:.68rem;text-transform:uppercase}
 .ro-card-field .v{font-size:.82rem;overflow-wrap:anywhere}
+.ro-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .6rem;margin:0 0 .5rem}
+.ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
+.ro-toolbar select,.ro-toolbar .ro-toolbar-date{width:auto;min-width:7.5rem}
+.ro-toolbar .ro-toolbar-tick{display:flex;align-items:center;gap:.3rem;margin:0;min-height:0;padding-left:1.4rem}
+.ro-toolbar .ro-toolbar-search{flex:1 1 16rem;min-width:10rem}
 .ro-paper-log{width:100%;overflow-x:auto;padding-bottom:.15rem}
-.ro-paper-grid{display:grid;grid-template-columns:8fr 5fr 11fr 8fr 10fr 11fr 5fr 10fr 10fr 8fr 5fr 5fr 2.8rem;min-width:52rem}
+.ro-paper-grid{display:grid;grid-template-columns:4fr 8fr 5fr 11fr 8fr 10fr 11fr 5fr 10fr 10fr 8fr 5fr 7fr 2.8rem;min-width:56rem}
 .ro-paper-head{color:var(--bs-secondary-color);font-size:.62rem;font-weight:600;line-height:1.1;text-transform:uppercase}
 .ro-paper-head>span{display:flex;align-items:end;min-width:0;padding:.18rem .3rem}
 .ro-record-card.ro-paper-row{display:grid;gap:0;min-height:2.2rem;padding:0;border-left-width:1px;border-left-color:var(--bs-border-color);font-size:.78rem;line-height:1.15}
@@ -41,6 +47,10 @@
 .ro-paper-row>*{display:flex;align-items:center;min-width:0;padding:.28rem .3rem;border-right:1px solid var(--bs-border-color)}
 .ro-paper-row>*:last-child{border-right:0}
 .ro-paper-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ro-paper-num{justify-content:flex-end;font-weight:600;font-variant-numeric:tabular-nums}
+.ro-paper-trip{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:var(--bs-secondary-color)}
+.ro-paper-who{display:flex;align-items:center;gap:.3rem;min-width:0}
+.ro-paper-who .badge{font-size:.6rem;padding:.12rem .3rem;flex:none}
 .ro-paper-link{color:inherit;font-weight:600;overflow:hidden;text-decoration:none;white-space:nowrap;text-overflow:ellipsis}
 .ro-paper-link:hover{text-decoration:underline}
 .ro-paper-action{justify-content:center;padding:0}
@@ -97,6 +107,10 @@
 .ro-detail-form .form-control,.ro-detail-form .form-select{font-size:1rem;min-height:2.8rem}
 .ro-view-tabs{display:flex;flex-wrap:wrap}
 .ro-view-tabs .btn{min-width:5.5rem}
+.ro-draft-filter{display:flex;align-items:center;gap:.4rem;margin:0 0 .55rem}
+.ro-draft-filter label{font-size:.75rem;color:var(--bs-secondary-color)}
+.ro-draft-filter input{width:10rem}
+.ro-row-number{flex:0 0 2.25rem;text-align:center;font-weight:600}
 @media (max-width:575.98px){
   .ro-workspace-pane{padding-top:.6rem}
   .ro-primary-form .form-control,.ro-primary-form .form-select{font-size:1.1rem}
@@ -106,6 +120,21 @@
   .ro-card-meta{flex-basis:100%}
   .ro-card-field{white-space:normal}
   .ro-card-top .ro-card-action{margin-left:0}
+  /* The paper grid becomes labelled cards. Every cell carries its column name in data-l, so the
+     label comes from the same markup the wide table uses; nothing is re-templated for phones.
+     Blank cells are hidden here only -- on a wide screen they must still occupy their column or
+     the grid stops lining up. */
+  .ro-paper-log{overflow-x:visible}
+  .ro-paper-head{display:none}
+  .ro-paper-grid{min-width:0}
+  .ro-record-card.ro-paper-row{grid-template-columns:1fr auto;gap:.05rem .5rem;padding:.45rem .55rem;border-left-width:4px;min-height:0}
+  .ro-paper-row>*{grid-column:1;border-right:0;padding:.05rem 0;white-space:normal;overflow:visible;text-overflow:clip}
+  .ro-paper-row>.ro-blank{display:none}
+  .ro-paper-row>*::before{content:attr(data-l) ": ";color:var(--bs-secondary-color);font-size:.66rem;font-weight:600;text-transform:uppercase;margin-right:.3rem}
+  .ro-paper-num{justify-content:flex-start}
+  .ro-paper-link{font-size:.95rem}
+  .ro-paper-action{grid-column:2;grid-row:1;justify-content:flex-end}
+  .ro-paper-action::before{content:none}
 }
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
@@ -171,35 +200,59 @@
 </script>
 {% endmacro %}
 
-{% macro draft_list(rows, now, reference, current=None, heading=True) %}
-{% if heading %}
-<div class="ro-list-head"><strong>{{ rows|length }} draft{{ '' if rows|length == 1 else 's' }}</strong></div>
-{% endif %}
+{# The radio log itself. ONE renderer for every status (draft, logged on, overdue, closed): a status
+   is a property of a record, not a different kind of thing to draw. Status only picks the left edge
+   colour and the row label; the columns never move.
+
+   Wide: the paper log, column for column, in figure 5's order -- with the record number leading on
+   the left like every other quackit list (myMacro_actions.html card-index), and 'Trip ID No.' last
+   where the paper prints it. Narrow: the same markup becomes labelled cards, in CSS alone, off the
+   data-l attributes. There is no second template for phones. #}
+{# Exact wording for an empty result: '0 drafts', not 'Nothing at sea'. One map, because the page
+   and the refresh partial must say the same thing. #}
+{% set EMPTY_LABELS = {'all': 'records', 'draft': 'drafts', 'loggedon': 'logged on', 'overdue': 'overdue', 'closed': 'closed'} %}
+
+{% macro state(r) %}{% if r.watchStatus in ('loggedoff', 'discarded', 'cancelled') %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'watching' %}watching{% else %}draft{% endif %}{% endmacro %}
+
+{% macro state_label(r) %}
+{%- if r.watchStatus == 'draft' %}
+{%- elif r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary">Discarded</span>
+{%- elif r.watchStatus == 'loggedoff' %}<span class="badge {{ 'text-bg-warning' if r.closeReason == 'notdeparted' else 'text-bg-success' }}">{{ 'Never departed' if r.closeReason == 'notdeparted' else 'Logged off' }}</span>
+{%- elif r.condition == 'overdue' %}<span class="badge text-bg-danger">OVERDUE</span>
+{%- endif %}
+{%- if r.watchStatus != 'draft' and r.verifyOutcome == 'conflict' %}<span class="badge text-bg-danger" title="{{ r.verifyBasis or '' }}">CONFLICT</span>{% endif %}
+{%- endmacro %}
+
+{% macro record_list(rows, now, reference, current=None, empty='0 records') %}
 <div class="ro-paper-log">
 {% if rows %}
   <div class="ro-paper-grid ro-paper-head" aria-hidden="true">
-    <span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>
+    <span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>
     <span>Mobile</span><span>Vessel details</span><span>POB</span><span>Departure</span>
-    <span>Going to</span><span>Return date</span><span>Time</span><span>Trip</span><span></span>
+    <span>Going to</span><span>Return date</span><span>Time</span><span>Trip ID No.</span><span></span>
   </div>
 {% endif %}
 {% for r in rows %}
-  <article class="ro-record-card ro-paper-grid ro-paper-row draft{% if r.id == current %} ro-current{% endif %}" data-draft="{{ r.id }}">
-    <span class="ro-paper-value" title="{{ r.callDayBox or '' }}">{{ cell(r.callDayBox) }}</span>
-    <span class="ro-paper-value" title="{{ r.callTimeRaw or '' }}">{{ cell(r.callTimeRaw) }}</span>
-    <a class="ro-paper-link" href="/logon/{{ r.id }}" title="{{ r.memberNumber or r.vesselName or ('Draft ' ~ reference(r)) }}">{{ r.memberNumber or r.vesselName or ('Draft ' ~ reference(r)) }}</a>
-    <span class="ro-paper-value" title="{{ r.registration or '' }}">{{ cell(r.registration) }}</span>
-    <span class="ro-paper-value" title="{{ r.mobile or '' }}">{{ cell(r.mobile) }}</span>
-    <span class="ro-paper-value" title="{{ vessel_summary(r, '') }}">{{ vessel_summary(r, '') }}</span>
-    <span class="ro-paper-value" title="{{ r.pob or '' }}">{{ cell(r.pob) }}</span>
-    <span class="ro-paper-value" title="{{ r.departurePoint or '' }}">{{ cell(r.departurePoint) }}</span>
-    <span class="ro-paper-value" title="{{ r.destination or '' }}">{{ cell(r.destination) }}</span>
-    <span class="ro-paper-value" title="{{ r.etaDayBox or '' }}">{{ cell(r.etaDayBox) }}</span>
-    <span class="ro-paper-value" title="{{ r.etaRaw or '' }}">{{ cell(r.etaRaw) }}</span>
-    <span class="ro-paper-value" title="Trip {{ reference(r) }}">{{ reference(r) }}</span>
-    <span class="ro-paper-action"><a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Edit draft" aria-label="Edit draft {{ reference(r) }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a></span>
+  {% set who = r.memberNumber or r.vesselName or ('Record ' ~ reference(r)) %}
+  {% set vessel = vessel_summary(r, '') %}
+  {% set trip = r.tripRef or '' %}
+  <article class="ro-record-card ro-paper-grid ro-paper-row {{ state(r)|trim }}{% if r.id == current %} ro-current{% endif %}" data-record="{{ r.id }}">
+    <span class="ro-paper-num" data-l="No." title="Record {{ reference(r) }} of that day">{{ reference(r) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.callDayBox }}" data-l="Date" title="{{ r.callDayBox or '' }}">{{ cell(r.callDayBox) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.callTimeRaw }}" data-l="Time" title="{{ r.callTimeRaw or '' }}">{{ cell(r.callTimeRaw) }}</span>
+    <span class="ro-paper-who" data-l="Member / Vessel"><a class="ro-paper-link" href="/logon/{{ r.id }}" title="{{ who }}">{{ who }}</a>{{ state_label(r) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.registration }}" data-l="Rego" title="{{ r.registration or '' }}">{{ cell(r.registration) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.mobile }}" data-l="Mobile" title="{{ r.mobile or '' }}">{{ cell(r.mobile) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not vessel }}" data-l="Vessel details" title="{{ vessel }}">{{ vessel }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.pob }}" data-l="POB" title="{{ r.pob or '' }}">{{ cell(r.pob) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.departurePoint }}" data-l="Departure" title="{{ r.departurePoint or '' }}">{{ cell(r.departurePoint) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.destination }}" data-l="Going to" title="{{ r.destination or '' }}">{{ cell(r.destination) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.etaDayBox }}" data-l="Return date" title="{{ r.etaDayBox or '' }}">{{ cell(r.etaDayBox) }}</span>
+    <span class="ro-paper-value{{ ' ro-blank' if not r.etaRaw }}" data-l="Time" title="{{ r.etaRaw or '' }}">{{ cell(r.etaRaw) }}</span>
+    <span class="ro-paper-trip{{ ' ro-blank' if not trip }}" data-l="Trip ID No." title="{{ trip }}">{{ trip }}</span>
+    <span class="ro-paper-action"><a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open {{ who }}" aria-label="Open {{ who }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a></span>
   </article>
-{% else %}{% if not heading %}<div class="ro-zero">0 drafts</div>{% endif %}
+{% else %}<div class="ro-zero">{{ empty }}</div>
 {% endfor %}
 </div>
 {% endmacro %}
@@ -294,86 +347,23 @@
 {% endmacro %}
 
 {# The queue keeps the paper log's information, but presents one vessel per Quackit-style record card. #}
-{% macro status_counts(rows, drafts) %}
-{% set overdue = rows|selectattr('condition', 'equalto', 'overdue')|list %}
-<div class="ro-status-counts" id="roStatusCounts" aria-label="Radio log totals">
-  <div class="ro-status-count logged-on"><span class="number" data-ro-count="loggedon">{{ rows|length }}</span><span class="label">Logged on</span></div>
-  <div class="ro-status-count{% if overdue %} overdue{% endif %}"><span class="number" data-ro-count="overdue">{{ overdue|length }}</span><span class="label">Overdue</span></div>
-  <div class="ro-status-count drafts"><span class="number" data-ro-count="drafts">{{ drafts|length }}</span><span class="label">Drafts</span></div>
-</div>
-{% endmacro %}
-
-{% macro queue(rows, now, current=None, heading=True, empty='0 logged on') %}
-{% if heading %}
-<div class="ro-list-head"><strong>{{ rows|length }} logged on</strong><span>Deadlines are counting down.</span></div>
-{% endif %}
-<div class="ro-card-list">
-{% for r in rows %}
-  <article class="ro-record-card {{ r.condition }}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
-    <div class="ro-card-top">
-      {{ cond(r) }}
-      <a class="btn btn-success btn-sm ro-card-title" href="/logon/{{ r.id }}">{{ r.memberNumber or r.vesselName or ('Log on ' ~ r.dayNumber) }}</a>
-      {% if r.memberNumber and r.vesselName %}<span>{{ r.vesselName }}</span>{% endif %}
-      {% if r.registration %}<span class="badge border text-secondary">{{ r.registration }}</span>{% endif %}
-      {{ outcome(r.verifyOutcome, r.verifyBasis or '') }}
-      <span class="text-secondary small">{{ r.dayNumber if r.dayNumber is not none else ('#' ~ r.id) }}</span>
-      <a class="btn btn-outline-secondary btn-sm ro-card-action" href="/logon/{{ r.id }}"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
-    </div>
-    <div class="ro-card-meta">
-      <div class="ro-card-field"><span class="k">Called</span><span class="v">{{ cell(r.callDayBox) }} {{ cell(r.callTimeRaw) }}</span></div>
-      <div class="ro-card-field"><span class="k">Return</span><span class="v">{% if r.etaDayBox %}{{ r.etaDayBox }} {% endif %}{% if r.eta %}{{ when(r.eta, now) }}{% else %}{{ r.etaRaw or '—' }}{% endif %}</span></div>
-      <div class="ro-card-field"><span class="k">Route</span><span class="v">{{ r.departurePoint or '—' }} → {{ r.destination or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">POB</span><span class="v">{{ r.pob or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">Mobile</span><span class="v">{{ r.mobile or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">Vessel</span><span class="v">{{ vessel_summary(r) }}</span></div>
-    </div>
-  </article>
-{% else %}{% if not heading %}<div class="ro-zero">{{ empty }}</div>{% endif %}
-{% endfor %}
-</div>
-{% endmacro %}
-
-{% macro closed_list(rows, now, reference) %}
-<div class="ro-list-head"><strong>{{ rows|length }} recently closed</strong><span>Logged off or discarded.</span></div>
-<div class="ro-card-list">
-{% for r in rows %}
-  <article class="ro-record-card closed" data-closed="{{ r.id }}">
-    <div class="ro-card-top">
-      {% if r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary">Discarded</span>
-      {% elif r.closeReason == 'notdeparted' %}<span class="badge text-bg-warning">Never departed</span>
-      {% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}
-      <a class="btn btn-outline-secondary btn-sm ro-card-title" href="/logon/{{ r.id }}">{{ r.memberNumber or r.vesselName or r.registration or reference(r) }}</a>
-      <span class="text-secondary small">{{ reference(r) }}</span>
-      <a class="btn btn-outline-secondary btn-sm ro-card-action" href="/logon/{{ r.id }}"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
-    </div>
-    <div class="ro-card-meta">
-      <div class="ro-card-field"><span class="k">Closed</span><span class="v">{{ when(r.discardedAt or r.cancelledAt or r.loggedOffAt, now) }}</span></div>
-      <div class="ro-card-field"><span class="k">Return was</span><span class="v">{{ when(r.eta, now) or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">Going to</span><span class="v">{{ r.destination or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">Reason / evidence</span><span class="v">{{ r.discardReason or r.cancelReason or r.loggedOffNote or '—' }}</span></div>
-    </div>
-  </article>
-{% else %}<div class="ro-empty">No recently closed records.</div>{% endfor %}
-</div>
-{% endmacro %}
-
 {% macro refresh_script(current) %}
 <script>
-// The queue re-fetches itself so a passed deadline shows without anyone pressing anything (WAT-3, minimal).
+// The log re-fetches itself so a passed deadline shows without anyone pressing anything (WAT-3, minimal).
+// The whole filter state rides along in the query string, so the refresh returns the view on screen
+// rather than snapping back to the default one.
 window.refreshQueue = function () {
-  var pane = document.getElementById('queuePane');
-  if (!pane) return;
-  fetch('/logons/rows?partial=1{% if current %}&current={{ current }}{% endif %}', { credentials: 'same-origin' })
-    .then(function (r) { if (!r.ok) throw new Error('Queue refresh failed (' + r.status + ')'); return r.text(); })
+  if (!document.getElementById('roLiveRecords')) return;
+  var params = new URLSearchParams(window.location.search);
+  params.set('partial', '1');
+  {% if current %}params.set('current', '{{ current }}');{% endif %}
+  fetch('/logons/rows?' + params.toString(), { credentials: 'same-origin' })
+    .then(function (r) { if (!r.ok) throw new Error('Log refresh failed (' + r.status + ')'); return r.text(); })
     .then(function (html) {
       var fresh = new DOMParser().parseFromString(html, 'text/html');
-      ['roStatusCounts', 'roLiveAlerts', 'roLiveDrafts', 'roLiveWatch', 'roLiveOverdue'].forEach(function (id) {
-        var current = document.getElementById(id), next = fresh.getElementById(id);
-        if (current && next) current.innerHTML = next.innerHTML;
-      });
-      document.querySelectorAll('#roStatusCounts [data-ro-count]').forEach(function (count) {
-        var badge = document.querySelector('[data-ro-tab="' + count.dataset.roCount + '"] .badge');
-        if (badge) badge.textContent = count.textContent;
+      ['roLiveAlerts', 'roLiveRecords'].forEach(function (id) {
+        var here = document.getElementById(id), next = fresh.getElementById(id);
+        if (here && next) here.innerHTML = next.innerHTML;
       });
     })
     .catch(function (e) { var n = document.getElementById('queueNote'); if (n) { n.textContent = e.message; n.hidden = false; } });

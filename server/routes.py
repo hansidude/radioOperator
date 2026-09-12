@@ -63,8 +63,41 @@ def _queue(cur, h):
     return L.queue(cur, h.unit(), _now(), h.approaching_minutes)
 
 
-def _drafts(cur, h):
-    return L.drafts(cur, h.unit(), _now(), h.approaching_minutes)
+def _drafts(cur, h, day=None):
+    return L.drafts(cur, h.unit(), _now(), h.approaching_minutes, day)
+
+
+# The date filter is on by default, because the log is read against today. Overdue is the exception:
+# a record is overdue precisely because its return date has passed, so limiting it to today would
+# hide the ones being chased. 'all' means every record, so a date would contradict it.
+DAY_DEFAULT_OFF = ('overdue', 'all')
+
+
+def _filters():
+    """The one toolbar, read back out of the query string. Everything the operator picked is in the
+    URL, so a refresh, a bookmark and the back button all keep the same view.
+
+    The date is an applied filter with a tick, not a mandatory picker: untick it and the date stops
+    narrowing anything. `f=1` marks a submitted toolbar, which is what separates 'unticked it' from
+    'has not touched it yet' -- without it an unticked box is indistinguishable from a first load."""
+    status = request.args.get('status', 'draft')
+    if status != 'all' and status not in L.STATUS_WHERE:
+        abort(400)
+    submitted = request.args.get('f') == '1'
+    day_on = (request.args.get('dayOn') == '1') if submitted else (status not in DAY_DEFAULT_OFF)
+    raw = request.args.get('day')
+    if raw:
+        try:
+            day = datetime.strptime(raw, '%Y-%m-%d').date()
+        except ValueError:
+            abort(400)
+    else:
+        day = _now().date()
+    sort = request.args.get('sort', 'newest')
+    if sort not in ('newest', 'oldest'):
+        abort(400)
+    return {'status': status, 'day': day, 'dayOn': day_on, 'sort': sort,
+            'newest': sort == 'newest', 'search': (request.args.get('q') or '').strip()}
 
 
 def _alerts(cur, h):
@@ -84,13 +117,16 @@ def _alerts(cur, h):
 
 @bp.route('/logons')
 def logons_page():
+    """The radio log: one collection, whatever the toolbar is filtering it to."""
     h, (conn, cur) = _open()
-    rows = _queue(cur, h)
-    unaccepted = _drafts(cur, h)
-    closed = L.recent_closed(cur, h.unit())
+    f = _filters()
+    rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
+                     status=None if f['status'] == 'all' else f['status'],
+                     day=f['day'] if f['dayOn'] else None,
+                     search=f['search'], newest_first=f['newest'])
     alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('logons.html', queue=rows, drafts=unaccepted, closed=closed, alerts=alerts, health=health,
+    return _page('logons.html', records=rows, filters=f, alerts=alerts, health=health,
                  window=h.approaching_minutes, reference=L.reference)
 
 
@@ -101,23 +137,48 @@ def logons_rows():
     if request.args.get('partial') != '1':
         cur.close()
         return redirect('/logons')
-    rows = _queue(cur, h)
-    unaccepted = _drafts(cur, h)
+    f = _filters()
+    rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
+                     status=None if f['status'] == 'all' else f['status'],
+                     day=f['day'] if f['dayOn'] else None,
+                     search=f['search'], newest_first=f['newest'])
     alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('_queue.html', queue=rows, drafts=unaccepted, alerts=alerts, health=health,
+    return _page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,
                  current=request.args.get('current', type=int), window=h.approaching_minutes, reference=L.reference)
 
 
-@bp.route('/logons/new', methods=['POST'])
+@bp.route('/logons/new', methods=['GET', 'POST'])
 def logons_new():
-    """Begin capture: an empty draft exists and is owned before a word is typed (CAP-1). It is not a
-    log on and is not watched until it is accepted (ACC-2)."""
+    """An unsaved entry form, or its one explicit durable draft creation."""
     h, (conn, cur) = _open()
-    new_id = L.create(cur, h.user(), h.unit(), _now())
-    conn.commit()
+    now = _now()
+    if request.method == 'POST':
+        body = request.get_json(silent=True) or {}
+        try:
+            out = L.create_saved(cur, body.get('fields'), h.user(), h.unit(), now)
+        except (L.Refused, L.Stale) as e:
+            conn.rollback()
+            cur.close()
+            response = {'error': str(e)}
+            if isinstance(e, L.InvalidDraft):
+                response['fields'] = e.fields
+            return jsonify(response), 400
+        conn.commit()
+        cur.close()
+        out['savedAt'] = now.strftime('%H:%M:%S')
+        return jsonify(out)
+
+    row = L.blank(now, h.unit(), now.date())
+    verified = ID.verify(cur, row, [])
     cur.close()
-    return redirect('/logon/%d' % new_id)
+    cond, minutes = L.condition(row, now, h.approaching_minutes)
+    return _page('logon.html', creating=True, logon=row, queue=[], drafts=[], alerts=[], health=None,
+                 identifiers=[], gaps=L.gaps(row), condition=cond, minutes=minutes, verified=verified,
+                 missing=L.missing(row), clash=None, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
+                 labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS, column=L.column,
+                 box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, close_reasons=L.CLOSE_REASONS,
+                 reference=L.reference, window=h.approaching_minutes)
 
 
 @bp.route('/logon/<int:logon_id>')
@@ -201,16 +262,23 @@ def api_set_field(logon_id):
     body = request.get_json(silent=True) or {}
     now = _now()
     try:
-        if 'field' not in body:
-            raise L.Refused('expected {field, value, version}')
-        out = L.set_field(cur, logon_id, body['field'], body.get('value'), h.user(), now, body.get('version'))
+        if 'fields' in body:
+            out = L.save_fields(cur, logon_id, body['fields'], h.user(), now, body.get('version'))
+        elif 'field' in body:
+            out = L.set_field(cur, logon_id, body['field'], body.get('value'), h.user(), now, body.get('version'))
+        else:
+            raise L.Refused('expected fields')
     except (L.Refused, L.Stale) as e:
         conn.rollback()
         cur.close()
-        return jsonify({'error': str(e)}), 409 if isinstance(e, L.Stale) else 400
+        response = {'error': str(e)}
+        if isinstance(e, L.InvalidDraft):
+            response['fields'] = e.fields
+        return jsonify(response), 409 if isinstance(e, L.Stale) else 400
     conn.commit()
     cur.close()
-    out['when'] = out['when'].isoformat() if out['when'] else None
+    if 'when' in out:
+        out['when'] = out['when'].isoformat() if out['when'] else None
     out['savedAt'] = now.strftime('%H:%M:%S')
     return jsonify(out)
 

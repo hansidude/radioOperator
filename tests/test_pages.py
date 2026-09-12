@@ -53,11 +53,15 @@ class Pages(unittest.TestCase):
         self.a.get('/test-login/alice/unitA')
         self.b = self.app.test_client()
         self.b.get('/test-login/bob/unitB')
+        self.new_count = 0
 
     def new(self, client=None):
-        r = (client or self.a).post('/logons/new')
-        self.assertEqual(r.status_code, 302)
-        return int(r.location.rsplit('/', 1)[-1])
+        self.new_count += 1
+        fields = {'callDay': date.today().isoformat(), 'callTime': '09:%02d' % self.new_count,
+                  'mobile': '0400%06d' % self.new_count}
+        r = (client or self.a).post('/logons/new', json={'fields': fields})
+        self.assertEqual(r.status_code, 200, r.data)
+        return r.json['id']
 
     def field(self, i, name, value, client=None):
         r = (client or self.a).post('/api/logon/%d' % i, json={'field': name, 'value': value})
@@ -84,12 +88,33 @@ class Pages(unittest.TestCase):
         self.assertTrue(r.location.endswith('/login'))
         self.assertEqual(c.post('/api/logon/1', json={}).status_code, 302)
 
+    def test_new_is_unsaved_until_the_minimum_is_explicitly_saved(self):
+        page = self.a.get('/logons/new').get_data(as_text=True)
+        self.assertIn('id="saveRecord"', page)
+        self.assertIn('>Not saved</span>', page)
+        self.assertRegex(page, r'id="f-callDay"[^>]+value="[^"]+"')
+        self.assertIn('id="f-callTime" class="form-control" data-field="callTime" value=""', page)
+        self.assertNotIn("addEventListener('change', function () { save", page)
+        self.assertIn('>0 drafts</div>', self.a.get('/logons').get_data(as_text=True))
+
+        missing = self.a.post('/logons/new', json={'fields': {'callDay': date.today().isoformat()}})
+        self.assertEqual(missing.status_code, 400)
+        self.assertEqual(set(missing.json['fields']), {'callTime', 'memberNumber', 'registration', 'mobile'})
+        self.assertIn('>0 drafts</div>', self.a.get('/logons').get_data(as_text=True))
+
+        saved = self.a.post('/logons/new', json={'fields': {
+            'callDay': date.today().isoformat(), 'callTime': '08:15', 'registration': 'AB123Q'}})
+        self.assertEqual(saved.status_code, 200, saved.data)
+        row = self.a.get('/logons').get_data(as_text=True)
+        self.assertIn('data-record="%d"' % saved.json['id'], row)
+        self.assertIn('08:15', row)
+
     def test_capture_page_shows_the_queue_and_saves_field_by_field(self):    # AC-1, AC-5, AC-6, CAP-7, CAP-19
         i = self.new()
         j = self.new()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertNotIn('id="queuePane"', page)
-        self.assertNotIn('data-draft="%d"' % j, page)          # other records belong only on /logons
+        self.assertNotIn('data-record="%d"' % j, page)         # other records belong only on /logons
         self.assertIn('data-field="eta"', page)
         self.assertIn('type="date" class="ro-native-picker" data-picker-target="callDay"', page)
         self.assertIn('type="time" class="ro-native-picker" data-picker-target="callTime"', page)
@@ -111,7 +136,6 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 2}).status_code, 200)
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Sea Dog', listing)
-        self.assertIn('data-ro-count="drafts">2</span>', listing)
         self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
@@ -150,37 +174,80 @@ class Pages(unittest.TestCase):
         self.assertTrue(self.field(i, 'eta', '25:70')['invalid'])
         self.assertTrue(self.field(i, 'etaDay', '2026-02-31')['invalid'])
 
-    def test_queue_uses_tabs_and_cards_not_tables(self):
+    def test_one_filtered_list_replaces_the_per_status_tabs(self):
         draft = self.new()
         watching = self.accepted(rego='CD456Q', member='7788')
         page = self.a.get('/logons').get_data(as_text=True)
-        for tab in ('overview', 'loggedon', 'overdue', 'drafts', 'closed', 'find'):
-            self.assertIn('data-ro-tab="%s"' % tab, page)
-        self.assertIn('id="ro-overview-pane" class="ro-workspace-pane"', page)
-        self.assertIn('id="ro-loggedon-pane" class="ro-workspace-pane d-none"', page)
-        self.assertIn('data-id="%d"' % watching, page)
-        self.assertIn('data-draft="%d"' % draft, page)
-        self.assertIn('class="ro-record-card', page)
+
+        # One toolbar, not a tab per status, and not a renderer per status either.
+        self.assertNotIn('data-ro-tab="drafts"', page)
+        self.assertNotIn('data-ro-tab="overdue"', page)
+        self.assertIn('id="roStatus"', page)
+        for value in ('all', 'draft', 'loggedon', 'overdue', 'closed'):
+            self.assertIn('value="%s"' % value, page)
+        self.assertIn('id="roDayOn"', page)
+        self.assertIn('id="roSort"', page)
+        self.assertIn('name="q"', page)
+
+        # Drafts by default, for today, newest first.
+        self.assertIn('<option value="draft" selected>Drafts</option>', page)
+        self.assertIn('id="roDayOn" name="dayOn" checked', page)
+        self.assertIn('<option value="newest" selected>Newest first</option>', page)
+        self.assertIn('data-record="%d"' % draft, page)
+        self.assertNotIn('data-record="%d"' % watching, page)   # a watch is not a draft
+
+        # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
         self.assertIn('class="ro-paper-grid ro-paper-head"', page)
+        self.assertIn('<span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
+        self.assertIn('<span>Time</span><span>Trip ID No.</span><span></span>', page)
         self.assertIn('class="ro-record-card ro-paper-grid ro-paper-row draft', page)
-        self.assertIn('<span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
+        self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)
-        draft_at = page.index('data-draft="%d"' % draft)
+        draft_at = page.index('data-record="%d"' % draft)
         draft_row = page[page.rfind('<article', 0, draft_at):page.index('</article>', draft_at)]
         self.assertNotIn('Unverified', draft_row)
         self.assertNotIn(' old', draft_row)
-        self.assertIn('class="ro-status-counts"', page)
-        self.assertIn('data-ro-count="loggedon">1</span><span class="label">Logged on</span>', page)
-        self.assertNotIn('<table', page)
 
-    def test_empty_tabs_confirm_zero_without_false_alarm_colour(self):
-        page = self.a.get('/logons').get_data(as_text=True)
-        self.assertIn('>0 logged on</div>', page)
-        self.assertIn('>0 overdue</div>', page)
-        self.assertIn('>0 drafts</div>', page)
-        self.assertIn('data-ro-tab="overdue"', page)
-        self.assertNotIn('btn-outline-danger', page)
-        self.assertNotIn('class="ro-status-count overdue"', page)
+        # The same rows, the same renderer, a different filter.
+        on = self.a.get('/logons?f=1&status=loggedon').get_data(as_text=True)
+        self.assertIn('data-record="%d"' % watching, on)
+        self.assertNotIn('data-record="%d"' % draft, on)
+        self.assertIn('class="ro-record-card ro-paper-grid ro-paper-row watching', on)
+        self.assertIn('class="ro-paper-grid ro-paper-head"', on)
+
+        # Counts do not sit beside the filters (a number on a filter nobody picked is noise).
+        self.assertNotIn('class="ro-status-counts"', page)
+
+    def test_the_date_filter_is_a_tick_you_can_turn_off(self):
+        i = self.new()
+        # Ticked and set to another day: today's record is not in that day.
+        away = self.a.get('/logons?f=1&status=draft&dayOn=1&day=2020-01-01').get_data(as_text=True)
+        self.assertNotIn('data-record="%d"' % i, away)
+        self.assertIn('>0 drafts</div>', away)
+        # Unticked: the date stops narrowing anything, whatever is in the box.
+        every = self.a.get('/logons?f=1&status=draft&day=2020-01-01').get_data(as_text=True)
+        self.assertIn('data-record="%d"' % i, every)
+        # Overdue starts with the date off, because an overdue record is never today's.
+        overdue = self.a.get('/logons?status=overdue').get_data(as_text=True)
+        self.assertNotIn('id="roDayOn" name="dayOn" checked', overdue)
+        self.assertIn('<option value="draft">Drafts</option>', overdue)
+
+    def test_search_finds_a_record_by_what_an_operator_says_out_loud(self):
+        i = self.new()
+        self.field(i, 'registration', 'ZZ999Q')
+        found = self.a.get('/logons?f=1&status=draft&q=ZZ999Q').get_data(as_text=True)
+        self.assertIn('data-record="%d"' % i, found)
+        missing = self.a.get('/logons?f=1&status=draft&q=NOSUCHTHING').get_data(as_text=True)
+        self.assertNotIn('data-record="%d"' % i, missing)
+        self.assertIn('>0 drafts</div>', missing)
+
+    def test_empty_results_say_exactly_what_is_empty(self):
+        for status, words in (('draft', '0 drafts'), ('loggedon', '0 logged on'),
+                              ('overdue', '0 overdue'), ('closed', '0 closed'), ('all', '0 records')):
+            page = self.a.get('/logons?f=1&status=%s' % status).get_data(as_text=True)
+            self.assertIn('>%s</div>' % words, page)
+            self.assertNotIn('Nothing at sea', page)
+            self.assertNotIn('btn-outline-danger', page)       # a zero is not an alarm
         self.assertNotIn('No delivery channel', page)
         self.assertNotIn('reached nobody', page)
         self.assertNotIn('roAlarmState', page)
@@ -210,9 +277,10 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('Logged on and watched', page)
         self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
-        listing = self.a.get('/logons').get_data(as_text=True)
+        listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)
         self.assertIn('OVERDUE', listing)
-        self.assertIn('class="ro-status-count overdue"', listing)
+        self.assertIn('data-record="%d"' % i, listing)
+        self.assertNotIn('class="ro-status-counts"', listing)
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
         self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 400)
 
@@ -236,7 +304,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % d).get_data(as_text=True)
         self.assertIn('This was never a log on', page)
         self.assertIn('hit New by mistake', page)
-        self.assertIn('Discarded', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('Discarded', self.a.get('/logons?f=1&status=closed').get_data(as_text=True))
         self.assertEqual(self.a.post('/api/logon/%d' % d, json={'field': 'pob', 'value': '1'}).status_code, 400)
         i = self.accepted(rego='CD456R', member='9001')
         r = self.a.post('/logon/%d/discard' % i, data={'reason': 'tidying'})
@@ -248,7 +316,9 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         self.assertIn('Draft 2', page)
         self.assertIn('draft 2 of', page)
-        self.assertIn('>Draft 1</a>', self.a.get('/logons').get_data(as_text=True))
+        page = self.a.get('/logons').get_data(as_text=True)
+        self.assertIn('data-l="No." title="Record 1 of that day">1</span>', page)
+        self.assertIn('data-l="No." title="Record 2 of that day">2</span>', page)
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by
@@ -279,10 +349,10 @@ class Pages(unittest.TestCase):
         self.assertIn('Member No.', offered['offers'])                            # says what it would fill
         r = self.a.post('/logon/%d/apply' % second, json={'key': offered['key']})
         self.assertEqual(r.status_code, 200, r.data)
-        self.assertIn('Mobile Phone Number', r.json['filled'])
+        self.assertIn('Member No.', r.json['filled'])
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         form = page[page.index('<form id="capture"'):page.index('</form>')]
-        self.assertIn('0412 345 678', form)
+        self.assertIn('4471', form)
         self.assertNotIn('Facing Island', form)                                   # a past trip is not this trip
         self.assertIn('does not corroborate', page)                               # IDV-1, said plainly
         self.assertIn('Unverified', page)                                         # applied values prove nothing
@@ -305,7 +375,7 @@ class Pages(unittest.TestCase):
                             ('etaDay', 'today'), ('eta', '2300')):
             self.field(mixed, name, value)
         self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)     # IDV-5: a conflict blocks nothing
-        self.assertIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('CONFLICT', self.a.get('/logons?f=1&status=loggedon').get_data(as_text=True))
 
 
 
@@ -318,8 +388,9 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('wrong boat', page)
         self.assertIn('thought it was back', page)                                    # the closure event is kept
-        self.assertIn('data-id="%d"' % i, self.a.get('/logons').get_data(as_text=True))
-        self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))         # time did not stop
+        reopened = self.a.get('/logons?f=1&status=all').get_data(as_text=True)
+        self.assertIn('data-record="%d"' % i, reopened)
+        self.assertIn('OVERDUE', reopened)                                            # time did not stop
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,
@@ -329,7 +400,7 @@ class Pages(unittest.TestCase):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)
         self.assertEqual(self.b.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 403)
-        self.assertNotIn('data-id="%d"' % i, self.b.get('/logons').get_data(as_text=True))
+        self.assertNotIn('data-record="%d"' % i, self.b.get('/logons').get_data(as_text=True))
         self.assertEqual(self.a.get('/logon/999').status_code, 404)
 
 

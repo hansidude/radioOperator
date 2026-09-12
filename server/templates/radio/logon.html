@@ -1,23 +1,25 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
-{% set open = logon.watchStatus not in ('loggedoff', 'discarded', 'cancelled') %}
-{% set draft = logon.watchStatus not in ('watching', 'loggedoff', 'discarded', 'cancelled') %}
+{% set creating = creating|default(false) %}
+{% set open = creating or logon.watchStatus not in ('loggedoff', 'discarded', 'cancelled') %}
+{% set draft = creating or logon.watchStatus not in ('watching', 'loggedoff', 'discarded', 'cancelled') %}
 {% block body_wrap_class %}container-fluid{% endblock %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endblock %}
+{% block page_title %}<i class="bi bi-broadcast me-1"></i>{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
     <a class="btn btn-outline-success btn-sm" href="/logons"><i class="bi bi-list-ul me-1"></i>Open watch queue</a>
-    {{ ui.cond({'condition': condition, 'minutes': minutes, 'etaRaw': logon.etaRaw}) }}
+    {% if not creating %}{{ ui.cond({'condition': condition, 'minutes': minutes, 'etaRaw': logon.etaRaw}) }}{% endif %}
   </div>
   <div class="btn-group btn-group-sm ro-view-tabs" id="logonViewTabs" role="group" aria-label="Log on views">
     <button type="button" class="btn btn-outline-secondary active" data-ro-tab="entry" aria-controls="ro-entry-pane" aria-pressed="true"><i class="bi bi-pencil-square me-1"></i>Log on</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="contact" aria-controls="ro-contact-pane" aria-pressed="false"><i class="bi bi-telephone me-1"></i>Contact</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="vessel" aria-controls="ro-vessel-pane" aria-pressed="false"><i class="bi bi-water me-1"></i>Vessel</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>Record</button>
+    {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>Record</button>{% endif %}
   </div>
-  <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if open %}Saved to the shared record{% else %}Closed: read only{% endif %}</span>
+  {% if open %}<button type="button" class="btn btn-primary btn-sm" id="saveRecord"><i class="bi bi-floppy me-1"></i>Save</button>{% endif %}
+  <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>
 </div>
 {% endblock %}
 {% block body %}
@@ -34,10 +36,10 @@
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
   {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime', 'eta', 'departureTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name in ('callTime', 'eta', 'departureTime') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button><input type="time" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% endif %}</div>{% endif %}
+  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime', 'eta', 'departureTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('registration', 'mobile') %}data-draft-identity{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name in ('callTime', 'eta', 'departureTime') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button><input type="time" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% endif %}</div>{% endif %}
 </div>
 {% endmacro %}
-<div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
+{% if not creating %}<div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>{% endif %}
 
 {# The operator's main entry point: the paper radio log fields in the five working rows requested by the unit (DAT-6). #}
 <section id="ro-entry-pane" class="ro-workspace-pane" data-ro-pane="entry">
@@ -46,7 +48,7 @@
       <div class="capture-row row g-3">{{ field('callDay', 'col-12 col-md-6') }}{{ field('callTime', 'col-12 col-md-6') }}</div>
       <div class="capture-row row g-3">
         <div class="col-12 col-lg-6 mandatory"><span class="group-label">Member No. or Vessel Name</span><div class="row g-2">
-          <div class="col-12 col-sm-5 paper-col"><input id="f-memberNumber" class="form-control" data-field="memberNumber" value="{{ logon.memberNumber or '' }}" aria-label="Member No." {% if not open %}disabled{% endif %}></div>
+          <div class="col-12 col-sm-5 paper-col"><input id="f-memberNumber" class="form-control" data-field="memberNumber" data-draft-identity value="{{ logon.memberNumber or '' }}" aria-label="Member No." {% if not open %}disabled{% endif %}></div>
           <div class="col-12 col-sm-7 paper-col"><input id="f-vesselName" class="form-control" data-field="vesselName" value="{{ logon.vesselName or '' }}" aria-label="Vessel Name" {% if not open %}disabled{% endif %}></div>
         </div></div>
         {{ field('registration', 'col-6 col-lg-3') }}{{ field('mobile', 'col-6 col-lg-3') }}
@@ -55,7 +57,8 @@
       <div class="capture-row row g-3">{{ field('pob', 'col-12 col-md-2') }}{{ field('departurePoint', 'col-12 col-md-5') }}{{ field('destination', 'col-12 col-md-5') }}</div>
       <div class="capture-row row g-3">{{ field('etaDay', 'col-12 col-md-7') }}{{ field('eta', 'col-12 col-md-5') }}</div>
     </form>
-    {% if draft %}
+    {% if creating %}
+    {% elif draft %}
     <section class="ro-gate{{ ' ready' if not missing }}" aria-label="Acceptance">
       {% if missing %}<strong>This is a draft, not a log on.</strong> Still needed: {{ missing|map(attribute='label')|join(' · ') }}.
       {% else %}<strong>Everything needed is here.</strong> Accept the log on to take the watch.{% endif %}
@@ -84,7 +87,7 @@
   </form>
 </section>
 
-<section id="ro-identity-pane" class="ro-workspace-pane d-none" data-ro-pane="identity">
+{% if not creating %}<section id="ro-identity-pane" class="ro-workspace-pane d-none" data-ro-pane="identity">
   <h2 class="ro-section-title">Find and verify</h2>
   {{ ui.find(logon.id) }}
   <div class="mt-4">{{ ui.verification(verified) }}</div>
@@ -104,6 +107,7 @@
   {% if draft %}<form method="post" action="/logon/{{ logon.id }}/discard" class="ro-cancel mt-4" onsubmit="return confirm('Discard: this was never a log on?')"><input type="hidden" name="back" value="/logons"><div class="d-flex flex-wrap gap-2 align-items-center"><input name="reason" class="form-control" style="max-width:28rem" placeholder="Why this was never a log on" maxlength="255" required><button class="btn btn-outline-danger">Discard draft</button></div></form>{% endif %}
 </section>
 {{ ui.find_script(logon.id) }}
+{% endif %}
 <script>
 (function () {
   var group = document.getElementById('logonViewTabs');
@@ -129,14 +133,39 @@
 </script>
 <script>
 (function () {
-  var id = {{ logon.id }}, version = {{ logon.version }}, open = {{ 'true' if open else 'false' }};
+  var id = {{ 'null' if creating else logon.id }}, version = {{ logon.version }}, creating = {{ 'true' if creating else 'false' }};
+  var open = {{ 'true' if open else 'false' }}, draft = {{ 'true' if draft else 'false' }}, dirty = false;
   var status = document.getElementById('saveStatus'), stale = document.getElementById('stale');
+  var saveButton = document.getElementById('saveRecord');
   var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function setStatus(text, cls) { status.textContent = text; status.className = 'small ' + cls; }
-  function renderGaps(gaps) {
-    var ol = document.getElementById('gaps');
-    ol.innerHTML = gaps.length ? gaps.map(function (g) { return '<li><button type="button" class="btn btn-outline-secondary ' + g.cls + '" data-focus="' + g.field + '"><span class="me-1">' + g.cls + '</span>' + esc(g.label) + '</button></li>'; }).join('') : '<li class="small text-success">Nothing left to ask.</li>';
+  function values() {
+    var out = {};
+    inputs.forEach(function (el) { out[el.dataset.field] = el.value; });
+    return out;
+  }
+  function mark(fields) {
+    inputs.forEach(function (el) {
+      var bad = fields.indexOf(el.dataset.field) !== -1;
+      el.classList.toggle('is-invalid', bad);
+      el.setAttribute('aria-invalid', String(bad));
+    });
+  }
+  function minimum() {
+    if (!draft) return [];
+    var missing = [];
+    if (!document.getElementById('f-callDay').value.trim()) missing.push('callDay');
+    if (!document.getElementById('f-callTime').value.trim()) missing.push('callTime');
+    if (!['memberNumber', 'registration', 'mobile'].some(function (name) { return document.getElementById('f-' + name).value.trim(); })) {
+      missing.push('memberNumber', 'registration', 'mobile');
+    }
+    return missing;
+  }
+  function changed(el) {
+    dirty = true;
+    el.classList.remove('is-invalid');
+    el.setAttribute('aria-invalid', 'false');
+    setStatus('Unsaved changes', 'text-secondary');
   }
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-focus]');
@@ -149,29 +178,25 @@
       }
     }
   });
-  // One save at a time. Two in flight race on the version, so a fast operator moving through the
-  // fields had a field rejected as stale by their own previous keystroke and silently not stored.
-  var pending = Promise.resolve();
-  function save(el) {
-    pending = pending.then(function () { return send(el); });
-  }
-  function send(el) {
-    var field = el.dataset.field;
-    setStatus('Saving…', 'text-secondary');
-    return fetch('/api/logon/' + id, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ field: field, value: el.value, version: version }) })
+  function save() {
+    var missing = minimum();
+    mark(missing);
+    if (missing.length) { setStatus('Not saved', 'text-secondary'); return; }
+    saveButton.disabled = true;
+    setStatus('Saving', 'text-secondary');
+    fetch(creating ? '/logons/new' : '/api/logon/' + id,
+          { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: values(), version: version }) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { return { ok: false, status: r.status, d: {} }; }); })
       .then(function (x) {
-        if (x.status === 409) { stale.hidden = false; setStatus('Not saved to the shared record: changed elsewhere', 'text-danger'); return; }
-        if (!x.ok) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); setStatus('Not saved to the shared record: ' + (x.d.error || ('HTTP ' + x.status)), 'text-danger'); return; }
-        version = x.d.version;
-        if (x.d.display != null) el.value = x.d.display;     // a day cell settles to the date it meant
-        el.classList.toggle('is-invalid', !!x.d.invalid);
-        el.setAttribute('aria-invalid', String(!!x.d.invalid));
-        renderGaps(x.d.gaps);
-        setStatus('Saved to the shared record ' + x.d.savedAt, 'text-success');
+        if (x.status === 409) { if (stale) stale.hidden = false; setStatus('Not saved', 'text-danger'); saveButton.disabled = false; return; }
+        if (!x.ok) { mark(x.d.fields || []); setStatus('Not saved', 'text-danger'); saveButton.disabled = false; return; }
+        mark(x.d.invalid || []);
+        dirty = false;
+        setStatus('Saved', 'text-success');
+        window.location.replace('/logon/' + (creating ? x.d.id : id) + window.location.hash);
       })
-      .catch(function (e) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); setStatus('Not saved to the shared record: ' + e.message, 'text-danger'); });
+      .catch(function () { setStatus('Save failed', 'text-danger'); saveButton.disabled = false; });
   }
   document.querySelectorAll('[data-picker-for]').forEach(function (button) {
     button.addEventListener('click', function () {
@@ -185,12 +210,12 @@
       var el = document.getElementById('f-' + picker.dataset.pickerTarget);
       if (!el || !picker.value) return;
       el.value = picker.value;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true }));
       picker.value = '';
     });
   });
   if (open) inputs.forEach(function (el, i) {
-    el.addEventListener('change', function () { save(el); });
+    el.addEventListener('input', function () { changed(el); });
     el.addEventListener('keydown', function (ev) {          // Enter = next field, so a call is keyboard only (CAP-3)
       if (ev.key === 'Enter' && el.tagName !== 'TEXTAREA') {
         ev.preventDefault();
@@ -200,6 +225,11 @@
         if (n) { n.focus(); n.select && n.select(); }
       }
     });
+  });
+  if (saveButton) saveButton.addEventListener('click', save);
+  window.addEventListener('beforeunload', function (ev) {
+    if (!dirty) return;
+    ev.preventDefault(); ev.returnValue = '';
   });
   if (open && !document.activeElement.matches('[data-field]')) {
     var activePane = document.querySelector('[data-ro-pane]:not(.d-none)');
