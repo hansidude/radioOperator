@@ -72,7 +72,7 @@ DATES = ('etaDate', 'callDate', 'departureDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
-DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'cancelledAt', 'capturedAt')
+DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'cancelledAt', 'reopenedAt', 'capturedAt')
 RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3}
 
 
@@ -341,6 +341,26 @@ def set_capture(cur, logon_id, complete, user, now, version=None):
     """Draft <-> Complete. Gaps may remain (CAP-12); monitoring and ownership do not change (§3.3)."""
     row = _open_row(cur, logon_id, version)
     return _bump(cur, row, {'captureStatus': 'complete' if complete else 'draft'}, user, now)
+
+
+def reopen(cur, logon_id, user, now, reason, version=None):
+    """Correct a closure made in error (§3.3). The closure event is preserved, not erased: the record
+    goes back on the queue under this unit's watch, and a deadline that has already passed is overdue
+    again from this moment, because time did not stop while the record was shut."""
+    row = get(cur, logon_id, lock=True)
+    if not row:
+        raise Refused('No such log on')
+    if row['watchStatus'] in OPEN:
+        raise Refused('This log on is already open')
+    reason = (reason or '').strip()
+    if not reason:
+        raise Refused('Reopening needs a reason: what was wrong with the closure?')
+    if len(reason) > 255:
+        raise Refused('Reopening reason: too long to store')
+    if version is not None and int(version) != row['version']:
+        raise Stale('Changed by someone else since you loaded it (now version %d, you had %s).' % (row['version'], version))
+    # Watching, not pending: whoever reopens a record is taking responsibility for it.
+    return _bump(cur, row, {'watchStatus': 'watching', 'reopenedAt': _s(now), 'reopenReason': reason}, user, now)
 
 
 def cancel(cur, logon_id, user, now, reason, duplicate_of=None, overdue_disposition=False, version=None):

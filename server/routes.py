@@ -136,6 +136,22 @@ def logon_capture(logon_id):
     return _action(logon_id, lambda cur, v: L.set_capture(cur, logon_id, complete, host().user(), _now(), v))
 
 
+@bp.route('/logon/<int:logon_id>/reopen', methods=['POST'])
+def logon_reopen(logon_id):
+    """Correct a closure made in error: the record comes back under watch, the closure event stays."""
+    h, (conn, cur) = _open()
+    _logon(cur, logon_id, h, lock=True)
+    try:
+        L.reopen(cur, logon_id, h.user(), _now(), request.form.get('reason'), request.form.get('version'))
+    except (L.Refused, L.Stale) as e:
+        conn.rollback()
+        cur.close()
+        return str(e), 409 if isinstance(e, L.Stale) else 400
+    conn.commit()
+    cur.close()
+    return redirect(request.form.get('back') or '/logon/%d' % logon_id)
+
+
 @bp.route('/logon/<int:logon_id>/cancel', methods=['POST'])
 def logon_cancel(logon_id):
     """No trip, no watch: an accidental entry, a call that never sailed, or the same one twice."""

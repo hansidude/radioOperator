@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `cancelledAt` DATETIME DEFAULT NULL,
   `cancelReason` VARCHAR(255) DEFAULT NULL,
   `duplicateOf` INT DEFAULT NULL,                             -- the canonical record, when this one was entered twice
+  -- A closure made in error is corrected, not erased: the closure event stays and this records the undo.
+  `reopenedAt` DATETIME DEFAULT NULL,
+  `reopenReason` VARCHAR(255) DEFAULT NULL,
   `version` INT NOT NULL DEFAULT 0,                           -- +1 per saved change; a save sends the version it saw (CAP-22)
   `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
   `createdAt` DATETIME DEFAULT NOW(),                         -- the entry time

@@ -18,6 +18,13 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
+{% macro reopen_form() %}
+<form method="post" action="/logon/{{ logon.id }}/reopen" class="d-flex gap-1 mt-2" onsubmit="return confirm('Reopen: was this closure wrong?')">
+  <input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="version" value="{{ logon.version }}">
+  <input name="reason" class="form-control form-control-sm" style="max-width:22rem" placeholder="Reason: what was wrong with the closure" maxlength="255" required>
+  <button class="btn btn-outline-warning btn-sm text-nowrap"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
+</form>
+{% endmacro %}
 {% macro field(name, cols='col') %}
 {% set raw = box(logon, name) %}
 {% set basis = logon[time_fields[name][4]] if name in time_fields else '' %}
@@ -30,8 +37,9 @@
 <div class="row g-3 mt-0">
 <div class="col-12 col-xxl-8">
   <div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
-  {% if logon.watchStatus == 'cancelled' %}<div class="alert alert-warning py-1 px-2 small mt-2">Cancelled {{ ui.when(logon.cancelledAt, now) }}: {{ logon.cancelReason }}{% if logon.duplicateOf %} · the record that stands is <a href="/logon/{{ logon.duplicateOf }}">#{{ logon.duplicateOf }}</a>{% endif %}. No trip and no watch were required. The record stays, findable and auditable, but stands for no boat or person.</div>
-  {% elif not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
+  {% if logon.watchStatus == 'cancelled' %}<div class="alert alert-warning py-1 px-2 small mt-2">Cancelled {{ ui.when(logon.cancelledAt, now) }}: {{ logon.cancelReason }}{% if logon.duplicateOf %} · the record that stands is <a href="/logon/{{ logon.duplicateOf }}">#{{ logon.duplicateOf }}</a>{% endif %}. No trip and no watch were required. The record stays, findable and auditable, but stands for no boat or person.
+    {{ reopen_form() }}</div>
+  {% elif not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only until reopened.{{ reopen_form() }}</div>{% endif %}
   {{ ui.verification(verified) }}
   <section class="ro-gaps mt-2" aria-label="Still to ask">
     <strong>Still to ask</strong> <span class="text-secondary">— advisory, ranked A to D; nothing here blocks saving or completing</span>
@@ -71,6 +79,7 @@
   </form>
   {% if open %}<form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"></form>{% endif %}
   <div class="ro-sys mb-2">
+    {% if logon.reopenedAt %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b %H:%M') }}: {{ logon.reopenReason }}. The earlier closure is kept above.</div>{% endif %}
     <strong>This system</strong> · record #{{ logon.id }} · entered {{ logon.createdAt.strftime('%a %d %b %H:%M') }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}{% if logon.loggedOffAt %} · logged off {{ logon.loggedOffAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}
     <div>Paper columns 13 to 15 — Trip ID No., Entered in Noggin, Logged off in Noggin — record transcription into Noggin and are marked on the paper. This system is not Noggin and cannot know them.</div>
   </div>

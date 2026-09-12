@@ -191,6 +191,23 @@ class Pages(unittest.TestCase):
         r = self.a.post('/logon/%d/cancel' % other, data={'reason': 'x', 'duplicateOf': str(other)})
         self.assertEqual(r.status_code, 400)
 
+    def test_a_closure_made_in_error_is_corrected_not_erased(self):       # §3.3 Correct mistaken closure
+        i = self.new()
+        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
+        self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})     # long past
+        self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'note': 'thought it was back'}).status_code, 302)
+        self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': ''}).status_code, 400)
+        self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'wrong boat'}).status_code, 302)
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertIn('wrong boat', page)
+        self.assertIn('thought it was back', page)                                    # the closure event is kept
+        self.assertIn('data-id="%d"' % i, self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))         # time did not stop
+        self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)
+        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
+        self.assertEqual(self.a.post('/logon/%d/cancel' % i,
+                                     data={'reason': 'never sailed', 'overdue': '1'}).status_code, 302)
+
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)
