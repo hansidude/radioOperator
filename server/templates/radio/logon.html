@@ -30,7 +30,8 @@
 <div class="row g-3 mt-0">
 <div class="col-12 col-xxl-8">
   <div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
-  {% if not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
+  {% if logon.watchStatus == 'cancelled' %}<div class="alert alert-warning py-1 px-2 small mt-2">Cancelled {{ ui.when(logon.cancelledAt, now) }}: {{ logon.cancelReason }}{% if logon.duplicateOf %} · the record that stands is <a href="/logon/{{ logon.duplicateOf }}">#{{ logon.duplicateOf }}</a>{% endif %}. No trip and no watch were required. The record stays, findable and auditable, but stands for no boat or person.</div>
+  {% elif not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
   {{ ui.verification(verified) }}
   <section class="ro-gaps mt-2" aria-label="Still to ask">
     <strong>Still to ask</strong> <span class="text-secondary">— advisory, ranked A to D; nothing here blocks saving or completing</span>
@@ -77,6 +78,18 @@
   <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
     {% if logon.watchStatus == 'pending' %}<form method="post" action="/logon/{{ logon.id }}/accept"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-outline-info btn-sm"><i class="bi bi-eye me-1"></i>Accept watch</button></form>{% endif %}
     <form method="post" action="/logon/{{ logon.id }}/capture"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="complete" value="{{ '0' if logon.captureStatus == 'complete' else '1' }}"><button class="btn btn-outline-secondary btn-sm">{% if logon.captureStatus == 'complete' %}<i class="bi bi-pencil me-1"></i>Reopen capture{% else %}<i class="bi bi-check2 me-1"></i>Mark capture complete{% endif %}</button></form>
+    <details class="ms-auto"><summary class="btn btn-outline-danger btn-sm">No trip: cancel</summary>
+      <form method="post" action="/logon/{{ logon.id }}/cancel" class="ro-cancel" onsubmit="return confirm('Cancel: establish that no trip and no watch were required?')">
+        <input type="hidden" name="back" value="/logons">
+        <p class="text-secondary mb-1">Cancelling says the trip never needed a watch: it did not sail, the entry was made by accident, or the same call is written down twice. It does not mean the boat came back. The record stays, findable and auditable.</p>
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+          <input name="reason" class="form-control form-control-sm" style="width:20rem" placeholder="Reason: what establishes no trip was required" maxlength="255" required>
+          <input name="duplicateOf" class="form-control form-control-sm" style="width:11rem" placeholder="Duplicate of record #" inputmode="numeric">
+          {% if condition == 'overdue' %}<label class="small text-danger"><input type="checkbox" name="overdue" value="1" required> This record is overdue. I am disposing of it, not tidying the queue.</label>{% endif %}
+          <button class="btn btn-outline-danger btn-sm">Cancel this record</button>
+        </div>
+      </form>
+    </details>
   </div>
   {% endif %}
   {% if identifiers %}

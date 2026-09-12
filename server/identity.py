@@ -70,10 +70,14 @@ def _keys(row):
     return vessel, person
 
 
-def past(cur, unit, exclude_id=None):
-    """Every earlier trip of this unit, newest first. The register this app has instead of a register."""
+def past(cur, unit, exclude_id=None, cancelled=False):
+    """Every earlier trip of this unit, newest first. The register this app has instead of a register.
+
+    A cancelled record says no trip was required, so it is not evidence of a boat or a person and
+    is left out by default. It stays searchable and auditable, which is why `cancelled` exists."""
     from . import logons                 # loaded by now; one definition of how a stored row is typed
-    cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND id <> %s ORDER BY id DESC',
+    cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND id <> %s'
+                + ('' if cancelled else " AND watchStatus <> 'cancelled'") + ' ORDER BY id DESC',
                 (unit, int(exclude_id or 0)))
     rows = [logons._row(r) for r in cur.fetchall() or []]
     for r in rows:
@@ -210,7 +214,7 @@ def search(cur, unit, q, limit=25):
     q = (q or '').strip()
     if len(q) < 2:
         return []
-    rows = past(cur, unit)
+    rows = past(cur, unit)                      # cancelled records stand for no boat and no person
     vessels, people = known(rows)
     open_ids = {r['vesselKey'] for r in rows if r['watchStatus'] in ('pending', 'watching')} | \
                {r['personKey'] for r in rows if r['watchStatus'] in ('pending', 'watching')}
@@ -222,7 +226,7 @@ def search(cur, unit, q, limit=25):
             haystack = ' '.join(str(x) for x in (item['label'], item['sublabel'], item['detail']) if x).lower()
             if needle in haystack or (loose and loose in normalize('registration', haystack)):
                 hits.append(dict(item, atSea=key in open_ids))
-    for r in rows:
+    for r in past(cur, unit, cancelled=True):   # but they remain findable, marked for what they are
         text = ' '.join(str(x) for x in (r.get('registration'), r.get('vesselName'), r.get('memberNumber'),
                                          r.get('mobile'), r.get('destination'), r.get('departurePoint')) if x).lower()
         if needle in text or (loose and loose in normalize('registration', text)):

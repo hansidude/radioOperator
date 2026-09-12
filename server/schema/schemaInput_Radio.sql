@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `verifyBasis` VARCHAR(255) DEFAULT NULL,                    -- the reason in words, recomputed from current evidence (IDV-3)
   `loggedOffAt` DATETIME DEFAULT NULL,
   `loggedOffNote` VARCHAR(255) DEFAULT NULL,
+  -- Cancel is not a tidy log off: it establishes that no trip and no watch were required (§3.3).
+  `cancelledAt` DATETIME DEFAULT NULL,
+  `cancelReason` VARCHAR(255) DEFAULT NULL,
+  `duplicateOf` INT DEFAULT NULL,                             -- the canonical record, when this one was entered twice
   `version` INT NOT NULL DEFAULT 0,                           -- +1 per saved change; a save sends the version it saw (CAP-22)
   `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
   `createdAt` DATETIME DEFAULT NOW(),                         -- the entry time

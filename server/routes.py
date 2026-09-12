@@ -136,6 +136,14 @@ def logon_capture(logon_id):
     return _action(logon_id, lambda cur, v: L.set_capture(cur, logon_id, complete, host().user(), _now(), v))
 
 
+@bp.route('/logon/<int:logon_id>/cancel', methods=['POST'])
+def logon_cancel(logon_id):
+    """No trip, no watch: an accidental entry, a call that never sailed, or the same one twice."""
+    return _action(logon_id, lambda cur, v: L.cancel(
+        cur, logon_id, host().user(), _now(), request.form.get('reason'),
+        request.form.get('duplicateOf'), request.form.get('overdue') == '1', v))
+
+
 @bp.route('/logon/<int:logon_id>/logoff', methods=['POST'])
 def logon_logoff(logon_id):
     return _action(logon_id, lambda cur, v: L.log_off(cur, logon_id, host().user(), _now(), request.form.get('note'), v))

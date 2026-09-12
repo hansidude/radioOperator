@@ -147,6 +147,50 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/logon/%d/capture' % mixed, data={'complete': '1'}).status_code, 302)  # IDV-5: blocks nothing
         self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)
 
+    def test_cancel_needs_a_reason_and_faces_an_overdue_record(self):     # §3.3 Cancel, WAT-7
+        i = self.new()
+        self.assertEqual(self.a.post('/logon/%d/cancel' % i, data={'reason': ''}).status_code, 400)
+        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
+        self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})     # long past: overdue
+        r = self.a.post('/logon/%d/cancel' % i, data={'reason': 'entered twice'})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('disposition, not a tidy-up', r.get_data(as_text=True))
+        r = self.a.post('/logon/%d/cancel' % i, data={'reason': 'entered twice', 'overdue': '1', 'back': '/logons'})
+        self.assertEqual(r.status_code, 302, r.get_data(as_text=True))
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertIn('No trip and no watch were required', page)
+        self.assertIn('entered twice', page)
+        self.assertNotIn('data-id="%d"' % i, self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('No trip', self.a.get('/logons').get_data(as_text=True))       # shown as closed, not hidden
+        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 400)
+
+    def test_a_cancelled_record_stands_for_no_boat_but_stays_findable(self):
+        ghost = self.new()
+        for f, v in [('registration', 'GH0ST1'), ('memberNumber', '1234')]:
+            self.a.post('/api/logon/%d' % ghost, json={'field': f, 'value': v})
+        self.assertTrue([h for h in self.a.get('/api/logons/search?q=GH0ST1').json['hits'] if h['kind'] == 'vessel'])
+        self.assertEqual(self.a.post('/logon/%d/cancel' % ghost,
+                                     data={'reason': 'never sailed', 'duplicateOf': ''}).status_code, 302)
+        hits = self.a.get('/api/logons/search?q=GH0ST1').json['hits']
+        self.assertEqual([h for h in hits if h['kind'] == 'vessel'], [])              # no longer a known boat
+        self.assertTrue([h for h in hits if h['kind'] == 'trip'])                      # but still findable
+        real = self.new()
+        for f, v in [('registration', 'GH0ST1'), ('memberNumber', '1234')]:
+            self.a.post('/api/logon/%d' % real, json={'field': f, 'value': v})
+        self.assertIn('Unverified', self.a.get('/logon/%d' % real).get_data(as_text=True))   # cancelled is not evidence
+
+    def test_a_duplicate_points_at_the_record_that_stands(self):
+        canonical = self.new()
+        dup = self.new()
+        self.assertEqual(self.a.post('/logon/%d/cancel' % dup,
+                                     data={'reason': 'same call written twice', 'duplicateOf': str(canonical)}).status_code, 302)
+        self.assertIn('/logon/%d' % canonical, self.a.get('/logon/%d' % dup).get_data(as_text=True))
+        other = self.new()
+        r = self.a.post('/logon/%d/cancel' % other, data={'reason': 'x', 'duplicateOf': '9999'})
+        self.assertEqual(r.status_code, 400)
+        r = self.a.post('/logon/%d/cancel' % other, data={'reason': 'x', 'duplicateOf': str(other)})
+        self.assertEqual(r.status_code, 400)
+
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
         self.assertEqual(self.b.get('/logon/%d' % i).status_code, 403)
@@ -174,7 +218,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('Logged off', page); self.assertIn('alongside', page); self.assertIn('disabled', page)
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 400)
-        self.assertIn('Recently logged off', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('Recently closed', self.a.get('/logons').get_data(as_text=True))
 
 
 if __name__ == '__main__':

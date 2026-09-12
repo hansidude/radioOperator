@@ -72,7 +72,7 @@ DATES = ('etaDate', 'callDate', 'departureDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
-DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'capturedAt')
+DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'cancelledAt', 'capturedAt')
 RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3}
 
 
@@ -341,6 +341,32 @@ def set_capture(cur, logon_id, complete, user, now, version=None):
     """Draft <-> Complete. Gaps may remain (CAP-12); monitoring and ownership do not change (§3.3)."""
     row = _open_row(cur, logon_id, version)
     return _bump(cur, row, {'captureStatus': 'complete' if complete else 'draft'}, user, now)
+
+
+def cancel(cur, logon_id, user, now, reason, duplicate_of=None, overdue_disposition=False, version=None):
+    """Establish that no trip and no watch were required: no departure, an entry made by accident,
+    or the same call written down twice (§3.3, WAT-7). This is not a quiet log off, so it needs a
+    reason, and an overdue record needs the cancellation faced rather than used to tidy the queue.
+    The row stays, searchable and auditable; it simply stops standing for a trip that happened."""
+    row = _open_row(cur, logon_id, version)
+    reason = (reason or '').strip()
+    if not reason:
+        raise Refused('Cancelling needs a reason: what establishes that no trip was required?')
+    if len(reason) > 255:
+        raise Refused('Cancellation reason: too long to store')
+    if row['eta'] and row['eta'] <= now and not overdue_disposition:
+        raise Refused('This record is overdue. Cancelling one is a disposition, not a tidy-up: '
+                      'confirm explicitly that no trip was required.')
+    canonical = None
+    if duplicate_of not in (None, '', 0, '0'):
+        canonical = int(duplicate_of)
+        if canonical == logon_id:
+            raise Refused('A record cannot be a duplicate of itself')
+        other = get(cur, canonical)
+        if not other or other['unit'] != row['unit']:
+            raise Refused('No record #%s to point at' % duplicate_of)
+    return _bump(cur, row, {'watchStatus': 'cancelled', 'cancelledAt': _s(now),
+                            'cancelReason': reason, 'duplicateOf': canonical}, user, now)
 
 
 def log_off(cur, logon_id, user, now, note, version=None):

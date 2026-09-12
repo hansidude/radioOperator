@@ -17,9 +17,13 @@
 {{ ui.styles() }}
 <div id="queuePane" class="mt-2">{{ ui.queue(queue, now) }}</div>
 {% if closed %}
-<details class="mt-3"><summary class="small text-secondary">Recently logged off ({{ closed|length }})</summary>
-<table class="table table-sm ro-queue mt-1"><thead><tr><th>Logged off</th><th>Vessel</th><th>ETA was</th><th>POB</th><th>Destination</th><th>Note</th><th></th></tr></thead><tbody>
-{% for r in closed %}<tr><td>{{ ui.when(r.loggedOffAt, now) }}</td><td>#{{ r.id }} {{ r.memberNumber or r.vesselName or r.registration or '' }}</td><td>{{ ui.when(r.eta, now) }}</td><td>{{ r.pob or '' }}</td><td class="wrap">{{ r.destination or '' }}</td><td class="wrap">{{ r.loggedOffNote or '' }}</td><td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td></tr>{% endfor %}
+<details class="mt-3"><summary class="small text-secondary">Recently closed ({{ closed|length }})</summary>
+<table class="table table-sm ro-queue mt-1"><thead><tr><th>Closed</th><th>How</th><th>Vessel</th><th>ETA was</th><th>POB</th><th>Destination</th><th>Reason / evidence</th><th></th></tr></thead><tbody>
+{% for r in closed %}<tr><td>{{ ui.when(r.cancelledAt or r.loggedOffAt, now) }}</td>
+  <td>{% if r.watchStatus == 'cancelled' %}<span class="badge text-bg-warning">No trip</span>{% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}</td>
+  <td>#{{ r.id }} {{ r.memberNumber or r.vesselName or r.registration or '' }}</td><td>{{ ui.when(r.eta, now) }}</td><td>{{ r.pob or '' }}</td><td class="wrap">{{ r.destination or '' }}</td>
+  <td class="wrap">{{ r.cancelReason or r.loggedOffNote or '' }}{% if r.duplicateOf %} · see #{{ r.duplicateOf }}{% endif %}</td>
+  <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td></tr>{% endfor %}
 </tbody></table></details>
 {% endif %}
 {{ ui.refresh_script(None) }}
