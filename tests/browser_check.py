@@ -58,8 +58,8 @@ def main():
         check('the radio page uses cards and no tables', page.locator('table').count() == 0)
         page.click('[data-ro-tab="contact"]')
         check('supporting details have a focused tab', page.locator('#captureContact').is_visible())
-        page.click('[data-ro-tab="drafts"]')
-        check('Drafts has its own card collection', page.locator('#ro-drafts-pane').is_visible())
+        page.click('[data-ro-tab="watch"]')
+        check('Watch shows the record collections', page.locator('#queuePane').is_visible())
         page.click('[data-ro-tab="entry"]')
 
         # type the way an operator does: every field, one after another, without waiting
@@ -92,6 +92,7 @@ def main():
         page.reload()
         check('the gate now says everything needed is here',
               'Everything needed is here' in page.content())
+        page.click('[data-ro-tab="entry"]')
         page.click('button:has-text("Accept the log on")')
         page.wait_for_load_state()
         check('accepting puts it on the watch queue', page.locator('[data-id="%s"]' % record).count() == 1)
