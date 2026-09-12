@@ -50,6 +50,8 @@ def create_app(db_url=None):
             if 'db' not in g:
                 g.db = lite.Connection(path)
             return g.db
+        def background():
+            return lite.Connection(path)        # the checker runs outside any request
     elif db_url.startswith('mysql://'):
         raw = _mysql_connect(db_url)
         _mysql_schema(raw)
@@ -57,6 +59,7 @@ def create_app(db_url=None):
             if 'db' not in g:
                 g.db = raw()
             return g.db
+        background = raw
     else:
         raise SystemExit('RADIO_DB must start with sqlite:/// or mysql://')
 
@@ -66,7 +69,15 @@ def create_app(db_url=None):
         if db is not None:
             db.close()
 
-    mount(app, NullHost(connect))
+    # These are the unit's to set, so they are configuration rather than constants in the code.
+    host = NullHost(connect, background)
+    for name, env in (('approaching_minutes', 'RADIO_APPROACHING_MINUTES'),
+                      ('draft_followup_minutes', 'RADIO_DRAFT_FOLLOWUP_MINUTES'),
+                      ('alert_repeat_minutes', 'RADIO_ALERT_REPEAT_MINUTES'),
+                      ('watch_stale_seconds', 'RADIO_WATCH_STALE_SECONDS')):
+        if os.environ.get(env):
+            setattr(host, name, int(os.environ[env]))
+    mount(app, host, watch_every=int(os.environ.get('RADIO_WATCH_SECONDS', '30')))
     app.add_url_rule('/', 'home', lambda: redirect('/logons'))
     return app
 
