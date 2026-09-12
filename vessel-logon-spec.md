@@ -1,13 +1,64 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.4 (draft)
-**Status:** For review
-**Domain:** Marine rescue vessel log on, watch, and log off
+**Version:** 0.5 (draft)<br>
+**Revised:** 12 September 2026 (AEST)<br>
+**Status:** For operational review; not an approved operating procedure<br>
+**Domain:** Marine rescue vessel log on, watch, and log off<br>
 **Audience:** Anyone implementing or evaluating a system that performs this function
+
+<!-- contents:start -->
+## Table of contents
+
+- [1. Purpose and scope](#section-1-purpose-and-scope)
+    - [1.1 Purpose](#section-11-purpose)
+    - [1.2 The primary safety objective](#section-12-the-primary-safety-objective)
+    - [1.3 Scope](#section-13-scope)
+    - [1.4 Priority](#section-14-priority)
+    - [1.5 Requirement language](#section-15-requirement-language)
+- [2. Definitions](#section-2-definitions)
+- [3. Domain model](#section-3-domain-model)
+    - [3.1 Entities](#section-31-entities)
+    - [3.2 Relationships](#section-32-relationships)
+    - [3.3 Capture, watch and escalation are separate](#section-33-capture-watch-and-escalation-are-separate)
+    - [3.4 Log on variants and obligations](#section-34-log-on-variants-and-obligations)
+- [4. Operating context](#section-4-operating-context)
+- [5. Requirements — Capture (P1)](#section-5-requirements-capture-p1)
+    - [5.1 Capture performance](#section-51-capture-performance)
+    - [5.2 Persistence, interruption and concurrent work](#section-52-persistence-interruption-and-concurrent-work)
+- [6. Requirements — Data (P1)](#section-6-requirements-data-p1)
+    - [6.1 Field priority classes](#section-61-field-priority-classes)
+- [7. Requirements — Identification, verification and search (P1)](#section-7-requirements-identification-verification-and-search-p1)
+    - [7.1 Cross-verification](#section-71-cross-verification)
+    - [7.2 Tolerant resolution](#section-72-tolerant-resolution)
+    - [7.3 Search](#section-73-search)
+- [8. Requirements — Watch and overdue (P2)](#section-8-requirements-watch-and-overdue-p2)
+- [9. Requirements — Record and audit (P2)](#section-9-requirements-record-and-audit-p2)
+- [10. Acceptance criteria](#section-10-acceptance-criteria)
+    - [10.1 Capture](#section-101-capture)
+    - [10.2 Verification and search](#section-102-verification-and-search)
+    - [10.3 Watch, record and audit](#section-103-watch-record-and-audit)
+    - [10.4 Adoption and release acceptance](#section-104-adoption-and-release-acceptance)
+    - [10.5 Interrupted and exceptional operation](#section-105-interrupted-and-exceptional-operation)
+    - [10.6 Operational release gate](#section-106-operational-release-gate)
+- [Appendix A — Justification from current practice](#section-appendix-a-justification-from-current-practice)
+- [Appendix B — Letter confusion set](#section-appendix-b-letter-confusion-set)
+- [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
+- [Appendix D — Open questions](#section-appendix-d-open-questions)
+- [Appendix E — Changes from version 0.4](#section-appendix-e-changes-from-version-04)
+- [Appendix F — Evidence figures](#section-appendix-f-evidence-figures)
+    - [Figure 1 — Active log on list](#section-figure-1-active-log-on-list)
+    - [Figure 2 — Validation error block](#section-figure-2-validation-error-block)
+    - [Figure 3 — Capture form scrolled](#section-figure-3-capture-form-scrolled)
+    - [Figure 4 — Trip-detail defaults](#section-figure-4-trip-detail-defaults)
+<!-- contents:end -->
 
 ---
 
+<a id="section-1-purpose-and-scope"></a>
+
 ## 1. Purpose and scope
+
+<a id="section-11-purpose"></a>
 
 ### 1.1 Purpose
 
@@ -19,6 +70,8 @@ It is written to be implementation-independent. It names no product and assumes 
 technology. It is equally usable as a build specification and as an evaluation checklist
 for an existing system.
 
+<a id="section-12-the-primary-safety-objective"></a>
+
 ### 1.2 The primary safety objective
 
 All requirements in this document derive from one objective:
@@ -26,7 +79,14 @@ All requirements in this document derive from one objective:
 > **PSO.** If a vessel does not return when it said it would, the unit shall know, and
 > the unit shall be able to find it.
 
-Where any two requirements appear to conflict, the one that better serves PSO prevails.
+PSO expresses the intended outcome; software cannot guarantee that a vessel will be found.
+Its testable contribution is to preserve the information received, expose missing or
+uncertain information, detect missed obligations, and retain an accountable watch owner.
+
+Conflicting requirements shall be resolved explicitly during review, with the decision
+recorded against PSO. Implementers shall not silently waive a requirement by invoking PSO.
+
+<a id="section-13-scope"></a>
 
 ### 1.3 Scope
 
@@ -38,6 +98,8 @@ audit.
 **Out of scope:** conduct of the search or rescue itself; asset and crew management;
 member administration and billing; incident management beyond the point of escalation.
 
+<a id="section-14-priority"></a>
+
 ### 1.4 Priority
 
 Requirements carry a priority reflecting current operational need, not importance:
@@ -48,12 +110,21 @@ Requirements carry a priority reflecting current operational need, not importanc
 | **P2** | Required, but adequately served by existing practice — §8, §9. |
 | **P3** | Required for completeness; lowest urgency. |
 
+P2 means lower change urgency in the existing operation, not an optional release gate.
+A replacement capture system shall demonstrate a functioning path into the existing watch
+or implement the required watch behavior before it is relied on operationally. A saved
+record alone is not evidence that anyone is monitoring it.
+
+<a id="section-15-requirement-language"></a>
+
 ### 1.5 Requirement language
 
 **Shall** — mandatory. **Should** — strongly recommended; deviation requires
 justification. **May** — optional.
 
 ---
+
+<a id="section-2-definitions"></a>
 
 ## 2. Definitions
 
@@ -66,141 +137,175 @@ justification. **May** — optional.
 | **Member** | A person with a standing record held by the organisation. |
 | **Public user** | A person without a standing record, logging on as a non-member. |
 | **Identifier** | Any value that resolves to a stored record: member number, vessel registration, mobile number, vessel name. |
-| **Verification** | Confirmation that captured identifying data corresponds to a real, correct record. |
-| **Cross-verification** | Verification achieved by two independent identifiers resolving to the same record. See §7. |
-| **Draft** | A log on that has been created and persisted but not yet completed. |
-| **Active** | A log on for a vessel currently out, before its ETA. |
-| **Overdue** | An active log on whose ETA has passed without log off. |
-| **Escalated** | An overdue log on for which the escalation sequence has begun. |
-| **ETA** | The time by which the vessel states it will return or report. Drives overdue detection. |
+| **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
+| **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
+| **Draft** | Capture is incomplete. This does not disable watch monitoring. |
+| **Active** | An open record in the watch queue, including pending acceptance and unresolved deadlines. |
+| **Overdue** | At least one open timed obligation has passed its due time without satisfaction or explicit amendment. |
+| **Escalated** | An open escalation exists. This is independent of capture completeness and deadline amendment. |
+| **ETA** | A supplied expected return or report date/time, represented by a timed obligation. |
+| **Obligation** | An expected return, position report, crossing completion, or operator follow-up, with its own status and deadline. |
+| **Watch owner** | The unit accountable for the open record, including unresolved capture and pending transfer. |
+| **Acknowledgment** | An operator records seeing an alert or accepting a transfer; neither action implies the vessel has returned. |
 | **POB** | Persons on board. |
 | **Enrichment** | Addition of detail to an existing log on after its initial creation. |
 | **Airtime** | Occupancy of a shared radio channel. A finite, contended resource. |
 
 ---
 
+<a id="section-3-domain-model"></a>
+
 ## 3. Domain model
+
+<a id="section-31-entities"></a>
 
 ### 3.1 Entities
 
 | Entity | Description | Key attributes |
 |---|---|---|
-| **LogOn** | The central record. One per trip. | state, channel, operator, unit, departure point, departure time, destination, ETA, POB, verification state, created/updated timestamps |
-| **Vessel** | A boat known to the system. | registration, name, length, hull colour, type (power/sail/other), make, model, AIS identifier |
-| **Member** | A person with a standing record. | member number, name, contact numbers, associated vessels |
-| **PublicUser** | A person without a standing record. | name, contact numbers, associated vessels |
-| **OnboardContact** | A person aboard or ashore who can be reached. | name, relationship, contact number |
-| **Identifier** | A captured identifying value and its resolution outcome. | type, value as captured, resolved record, verification state |
-| **EscalationStep** | One action taken against an overdue log on. | action, timestamp, operator, outcome |
-| **Location** | A departure or destination point. | name, coordinates (optional), free-text flag |
-| **Operator** | The person taking the call. | identity, unit, shift |
+| **LogOn** | One trip record, with independent capture and watch states. | capture status, watch status, watch owner, channel, operator, call time, departure point/time, destination, POB, verification outcome, created/updated timestamps |
+| **Vessel** | A boat known to the system. | registration, name, length, hull colour, type, make, model, AIS identifier |
+| **Member / PublicUser** | A person, with membership a standing-record attribute rather than a prerequisite to capture. | identifiers, name, contact numbers, associated vessels |
+| **OnboardContact** | A reachable person aboard or ashore; location/role explicitly recorded. | name, aboard/ashore, relationship, number, source and confirmation time |
+| **Identifier** | An independently captured value and its resolution history. | type, raw value, normalized value, source, captured time, candidates, match basis, selected record, outcome |
+| **Obligation** | One expected event or internal follow-up. | kind, due date/time, raw time expression, interpretation basis/timezone, status, satisfaction/amendment evidence |
+| **EscalationStep** | An action under the unit's approved escalation procedure. | procedure version, action, timestamp, actor, outcome, disposition |
+| **WatchTransfer** | A request and acknowledgment of a change in owning unit. | source/target, requester, requested time, record version, accepting operator/time, outcome |
+| **Location** | A departure/destination/report point. | name, optional coordinates, free-text flag, source |
+| **Operator** | The authenticated person taking an action. | identity, unit, shift |
+
+This is a conceptual model; it does not prescribe separate database tables for each row.
+Automated events record a system actor and responsible unit, rather than inventing an operator.
+
+<a id="section-32-relationships"></a>
 
 ### 3.2 Relationships
 
-- A **LogOn** references at most one **Vessel** and at most one **Member** or
-  **PublicUser**. All three may be absent in a Draft.
-- A **LogOn** holds zero or more **Identifier** records — one per identifying value
-  captured, retaining the value **as captured** alongside its resolution.
-- A **LogOn** holds zero or more **OnboardContact** records.
-- A **LogOn** holds zero or more **EscalationStep** records, ordered by time.
-- A **Vessel** may be associated with zero or more **Members** and **PublicUsers**, and
-  vice versa.
+- A LogOn may reference one selected Vessel and one primary Member or PublicUser;
+  either may remain unknown even after capture is marked complete. Additional people
+  are contacts. Vessel/person selection does not require creating a standing record.
+- A LogOn retains zero or more captured Identifiers, contacts, obligations, and
+  escalation steps. It retains every transfer attempt and ownership change.
+- Vessels and people have many-to-many associations. A phone number or name need not
+  be unique. Registration/identifier namespaces and validity periods must be respected.
+- Stored profile changes do not rewrite historical trip evidence. A log on retains the
+  values, source and verification basis used at the time, alongside links to current profiles.
 
-### 3.3 States and transitions
+<a id="section-33-capture-watch-and-escalation-are-separate"></a>
 
-```
-            create
-              │
-              ▼
-         ┌─────────┐  complete   ┌──────────┐  ETA passes  ┌──────────┐
-         │  DRAFT  │ ──────────▶ │  ACTIVE  │ ───────────▶ │ OVERDUE  │
-         └─────────┘             └──────────┘              └──────────┘
-              │                    │      ▲                  │      │
-              │ cancel             │      │ amend ETA        │      │ begin
-              │                    │      └──────────────────┘      │ escalation
-              ▼                    │                                ▼
-         ┌───────────┐             │                          ┌────────────┐
-         │ CANCELLED │             │                          │ ESCALATED  │
-         └───────────┘             │                          └────────────┘
-                                   │                                │
-                    log off        ▼            log off             ▼
-                            ┌────────────────────────────────────────────┐
-                            │                LOGGED OFF                   │
-                            └────────────────────────────────────────────┘
-```
+### 3.3 Capture, watch and escalation are separate
 
-| Transition | Trigger | Notes |
-|---|---|---|
-| → Draft | Operator begins capture | Persisted immediately (CAP-1) |
-| Draft → Active | Operator marks complete, or ETA and POB present and operator confirms | Draft may remain Draft indefinitely |
-| Draft → Cancelled | Vessel did not depart | |
-| Active → Overdue | ETA passes without log off | Automatic, system-driven |
-| Active → Active | Amendment of ETA, destination, POB | Appends, does not overwrite (REC-3) |
-| Overdue → Active | Vessel makes contact, new ETA agreed | |
-| Overdue → Escalated | Escalation sequence begun | |
-| Any → Logged off | Vessel returns or trip ends | Explicit operator action only (WAT-7) |
-| Active → Transferred | Another unit assumes the watch | Record moves without re-keying |
+**Capture status:** Draft or Complete. An operator may mark capture complete with missing
+or inconsistent information (CAP-12); the gaps remain visible. Complete is not a claim
+that the vessel is identified, the record is correct, or the watch is established.
 
-A **Draft** is a valid, legally-held, searchable record in every state-dependent
-behaviour except overdue detection, which requires an ETA.
+**Watch status:** Pending acceptance, Watching, Logged off, or Cancelled. Every new
+record is immediately owned by the capturing unit and appears in its open watch queue,
+including an empty Draft. When shared creation is unavailable, CAP-19–20 require an
+explicit local-only/unsaved state and the approved operational fallback; a local capture
+is not falsely presented as present in the shared queue. Pending acceptance means responsibility for resolving the
+record has been assigned; it does not claim that a completed log on was acknowledged to
+the vessel. Acceptance is an explicit operator action and may occur before capture is complete.
 
-### 3.4 Log on variants
+**Deadline condition:** No usable vessel deadline, Not yet due, Approaching, or Overdue.
+Conditions derive from open obligations, independently of Draft/Complete and pending
+acceptance. A usable deadline on any open record is monitored immediately. Entering a
+past deadline raises the overdue condition immediately; missing POB or identity does not
+inhibit it. Missing or uninterpretable times create a conspicuous unresolved condition
+and operator follow-up, not a fabricated vessel ETA (WAT-9).
 
-| Variant | Difference |
+**Escalation status:** None, Open, or Closed. An open escalation remains open after an
+ETA change until an authorized operator records its disposition. Alert acknowledgment,
+record completion, and transfer do not close it.
+
+| Action | Preconditions and result |
 |---|---|
-| **Standard** | Single departure, single ETA. |
-| **Long term** | Multi-day passage. ETA replaced by a schedule of expected position reports; overdue triggers on a missed report. |
-| **Bar crossing** | Short, high-risk watch over a specific hazard. Short ETA. May be nested within a standard log on. |
+| Begin capture | Create Draft + Pending acceptance; assign the capturing unit; add to the shared open queue. |
+| Accept watch | Pending acceptance → Watching; record operator/time. Missing information remains visible. |
+| Complete/reopen capture | Change Draft/Complete only; monitoring and ownership do not change. |
+| Deadline passes | Any open record becomes Overdue for the affected obligation; alert under WAT-3. |
+| Amend obligation | Retain previous deadline and reason/source; recompute deadline condition. Existing escalation requires explicit disposition. |
+| Begin escalation | Record the approved procedure and actor. May occur before a deadline where that procedure authorizes it. |
+| Log off | Explicit operator action on an open record, with contact/evidence and time. Resolve each open obligation and escalation explicitly in the closing action; do not silently mark all as fulfilled. |
+| Cancel | Explicitly establish no trip/watch was required (for example no departure, accidental entry, or duplicate); record reason and any canonical record link. Overdue/escalated records require authorized disposition, not deletion. |
+| Request transfer | Keep source ownership and monitoring; record transfer pending. |
+| Accept transfer | Change owner to receiving unit through the acknowledged transfer protocol (WAT-8); preserve all open conditions. |
+| Correct mistaken closure | Authorized reopen with reason, restoring ownership and evaluating unsatisfied deadlines immediately; preserve the closure event. |
 
-All variants are the same entity with different ETA semantics. They shall not be modelled
-as separate record types.
+Closed records remain searchable and auditable. Corrections are appended with an explicit
+reason; they do not silently resume or cancel monitoring. There is no terminal
+“Transferred” trip state: transfer changes ownership, not whether the trip is open.
+
+<a id="section-34-log-on-variants-and-obligations"></a>
+
+### 3.4 Log on variants and obligations
+
+| Variant | Obligations |
+|---|---|
+| **Standard** | Expected return, plus any agreed follow-up. |
+| **Long term** | Individually tracked position-report deadlines and, where known, expected return. A report does not log off the trip. |
+| **Bar crossing** | Its own crossing-completion deadline, optionally within the same trip as a later return deadline. Completing the crossing does not satisfy the return obligation. |
+
+Variants use the same trip model. Each missed obligation remains independently visible;
+fulfilling one does not fulfill another. Report schedules, tolerance and escalation policy
+must be confirmed by the unit before operational use (Appendix D). Internal operator
+follow-up deadlines are labeled as such and are never presented as caller-supplied ETAs.
 
 ---
+
+<a id="section-4-operating-context"></a>
 
 ## 4. Operating context
 
 Context that constrains the requirements. Stated as fact, not as complaint.
 
 **OC-1.** Log ons arrive by marine radio, telephone, in person, and self-service. Radio
-is the dominant channel and the most constrained; the system shall be designed for radio
-and will thereby satisfy the others.
+is reported as dominant at the observed unit and drives the capture design. Other channels
+require their own acceptance checks; self-service submissions require a defined unit
+acceptance/acknowledgment path and shall not imply an established watch merely by submitting.
 
 **OC-2.** A radio log on is an interview, not a dictation. The caller states a rough
 intention; the operator elicits the remaining detail by asking. Field order is arbitrary
 and varies per call.
 
-**OC-3.** There is no published procedure instructing callers what to say, and no
-enforced script instructing operators what to ask. Operators are volunteers of varying
-experience and each works differently. The system shall not assume procedural
-consistency.
+**OC-3.** Local observations report varying caller information and operator interview
+order. The system shall not assume a consistently followed script. This does not establish
+that no organisational procedure exists; applicable procedures must be identified and
+represented accurately, particularly for escalation and handover.
 
 **OC-4.** Airtime is contended. Every question the operator asks occupies a shared
 channel that other vessels are waiting on. The system shall treat operator questions as
 a cost to be minimised.
 
-**OC-5.** Phonetic alphabet use is inconsistent, by callers and operators alike. Spoken
-digits are reliable, because the operator controls the conversation and can request a
-repeat. **Spoken letters are not**, and confuse along the predictable set in Appendix B.
+**OC-5.** Local observations report inconsistent phonetic use and recurring letter
+confusions. Letters and digits can both be misheard. Appendix B is an initial candidate
+matching heuristic to validate against observed errors, not a guarantee of identity or
+a substitute for clarification and approved radio procedures.
 
 **OC-6.** Identifying detail — vessel registration, mobile number — typically arrives
 late in a call or only when asked, and sometimes on a later call. It shall not be
 required early.
 
-**OC-7.** The organisation is under a legislative obligation to hold a computer record of
-log ons. A record held only on paper does not discharge that obligation.
+**OC-7.** A requirement for a computer record has been reported locally. Its legislative,
+policy or contractual basis, permitted media, retention period and evidentiary requirements
+are **not yet established by this specification**. Appendix D question 5 must be resolved
+before claiming compliance. Immediate durable capture is justified operationally regardless.
 
 **OC-8.** Calls arrive in bursts. Peak load is a period of good weather, which is also
 when the greatest number of vessels are at sea.
 
 ---
 
+<a id="section-5-requirements-capture-p1"></a>
+
 ## 5. Requirements — Capture (P1)
 
 **CAP-1.** The system **shall** persist a log on record containing any subset of fields,
-including an empty subset, from the moment capture begins.
-*Rationale: a record that exists partially is operationally and legally superior to one
-that exists only on paper (OC-7). Blocking creation converts a survivable gap into a
-missing record.*
+including an empty subset, from the moment capture begins. Shared persistence requires
+the acknowledgment in CAP-19; during an outage CAP-20 governs recovery, and the interface
+shall not imply that an unacknowledged capture is shared or monitored.
+*Rationale: retaining partial information prevents a missing operational record. Legal
+sufficiency remains subject to OC-7. Persistence and failure semantics are defined in §5.2.*
 
 **CAP-2.** The system **shall not** require any field to be populated in order to create,
 save, or retain a log on.
@@ -210,10 +315,12 @@ save, or retain a log on.
 reachable and editable from the keyboard without pointing-device interaction.
 *Rationale: OC-2. Entry order is dictated by the caller.*
 
-**CAP-4.** The system **shall** leave unpopulated fields empty, and **shall not**
-pre-populate any field with a value that has not been supplied.
-*Rationale: an unsupplied value that looks supplied produces a record that appears
-correct and is not — the most dangerous output of the system.*
+**CAP-4.** Unsupplied trip facts **shall** remain empty. The system **shall not** invent
+POB, destination, departure time or ETA. It **may** record authenticated operator, unit,
+entry time and reliably known channel as system metadata, visibly distinct from reported
+facts. Previously stored details **shall** be offered with source/age and confirmation
+status; applying them shall retain that provenance, not imply fresh caller confirmation.
+*Rationale: a known system fact is not a guessed trip fact. Reuse must not conceal uncertainty.*
 
 **CAP-5.** Where the system detects an inconsistency — for example an ETA preceding the
 departure time — it **shall** present the warning adjacent to the field concerned, at the
@@ -225,8 +332,8 @@ protect the field.*
 **shall** permit an operator to suspend and resume capture of any Draft without loss.
 *Rationale: a priority radio call may interrupt capture at any point.*
 
-**CAP-7.** The list of active and overdue log ons **shall** remain visible to the operator
-during capture of a new log on.
+**CAP-7.** The shared open watch queue, including pending acceptance, unresolved drafts,
+and overdue log ons, **shall** remain visible during capture of a new log on.
 *Rationale: situational awareness is the operator's primary function; capture must not
 suspend it.*
 
@@ -263,21 +370,69 @@ known, which is late (OC-6).*
 vessel or person, the system **shall** offer it rather than requesting it again.
 *Rationale: OC-4. Re-asking known detail spends airtime for no information gain.*
 
+<a id="section-51-capture-performance"></a>
+
 ### 5.1 Capture performance
 
 **CAP-16.** For a caller whose identifiers resolve to an existing record, and who supplies
-all requested detail without repetition, a complete log on **shall** be capturable in
-**30 seconds or less**, keyboard only.
+all requested detail without repetition, a complete log on **shall** meet the
+**30-second 95th-percentile target**, keyboard only, under CAP-18.
 
-**CAP-17.** For a caller with no existing record, a complete log on **shall** be capturable
-in **90 seconds or less**.
+**CAP-17.** For a caller with no existing record, a complete log on **shall** meet the
+**90-second 95th-percentile target** under CAP-18.
 
-**CAP-18.** Capture performance **shall** be measured against real calls under peak load
-(OC-8), not estimated or measured under simulation.
+**CAP-18.** Simulation **shall** be used before operational trials; it is not sufficient
+for final performance acceptance. Final evaluation **shall** observe authorized real-call
+use under peak load without compromising the existing watch. The approved measurement
+protocol shall define a complete capture, timing start/end, operator experience, sample
+size, peak-load conditions and interruptions. Report median, 95th percentile, maximum,
+error/correction rate and live-entry proportion separately for known and unknown callers.
+The 30/90-second targets apply to the 95th percentile of eligible calls; no field may be
+fabricated or warning hidden to meet them. Record excluded/interrupted calls separately.
+Report both end-to-end elapsed capture time and operator interaction time; do not count
+only keystrokes while excluding normal caller speech from the elapsed measure.
+
+<a id="section-52-persistence-interruption-and-concurrent-work"></a>
+
+### 5.2 Persistence, interruption and concurrent work
+
+**CAP-19.** Begin capture **shall** immediately attempt durable creation and subsequent
+edits **shall** be retained automatically without a final Save dependency. The interface
+shall distinguish Saving, Saved to the shared record, and Not saved to the shared record.
+It shall claim Saved only after durable acknowledgment. Any local recovery copy must be
+labeled separately; local storage alone does not establish a shared watch.
+
+**CAP-20.** Loss of connectivity, rejected saves and unavailable shared monitoring **shall**
+be conspicuous. Captured edits shall be recoverable after interrupted browser sessions
+on the same supported workstation, subject to the approved recovery envelope. Recovery
+shall preserve raw input, original capture time and pending actions. Cross-workstation
+availability shall be stated honestly. The operational fallback and recovery envelope
+(including workstation/power loss) require approval before live use; no claim of zero loss
+may be made without demonstrated coverage.
+
+**CAP-21.** Retrying creation, edits or queued recovery actions **shall not** duplicate
+trips, obligations, transfer acceptance or closure events. Reconnection shall reconcile
+pending work without silently overwriting later shared edits. Suspected duplicate calls
+shall be shown for operator review; uncertain identities shall not trigger automatic merging.
+
+**CAP-22.** Concurrent changes **shall** preserve both operators' evidence. Conflicting
+changes, especially ETA, identity, ownership and closure, shall be presented for explicit
+resolution; stale edits shall not silently replace current values. Operators shall see
+that another operator is working on the same open record.
+
+**CAP-23.** Unknown, explicitly unavailable, not applicable, and inconsistent values
+**shall** remain distinguishable. Unparsed or implausible input shall be retained as
+captured with a warning rather than silently discarded, rounded or converted into a
+credible-looking operational value. Only a usable, explicitly interpreted deadline can
+drive vessel overdue detection; unresolved time input invokes WAT-9.
 
 ---
 
+<a id="section-6-requirements-data-p1"></a>
+
 ## 6. Requirements — Data (P1)
+
+<a id="section-61-field-priority-classes"></a>
 
 ### 6.1 Field priority classes
 
@@ -288,8 +443,10 @@ in **90 seconds or less**.
 | **C** | Reach the vessel | Radio channel monitored, onboard/shore contact, AIS identifier |
 | **D** | Describe the vessel | Length, hull colour, type, make, model |
 
-**DAT-1.** Class A fields **shall** be treated as the minimum useful log on. A record
-lacking an ETA **shall** be visibly distinguished, since it cannot become overdue.
+**DAT-1.** Class A fields **shall** be the preferred trip-information set, not a save or
+watch-acceptance gate. Incomplete records may still be useful. A record without a usable
+vessel deadline shall be conspicuously marked as not time-monitorable for vessel return,
+while remaining owned, visible and subject to an operator follow-up deadline (WAT-9).
 
 **DAT-2.** The mobile number **shall** be treated as both a Class B identifier and a
 Class C contact, and prioritised accordingly.
@@ -309,53 +466,77 @@ value destroys the ability to detect a mis-resolution later.*
 
 ---
 
+<a id="section-7-requirements-identification-verification-and-search-p1"></a>
+
 ## 7. Requirements — Identification, verification and search (P1)
+
+<a id="section-71-cross-verification"></a>
 
 ### 7.1 Cross-verification
 
-**IDV-1.** The system **shall** support the capture of two or more independent identifiers
-against a single log on.
-*Rationale: two identifiers resolving to the same record verify each other. This is the
-unit's existing accuracy practice and the strongest verification available at no airtime
-cost.*
+**IDV-1.** The system **shall** support two or more independently supplied identifiers.
+Repeated entry of the same identifier, a normalized duplicate, or a value populated from
+the first match shall not count as independent corroboration. Record whether each value
+was supplied on this call, imported, selected from a profile, or corrected after clarification.
 
-**IDV-2.** On capture of a second identifier, the system **shall** resolve both and
-**shall** display the outcome immediately, as one of:
+**IDV-2.** Resolution **shall** operate over compatible person/vessel associations, with
+explicit handling of non-unique identifiers. Outcomes shall be:
 
 | Outcome | Condition |
 |---|---|
-| **Verified** | All captured identifiers resolve to the same member and vessel |
-| **Conflict** | Identifiers resolve to different records |
-| **Partial** | At least one resolves, at least one does not |
-| **Unverified** | Fewer than two identifiers captured, or none resolve |
+| **Verified** | At least two independent supplied identifiers have exact normalized matches whose intersection uniquely identifies one person/vessel association; no captured identifying evidence contradicts it or remains unresolved. |
+| **Conflict** | Exact resolving evidence has incompatible candidate associations, or retained evidence explicitly contradicts the selected association. |
+| **Partial** | Some exact evidence resolves but other evidence is unmatched or only approximate, or more than one compatible association remains. Display the unresolved/ambiguous reason. |
+| **Unverified** | Fewer than two independent identifiers, or no exact evidence resolves. |
 
-**IDV-3.** A **Conflict** outcome **shall** be presented prominently at the moment of
-detection.
-*Rationale: a conflict is the only reliable in-call signal that a captured value is
-wrong.*
+Conflict takes precedence over other outcomes. A member with several vessels is not a
+conflict merely because there are several associations. Shared numbers and names do not
+prove uniqueness. A vessel identified without a person may be selected and watched, but
+does not meet the stated Verified person/vessel criterion. The display shall explain
+which person, vessel and evidence are matched rather than show a badge alone.
 
-**IDV-4.** The verification outcome **shall** be stored on the log on and **shall** be
-displayed wherever the log on appears, including the active watch list.
+**IDV-3.** Conflict **shall** be shown prominently immediately. The operator shall be able
+to inspect all captured values and match bases, request clarification, append a correction,
+select a provisional association with a reason, or leave identity unresolved. A provisional
+selection shall not dismiss the conflict or relabel it Verified. Explicitly superseded
+incorrect values remain in history; verification is recomputed from current evidence.
 
-**IDV-5.** A verification outcome other than **Verified** **shall not** prevent the log on
-being created, saved, or activated.
-*Rationale: an unverified record is still a record of a vessel at sea.*
+**IDV-4.** The outcome, evidence, match method and selected association **shall** be stored
+and shown on the open watch queue and record. Changes shall be versioned. Later profile
+edits shall not silently change what was verified at the time of the call.
+
+**IDV-5.** An outcome other than Verified **shall not** block creation, saving, completion,
+or watch acceptance. Verified refers only to consistency with stored identity associations;
+it does not authenticate the caller, validate trip facts, confirm contact reachability,
+or establish a vessel's current location.
+
+
+<a id="section-72-tolerant-resolution"></a>
 
 ### 7.2 Tolerant resolution
 
-**IDV-6.** Identifier resolution **shall** return near matches in addition to exact
-matches, matching across the letter confusion set in Appendix B.
-*Rationale: OC-5. A registration heard once without phonetics is routinely one letter
-from correct, and the error is predictable.*
+**IDV-6.** Resolution **shall** offer labeled near-match candidates in addition to exact
+matches, using Appendix B as an initial heuristic. Exact candidates shall be ranked first;
+matched/substituted characters and match basis shall be visible. Selecting a near match
+shall not make the raw captured value exact or establish Verified. Clarification may
+append a corrected supplied value while retaining the original.
+*Rationale: tolerate plausible capture errors while keeping uncertainty visible (OC-5).*
 
 **IDV-7.** Resolution results **shall** include sufficient descriptive detail — vessel
 name, length, hull colour, type, associated member — to allow the operator to confirm
 identity by description.
-*Rationale: confirming "the white centre console, Sea Breeze" is one short transmission
-and is more reliable than a phonetic readback of the registration.*
+*Rationale: descriptive detail offers another route to clarification. Its reliability
+relative to readback is not established by this specification.*
 
-**IDV-8.** Where resolution returns more than one candidate, all candidates **shall** be
-presented together.
+**IDV-8.** Multiple candidates **shall** be presented in one comparison view, without
+silently selecting the first. Large sets may be paginated with visible counts and no
+hidden truncation. Profile freshness and uncertainty shall be visible.
+
+**IDV-9.** Normalization rules and identifier namespaces **shall** be explicit and tested.
+Formatting normalization may yield an exact match; character substitution is approximate.
+Neither normalization nor profile selection shall overwrite the value as captured.
+
+<a id="section-73-search"></a>
 
 ### 7.3 Search
 
@@ -379,70 +560,133 @@ result, and **shall** indicate whether a returned vessel or person is currently 
 
 **SRCH-5.** Search **shall** return results on partial input.
 
-**SRCH-6.** Every search result **shall** offer a single action to apply it to the log on
-in progress.
+**SRCH-6.** Every applicable search result **shall** offer one action to apply its identity
+or offered profile detail to the current capture. Show what will be applied. A historical
+trip shall not supply current ETA, POB, destination or departure facts; selecting an open
+trip shall offer resumption rather than silently create a duplicate. Permission boundaries
+shall apply across all search types (REC-7).
 
 ---
 
+<a id="section-8-requirements-watch-and-overdue-p2"></a>
+
 ## 8. Requirements — Watch and overdue (P2)
 
-**WAT-1.** The system **shall** display a persistent list of active and overdue log ons,
-ordered by proximity to ETA.
+**WAT-1.** The system **shall** display the persistent open watch queue, including Drafts,
+pending acceptance, missing/unusable vessel deadlines, overdue obligations and open
+escalations. Overdue/escalated and unresolved records shall not be hidden by an ETA-only
+sort; records with usable deadlines shall show the next deadline and all missed obligations.
+Age, watch owner, capture status and synchronization health shall remain visible.
 
 **WAT-2.** The system **shall** indicate log ons approaching their ETA before that ETA
 passes.
 
-**WAT-3.** Transition to Overdue **shall** produce an alert that does not depend on the
-operator observing a change in a list.
+**WAT-3.** A missed obligation **shall** produce an alert independent of the operator
+observing a list change. Deadline evaluation shall continue without an open capture page
+or browser. The approved deployment shall define detection/delivery latency, notification
+recipients, acknowledgment, repeat/unacknowledged-alert behavior and monitoring-health
+failure notification. On restart or reconnect, already-missed obligations shall be
+reconciled and surfaced, not postponed until another state transition. Acknowledgment
+records attention; it neither satisfies the obligation nor closes escalation.
 
-**WAT-4.** The system **shall** present the escalation sequence as an ordered set of
-actions, and **shall** record each action attempted with time, operator and outcome.
-*Rationale: OC-3. Where no written procedure exists, the recorded sequence is the
-procedure and the audit trail simultaneously.*
+**WAT-4.** The system **shall** present the owning unit's approved escalation procedure,
+including its version, and record attempted actions with time, actor, outcome and any
+authorized deviation. The procedure, responsibilities and contact paths must be approved
+before live use. Software shall not invent rescue policy from a generic checklist.
 
 **WAT-5.** On transition to Overdue, the system **shall** surface the log on's verification
 outcome (IDV-2).
 *Rationale: personnel about to act on the record need to know which parts of it are
 verified.*
 
-**WAT-6.** The system **shall** transfer the complete state of all active log ons,
-including escalation history, on shift handover, without re-keying.
+**WAT-6.** Shift handover **shall** present and acknowledge all open records, including
+incomplete/unresolved capture, pending saves, missed obligations, pending transfers and
+open escalation. Record outgoing/incoming operators and outstanding responsibilities
+without re-keying. Unit ownership and monitoring shall persist through shift change.
 
-**WAT-7.** A log on **shall** leave the active list only by explicit operator action,
-recorded against that operator.
+**WAT-7.** A record **shall** leave the owning unit's open queue only through explicit,
+authorized log off, cancellation or acknowledged transfer under §3.3. Record actor, time,
+reason/evidence and disposition of obligations/escalation. Alerts, refreshes, time passage
+and changes to capture completeness shall not silently remove it.
 
-**WAT-8.** The system **shall** support transfer of an active log on to another unit,
-preserving the record and its history without re-keying.
+**WAT-8.** Transfer **shall** preserve the complete record without re-keying. The source
+unit remains responsible until the receiving unit explicitly accepts the current transfer
+and durably receives the current open obligations/escalation state. Acceptance shall make
+one authoritative ownership change, visible to both units, without a monitoring gap.
+Stale acceptance shall require review of intervening changes. Rejected, timed-out, retried
+or disconnected transfer attempts shall retain source responsibility until reconciled;
+the transfer itself shall never fulfill a deadline or close escalation.
+
+**WAT-9.** Every open record without a usable vessel deadline, including an empty Draft,
+**shall** have an accountable operator follow-up under the unit's approved policy. The
+policy shall define the follow-up interval, recipient, reminder and escalation for an
+unresolved capture, including operator interruption or shift end. Label it as an internal
+follow-up, not an inferred ETA. Draft status shall never exempt a supplied usable vessel
+deadline from monitoring.
+
+**WAT-10.** Each obligation **shall** retain its own fulfillment/amendment evidence.
+A later report or revised ETA shall not erase a previous miss. An ETA change following
+escalation shall retain the open escalation until explicit authorized disposition.
+A new due time shall be shown with its source and the previous due time accessible.
 
 ---
 
+<a id="section-9-requirements-record-and-audit-p2"></a>
+
 ## 9. Requirements — Record and audit (P2)
 
-**REC-1.** The system **shall** constitute the record of log ons for the purpose of the
-organisation's legislative obligation (OC-7), including retention, integrity and
-export.
+**REC-1.** The system **shall** support durable records, retention, integrity and export.
+The responsible organisation shall identify and approve the applicable legal/policy basis,
+retention schedule, access, disposal and export obligations before claiming the system is
+its compliant official record (OC-7). This draft does not itself establish compliance.
 
-**REC-2.** Every log on and every subsequent action **shall** record the operator, unit,
-timestamp and channel.
+**REC-2.** Every log on and subsequent action **shall** record actor, unit, event/entry
+time and available channel/source. Automated events shall identify the system actor;
+unknown channels remain unknown. Reported call time and departure time shall remain
+separate from automatic entry time. Late entries shall retain both event and entry times.
 
 **REC-3.** Amendments **shall** be appended. Prior values **shall** remain retrievable.
 *Rationale: post-incident review requires knowing what was known at each point in time,
 not only the final state.*
 
-**REC-4.** Verification outcomes and the identifiers as captured (DAT-5) **shall** form
-part of the permanent record.
+**REC-4.** Verification outcomes and raw identifiers (DAT-5) **shall** remain part of the
+audit record for the approved retention period, including superseded interpretations.
 
 **REC-5.** The system **shall** report on operational measures including call volume by
 period, overdue frequency, escalation outcomes, and **the proportion of log ons captured
 during the call versus entered afterwards**.
-*Rationale: the latter is the direct measure of whether capture is keeping pace with the
-radio.*
+*Rationale: the latter measures whether capture is keeping pace with the radio. The
+measurement protocol shall establish call start/end or a recorded live/late/unknown
+classification; entry timestamps alone cannot establish when the call occurred.*
+
+**REC-6.** Interpreted times **shall** include full date, time and timezone. Preserve raw
+time input and the reference instant for relative expressions. `+2h` shall use the displayed,
+recorded reference (normally the call time when known, otherwise the entry time), not be
+recalculated on reload. Ambiguous day rollover, past-date entry and timezone interpretation
+shall require clarification or remain unresolved; never silently shift an elapsed deadline
+to tomorrow. Changes append a new interpretation. Time-source health and acceptable clock
+error shall be defined in the approved monitoring configuration.
+
+**REC-7.** Access **shall** be authenticated and authorized by role/unit for search, edit,
+export, closure, reopening, transfer and escalation. Record access-relevant administrative
+actions. Session expiry shall not silently lose capture or stop shared monitoring. Public
+self-service shall not expose other people's records or grant operator privileges.
+
+**REC-8.** Recovery **shall** be demonstrated by restoring representative records,
+identifiers, histories, ownership and obligations into an isolated environment. The approved
+recovery-time and data-loss limits shall be documented, including reconciliation of changes
+made during outage. Restored missed deadlines shall be evaluated before resuming live watch;
+a backup file existing is not evidence that recovery works.
 
 ---
+
+<a id="section-10-acceptance-criteria"></a>
 
 ## 10. Acceptance criteria
 
 Each criterion is a pass/fail test against a running system.
+
+<a id="section-101-capture"></a>
 
 ### 10.1 Capture
 
@@ -450,29 +694,33 @@ Each criterion is a pass/fail test against a running system.
 |---|---|---|
 | **AC-1** | Begin a log on, enter nothing, save. | Record persists and is retrievable. |
 | **AC-2** | Enter only POB and destination. Save. Close the session. Reopen. | Record persists with those two fields. |
-| **AC-3** | Open a new log on form and inspect every field. | No field holds a value that was not entered. |
+| **AC-3** | Inspect a new capture and apply offered profile details. | Trip facts remain empty; automatic metadata and reused/unconfirmed profile values are visibly distinguished and retain provenance. |
 | **AC-4** | Enter an ETA earlier than the departure time. Save. | Warning shown beside the field; save succeeds. |
 | **AC-5** | Begin a log on, start a second, return to the first. | Both retained, neither altered. |
 | **AC-6** | Capture a log on while the active list is on screen. | Active list remains visible throughout. |
 | **AC-7** | Complete a full log on using keyboard only. | Achievable; no pointing device required. |
-| **AC-8** | Enter `1500`, `3pm`, `+2h` into an ETA field. | All three accepted. |
+| **AC-8** | Enter `1500`, `3pm`, `+2h`; include midnight rollover and late entry. | Raw values retained; full interpreted date/time, timezone and reference shown; ambiguity is clarified or visibly unresolved; reload does not move a relative deadline. |
 | **AC-9** | Enter a destination not present in any list. | Accepted as entered. |
-| **AC-10** | Time a known-member log on under peak load. | ≤ 30 seconds (CAP-16). |
-| **AC-11** | Time an unknown-vessel log on under peak load. | ≤ 90 seconds (CAP-17). |
+| **AC-10** | Measure eligible known-caller captures under the approved peak-load protocol. | 95th percentile ≤ 30 seconds; sample, maximum, errors and exclusions reported (CAP-16, CAP-18). |
+| **AC-11** | Measure eligible unknown-caller captures under the approved peak-load protocol. | 95th percentile ≤ 90 seconds with the same reporting (CAP-17, CAP-18). |
 | **AC-12** | Add a registration to a log on created an hour earlier. | Same interaction cost as initial capture. |
+
+<a id="section-102-verification-and-search"></a>
 
 ### 10.2 Verification and search
 
 | # | Test | Pass condition |
 |---|---|---|
-| **AC-13** | Enter a member number and a registration belonging to the same member. | Outcome shown as **Verified**. |
-| **AC-14** | Enter a member number and a registration belonging to different members. | Outcome shown as **Conflict**, prominently. |
-| **AC-15** | Enter a registration one letter wrong, within the Appendix B confusion set. | Correct vessel returned as a candidate. |
+| **AC-13** | Independently enter exact identifiers uniquely identifying one person/vessel association. | Verified with evidence shown. Duplicate/autofilled evidence does not independently corroborate. |
+| **AC-14** | Enter exact identifiers with disjoint person/vessel candidate associations. | Outcome shown as **Conflict**, prominently; shared-vessel associations alone do not produce a false conflict. |
+| **AC-15** | Enter a registration one character wrong within Appendix B; select a suggested match. | Correct vessel offered with substitution marked; selection alone never becomes exact or Verified. |
 | **AC-16** | Inspect any resolution result. | Includes vessel name, length, colour, type, associated member. |
 | **AC-17** | Search a registration for a vessel currently logged on. | Vessel returned, marked as currently logged on. |
 | **AC-18** | Search a member number, a registration, a mobile number and a vessel name in the same input. | All return results without changing search mode. |
 | **AC-19** | Save a log on with a **Conflict** outcome. | Save succeeds; conflict remains visible on the record. |
 | **AC-20** | View the active watch list. | Verification outcome visible per row. |
+
+<a id="section-103-watch-record-and-audit"></a>
 
 ### 10.3 Watch, record and audit
 
@@ -484,14 +732,58 @@ Each criterion is a pass/fail test against a running system.
 | **AC-24** | Perform a shift handover. | All active log ons and escalation history transfer without re-entry. |
 | **AC-25** | Run the operational report. | Proportion of live-captured versus later-entered log ons is reported. |
 
-### 10.4 System-level acceptance
+<a id="section-104-adoption-and-release-acceptance"></a>
 
-**AC-26.** Operators cease maintaining a parallel paper log, without being instructed to.
+### 10.4 Adoption and release acceptance
 
-*This is the single sufficient test. A system passing AC-1 to AC-25 and failing AC-26 has
-met the letter of the specification and not its purpose.*
+**AC-26.** During an approved operational trial, routine double entry into a parallel paper
+log ceases because the system supports the work, rather than because operators are told
+to stop. Measure duplicate-entry proportion and delay against the baseline. Approved
+outage/contingency records are evaluated separately.
+
+This is an adoption outcome, not a sufficient safety test. Passing it cannot substitute
+for deadline, persistence, recovery and handover acceptance. Failure requires investigation
+of workflow, policy and trust rather than assuming operator resistance.
+
+<a id="section-105-interrupted-and-exceptional-operation"></a>
+
+### 10.5 Interrupted and exceptional operation
+
+| # | Test | Pass condition |
+|---|---|---|
+| **AC-27** | Capture ETA/POB/destination, leave Draft and pending acceptance, then pass ETA. | Record stays owned and visible; overdue alert occurs despite incomplete capture. |
+| **AC-28** | Begin an empty Draft; interrupt operator until the approved follow-up deadline passes. | Unresolved record has an owner; internal follow-up alerts without fabricating a vessel ETA. |
+| **AC-29** | Fail a save, disconnect, close/reopen the browser, reconnect and retry. | Status never falsely claims shared persistence; recovery meets the approved envelope; no duplicate trip or silent loss/overwrite. |
+| **AC-30** | Two operators amend ETA or identity from the same version; one closes the record while the other is editing. | Stale/conflicting changes require explicit resolution; both evidence histories remain; closure is not silently undone. |
+| **AC-31** | Supply shared phone numbers, a member with several vessels, unmatched evidence and incompatible exact matches. | Outcomes follow IDV-2; ambiguity is explained; conflict takes precedence; raw inputs remain. |
+| **AC-32** | Request transfer, pass ETA before acceptance, retry after disconnect, then accept after an intervening edit. | Source remains responsible until current-state acceptance; alert is delivered without a gap; one ownership change; stale state cannot silently be accepted. |
+| **AC-33** | Miss a position report on a long-term trip with a later return ETA; complete a nested bar crossing. | Missed report remains visible/alerted; crossing completion does not fulfill report or return obligations. |
+| **AC-34** | Change ETA on an escalated trip and acknowledge its alert. | Old miss and actions remain; escalation closes only through explicit authorized disposition. |
+| **AC-35** | Close all browsers and pass a deadline; restart monitoring with already-missed obligations; leave an alert unacknowledged. | Detection, delivery, health failure and repeat behavior meet approved limits; acknowledgment does not log off a vessel. |
+| **AC-36** | Log off, cancel a duplicate, and correct a mistaken closure with appropriate roles. | Reasons/evidence retained; obligations/escalations receive explicit disposition; reopen evaluates missed deadlines; unauthorized actions refused. |
+| **AC-37** | Expire a session, attempt cross-unit/private search/export without permission, and submit through self-service. | Capture recovery and shared monitoring persist; access boundaries enforced; submission does not falsely acknowledge watch acceptance. |
+| **AC-38** | Restore a backup and reconcile outage records in isolation. | REC-8 recovery limits met; audit and ownership preserved; pending/missed obligations recovered without duplicate actions. |
+| **AC-39** | Change a vessel/person profile after a completed call. | Historical identifiers, applied details and verification evidence remain as known at the call; current profile changes are distinguishable. |
+
+<a id="section-106-operational-release-gate"></a>
+
+### 10.6 Operational release gate
+
+Before operational reliance, the unit shall approve the unresolved policy/configuration
+items in Appendix D that affect this deployment, and record a traceability checklist for
+all applicable requirements. In particular, define measurable alert latency, clock error,
+follow-up intervals, escalation/transfer authority, recovery limits and trial metrics.
+These values are not invented by this functional specification.
+
+All applicable acceptance criteria shall pass on the intended deployment, including its
+existing-watch integration if P2 functions are retained elsewhere. Simulation and isolated
+failure/recovery tests precede a supervised live trial with continuity of the established
+watch. Unsupported variants/channels shall be explicitly declared and excluded from the
+initial rollout; they shall not appear available without their monitoring behavior.
 
 ---
+
+<a id="section-appendix-a-justification-from-current-practice"></a>
 
 ## Appendix A — Justification from current practice
 
@@ -505,8 +797,8 @@ date; return time; *entered into the computer system*; *system record ID*; logge
 
 The presence of the last-but-two and last-but-one columns is decisive. **The paper log
 tracks the computer system as an outstanding task.** The operational record is paper; the
-computer record is a downstream transcription. Given OC-7, the legally required record
-therefore runs permanently behind the operational one. AC-26 exists to detect when this
+computer record is a downstream transcription. The computer record therefore lags the operational one; its legal status remains
+subject to confirmation under OC-7. AC-26 exists to detect when this
 has been reversed.
 
 **A.2 All-or-nothing saving produces the backlog.** The current system cannot persist an
@@ -523,9 +815,9 @@ surrenders last. CAP-2, CAP-13 and CAP-14 address this.
 **A.4 Default values that fail validation.** The observed new-log-on form pre-populates
 departure time and ETA with the same value, then rejects the record on the grounds that
 the ETA must be later than the departure. The form's initial state fails its own
-validation, so every log on begins from an error condition. Worse, the paired defaults
-could be saved unnoticed if validation did not object, producing a record that would
-never become overdue. CAP-4 and CAP-5 address this.
+validation, so every log on begins from an error condition. If saved unnoticed, the paired defaults would record a zero-duration trip and
+could produce immediate or premature overdue handling. The screenshots do not establish
+how the existing overdue engine would behave; that requires a runtime check. CAP-4 and CAP-5 address this.
 
 **A.5 Validation errors are remote from their fields.** Errors are presented as a block at
 the top of the form, referring to fields several sections away, discovered only on
@@ -544,22 +836,26 @@ this.
 
 **A.8 Two identifiers are the existing accuracy practice.** Operators routinely request
 two identifying values — member number and registration, or registration and mobile
-number. This is not redundancy but a checksum: agreement verifies, disagreement detects
-an error that is otherwise invisible. The practice is undocumented and unsupported by
+number. Agreement provides corroboration; disagreement signals a possible error. This is
+not a guarantee of identity, and shared, stale or correlated identifiers require the
+ambiguity rules in §7. The practice is undocumented and unsupported by
 software, and is performed by eye across the partitioned searches described in A.7.
 IDV-1 to IDV-5 formalise it.
 
 **A.9 Phonetic discipline is not reliable under load.** Requesting a phonetic repeat costs
-a transmission on a contended channel. Under peak load, operators reasonably omit it.
-Registrations captured from a single unphonetic hearing are therefore routine, and
-IDV-6 exists because discipline is not an available solution.
+a transmission on a contended channel. Local observations report that repeats are sometimes omitted under load.
+IDV-6 supports recovery from plausible mishearing; it does not justify abandoning approved
+radio procedures or necessary clarification.
 
 ---
 
+<a id="section-appendix-b-letter-confusion-set"></a>
+
 ## Appendix B — Letter confusion set
 
-Errors in unphonetic spoken letters are not uniformly distributed. Resolution under
-IDV-6 shall treat members of each group as candidate substitutions for one another.
+The following initial groups reflect reported confusion patterns, not validated error
+probabilities. IDV-6 shall use them to suggest candidates, subject to field-specific
+identifier formats and namespaces. They shall never establish an exact match.
 
 | Group | Members |
 |---|---|
@@ -569,10 +865,14 @@ IDV-6 shall treat members of each group as candidate substitutions for one anoth
 | Long-A | A · J · K · 8 |
 | Letter/digit collision | 0 ↔ O · 1 ↔ I ↔ L · 5 ↔ S · 2 ↔ Z |
 
-Spoken digits are excluded: the operator controls the conversation and may request a
-repeat, and digit confusion is not systematic (OC-5).
+Digits shown in the table participate in those candidate substitutions. Other digit
+errors remain possible and shall be preserved for clarification rather than presumed
+reliable. Evaluate candidate recall and false suggestions against representative calls;
+clarify local pronunciations (including Z) and identifier formats before tuning rankings.
 
 ---
+
+<a id="section-appendix-c-traceability-from-version-03"></a>
 
 ## Appendix C — Traceability from version 0.3
 
@@ -605,17 +905,105 @@ repeat, and digit confusion is not systematic (OC-5).
 
 ---
 
+<a id="section-appendix-d-open-questions"></a>
+
 ## Appendix D — Open questions
 
-1. On a **Conflict** outcome (IDV-2), what resolution does the operator perform today?
-   Determines whether IDV-3 requires a defined workflow or a flag alone.
+1. On a **Conflict** outcome (IDV-2), what clarification does the operator perform today?
+   Validate the IDV-3 workflow against that practice and define acceptable evidence for
+   correction or an explicitly unresolved/provisional association.
 2. Is a logged-on vessel excluded from vessel search by query construction or by data
    model? Determines the difficulty of SRCH-3.
 3. What is the typical transcription backlog — count of entries, and elapsed time from
    call to computer entry? Establishes the baseline for REC-5 and AC-26.
 4. Which identifier pair is most commonly used: member number with registration, or
    registration with mobile number? Determines what IDV-2 optimises for.
-5. What is the legislative instrument underlying OC-7? Determines retention period and
-   integrity obligations under REC-1.
+5. What legal, policy or contractual instrument underlies the reported computer-record
+   obligation (OC-7)? Identify the authority, permitted record media, retention period and
+   integrity obligations under REC-1; do not presume a legislative basis.
 6. For long term log ons (§3.4), what reporting schedule is expected, and what constitutes
    a missed report?
+
+
+7. Which approved procedures govern escalation, early escalation, alert acknowledgment,
+   closure/reopening and handover? Who may authorize deviations and which version applies?
+8. Who owns pending acceptance and unresolved drafts? What internal follow-up intervals,
+   recipients and overdue/unacknowledged-alert behavior should apply at each operating period?
+9. What detection/delivery latency, clock-error bounds, monitoring-health notification,
+   recovery-time and data-loss limits can the intended deployment demonstrate?
+10. How do source and receiving units accept transfers, including after hours, refusal,
+    connectivity loss and changes while acceptance is pending?
+11. What identifier namespaces, shared-number patterns, stale records and person/vessel
+    associations occur? What clarification evidence may supersede a conflicting raw value?
+12. What sampling protocol establishes live-call timing and transcription delay? Define
+    peak load, sample size, start/end, complete capture, interruptions and privacy handling.
+13. Which channels and variants are included at initial release? What existing watch
+    integration remains authoritative, and how will its acknowledgment/failure be shown?
+14. What access, retention, disposal, export and contingency-record policies apply?
+    Identify the document/authority and approver for each release-affecting answer.
+
+---
+
+<a id="section-appendix-e-changes-from-version-04"></a>
+
+## Appendix E — Changes from version 0.4
+
+- Separated capture completeness, watch acceptance/ownership, deadline condition and
+  escalation. Drafts with usable deadlines are monitored; unresolved records get internal
+  follow-up. Transfers retain ownership until explicit current-state acceptance.
+- Represented return, position-report and crossing deadlines as independent obligations.
+- Added persistence acknowledgment, recovery, retry, concurrent-edit and duplicate handling.
+- Distinguished system metadata, supplied facts and reused profile data; preserved time
+  expressions, interpretation basis, call time and entry time.
+- Defined independent evidence, ambiguous associations, conflict precedence and approximate
+  candidates. Verified no longer implies caller authentication or confirmed trip facts.
+- Added approved alert/escalation configuration, access control and demonstrated recovery.
+- Corrected the unsupported equal-time/never-overdue claim and qualified unverified legal,
+  procedural and phonetic assertions. Adoption is now separate from safety acceptance.
+- Retained requirement IDs, revised their wording where necessary, and added CAP-19–23,
+  IDV-9, WAT-9–10, REC-6–8 and AC-27–39. CAP-16/17 targets are interpreted by revised CAP-18.
+- Added a linked table of contents and included the existing evidence figures in the
+  formatted specification. The figures contain operational/contact data; sharing beyond
+  the authorized audience requires an appropriately redacted copy.
+
+<a id="section-appendix-f-evidence-figures"></a>
+
+## Appendix F — Evidence figures
+
+These are supplied screenshots of the existing platform, not proposed interface designs.
+Static images evidence visible layout/defaults; search exclusions, persistence behavior,
+and overdue behavior require observations or runtime checks beyond a screenshot.
+
+<a id="section-figure-1-active-log-on-list"></a>
+
+### Figure 1 — Active log on list
+
+![Current platform: active log on list and navigation](figures/figure-1-active-log-on-list.png)
+
+Supports the visible dashboard/navigation observations in A.6–A.7. Does not independently
+prove that an active vessel is excluded from a search query.
+
+<a id="section-figure-2-validation-error-block"></a>
+
+### Figure 2 — Validation error block
+
+![Current platform: validation messages separated from fields](figures/figure-2-validation-error-block.png)
+
+Supports A.3–A.5: required controls and errors remote from affected fields.
+
+<a id="section-figure-3-capture-form-scrolled"></a>
+
+### Figure 3 — Capture form scrolled
+
+![Current platform: scrolled capture form and trip details](figures/figure-3-capture-form-scrolled.png)
+
+Supports A.4 and A.6: trip fields/defaults and capture occupying the screen.
+
+<a id="section-figure-4-trip-detail-defaults"></a>
+
+### Figure 4 — Trip-detail defaults
+
+![Current platform: departure and return fields with identical defaults](figures/figure-4-trip-details-defaults.png)
+
+Supports A.4: identical displayed departure/return values. No claim about the actual
+runtime overdue calculation can be established from this image alone.
