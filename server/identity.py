@@ -163,7 +163,9 @@ def outcome(ev):
     if len(resolving) >= 2 and not common:
         return 'conflict', 'Exact matches point at different boats or people: %s.' % _names(resolving), set()
     if len(independent) < 2:
-        return 'unverified', 'Only %d identifier supplied on this call; two that agree are the check.' % len(independent), common
+        return 'unverified', ('Nothing identifying supplied on this call yet; two values that agree are the check.'
+                              if not independent else
+                              'Only one identifier supplied on this call; two that agree are the check.'), common
     if not resolving:
         return 'unverified', 'No identifier matches anything this unit has logged before.', set()
     if len(resolving) >= 2 and len(common) == 1 and len(resolving) == len(independent) \

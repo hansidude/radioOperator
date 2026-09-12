@@ -113,7 +113,7 @@
     clearTimeout(timer);
     if (q.length < 2) { pane.hidden = true; return; }
     timer = setTimeout(function () {
-      fetch('/api/search?q=' + encodeURIComponent(q) + (current ? '&for=' + current : ''), { credentials: 'same-origin' })
+      fetch('/api/logons/search?q=' + encodeURIComponent(q) + (current ? '&for=' + current : ''), { credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) throw new Error('Search failed (' + r.status + ')'); return r.json(); })
         .then(render)
         .catch(function (e) { pane.innerHTML = '<table><tr><td class="text-danger">' + esc(e.message) + '</td></tr></table>'; pane.hidden = false; });

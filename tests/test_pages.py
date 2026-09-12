@@ -111,14 +111,14 @@ class Pages(unittest.TestCase):
             self.assertEqual(self.a.post('/api/logon/%d' % first, json={'field': f, 'value': v}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
 
-        self.assertEqual(self.a.get('/api/search?q=a').json['hits'], [])          # one letter is not a search
-        hits = self.a.get('/api/search?q=ab123').json['hits']
+        self.assertEqual(self.a.get('/api/logons/search?q=a').json['hits'], [])          # one letter is not a search
+        hits = self.a.get('/api/logons/search?q=ab123').json['hits']
         self.assertEqual(hits[0]['kind'], 'vessel')
         for q in ('4471', '0412 345', 'facing', 'AB12'):                          # any identifier, partial, same box
-            self.assertTrue(self.a.get('/api/search?q=' + q).json['hits'], q)
+            self.assertTrue(self.a.get('/api/logons/search?q=' + q).json['hits'], q)
 
         second = self.new()
-        offered = self.a.get('/api/search?q=ab123&for=%d' % second).json['hits'][0]
+        offered = self.a.get('/api/logons/search?q=ab123&for=%d' % second).json['hits'][0]
         self.assertIn('Member No.', offered['offers'])                            # says what it would fill
         r = self.a.post('/logon/%d/apply' % second, json={'key': offered['key']})
         self.assertEqual(r.status_code, 200, r.data)

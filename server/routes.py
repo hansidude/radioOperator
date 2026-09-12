@@ -166,10 +166,13 @@ def api_set_field(logon_id):
     return jsonify(out)
 
 
-@bp.route('/api/search')
+@bp.route('/api/logons/search')
 def api_search():
     """One input, every record type (SRCH-1 to SRCH-5). `for` is the record being captured, so each
-    result can say what applying it would fill in."""
+    result can say what applying it would fill in.
+
+    Namespaced under /api/logons because a host may already have mounted another app: quackit's
+    3D planner owns a bare /api/search, and whichever blueprint registers first wins the URL."""
     h, (conn, cur) = _open()
     hits = ID.search(cur, h.unit(), request.args.get('q'))
     current = request.args.get('for', type=int)

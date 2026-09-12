@@ -70,6 +70,13 @@ def main():
               [f for f, _ in FIELDS if not stored[f]])
         check('the queue shows this record', page.locator('tr[data-id="%s"]' % record).count() == 1)
 
+        # section 7 through the real page: a host may own the bare /api/search, so this must not 404
+        page.fill('#findBox', 'BROWSER')
+        page.wait_for_selector('#findHits table tr', timeout=8000)
+        rows = page.locator('#findHits tr').all_inner_texts()
+        check('the search box returns something', rows and 'Nothing matches' not in rows[0], rows[:2])
+        check('and the verification panel is on the page', page.locator('.ro-verify').count() == 1)
+
         page.fill('#logoffNote', 'browser check')
         page.click('button:has-text("Log off now")')
         page.wait_for_load_state()
