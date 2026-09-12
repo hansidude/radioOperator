@@ -295,7 +295,7 @@ def api_alerts():
     alerts, health = _alerts(cur, h)
     cur.close()
     for a in alerts:
-        for k in ('dueAt', 'raisedAt', 'notifiedAt', 'acknowledgedAt'):
+        for k in ('dueAt', 'raisedAt', 'notifiedAt', 'deliveredAt', 'acknowledgedAt'):
             if a.get(k):
                 a[k] = a[k].isoformat()
     if health.get('lastRunAt'):
