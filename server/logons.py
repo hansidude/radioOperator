@@ -10,10 +10,14 @@ The field set and its order are the unit's paper radio log (spec A.1, DAT-6): `P
 row as printed, `EXTRA` is what the system adds after it.
 
 A day is never assumed (CAP-4). Each time is a day cell plus a time cell; without a day there is
-no instant, and the trip is simply not time-monitorable (DAT-1) with an accountable follow-up
-(WAT-9). A day cell resolves the moment it is written and the date is stored, so a word like
+no instant. A day cell resolves the moment it is written and the date is stored, so a word like
 "tomorrow" cannot mean something else when the row is read the next day; the word itself is kept
 beside the date as what was heard (REC-6).
+
+Nothing is watched until the log on is accepted (§5.3). A draft holds what was heard and is not
+counted down; acceptance needs the mandatory set (ACC-1) and no other open log on for the vessel
+(ACC-6), and it starts the watch from that instant (ACC-4). A draft that was never a log on is
+discarded; a log on that happened is logged off (ACC-7).
 """
 import re
 from datetime import date, datetime, timedelta
@@ -21,8 +25,12 @@ from datetime import date, datetime, timedelta
 from . import identity, times
 
 DT = '%Y-%m-%d %H:%M:%S'
-OPEN = ('pending', 'watching')          # watch statuses that are on the open queue (§2 Active)
+OPEN = ('draft', 'watching')            # a record still on someone's hands: unaccepted, or being watched
+CLOSED = ('loggedoff', 'discarded')
 CHANNELS = ('radio', 'phone', 'person', 'self')
+# Why a log on ended. A trip that never sailed is still a log on that happened, so it is logged
+# off like any other; only the reason differs (§3.3).
+CLOSE_REASONS = (('returned', 'The vessel returned'), ('notdeparted', 'It never departed'), ('other', 'Something else'))
 
 # The paper log's columns, in its order, under its headings (DAT-6). A column that is a heading
 # over several inputs (member number OR vessel name; ETA/ETR day and time) lists them together.
@@ -38,7 +46,12 @@ PAPER = (
     ('Going to', ('destination',)),
     ('ETA/ETR', ('etaDay', 'eta')),
 )
-MANDATORY = ('memberNumber', 'vesselName', 'registration', 'mobile')   # the paper's shaded columns: obtain before the call ends
+# ACC-1: what a log on cannot be accepted without. Two of the four identity values rather than all
+# four, because agreement between two independently supplied ones is the unit's accuracy check.
+IDENTITY_SET = ('memberNumber', 'vesselName', 'registration', 'mobile')
+IDENTITY_NEEDED = 2
+TRIP_SET = ('pob', 'departurePoint', 'destination', 'eta')
+MANDATORY = IDENTITY_SET + TRIP_SET
 # Not on the paper log; shown after it, visibly additional (DAT-6).
 EXTRA = (
     ('Call and departure', ('channel', 'departureDay', 'departureTime')),
@@ -68,12 +81,13 @@ TIME_FIELDS = {'eta': ('etaDayRaw', 'etaDate', 'etaRaw', 'eta', 'etaBasis'),
                'callTime': ('callDayRaw', 'callDate', 'callTimeRaw', 'callTime', 'callTimeBasis'),
                'departureTime': ('departureDayRaw', 'departureDate', 'departureRaw', 'departureTime', 'departureBasis')}
 DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime', 'departureDay': 'departureTime'}
-DATES = ('etaDate', 'callDate', 'departureDate')
+DATES = ('etaDate', 'callDate', 'departureDate', 'dayDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
-DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'cancelledAt', 'reopenedAt', 'capturedAt')
-RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3}
+DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'acceptedAt', 'loggedOffAt',
+             'discardedAt', 'cancelledAt', 'reopenedAt', 'capturedAt')
+RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3, 'notwatched': 4}
 
 
 class Refused(Exception):
@@ -115,6 +129,13 @@ def _s(dt):
 
 def _sd(day):
     return day.isoformat() if day else None
+
+
+def reference(row):
+    """How an operator names this record out loud: "log on 50", not a database key (REC-9)."""
+    if row.get('dayNumber') is None:
+        return '#%d' % row['id']
+    return '%d' % row['dayNumber']
 
 
 def column(field):
@@ -168,8 +189,32 @@ def gaps(row):
     return [{'field': f, 'label': LABELS[f], 'cls': cls} for cls, _, fs in CLASSES for f in fs if not present(row, f)]
 
 
+def missing(row):
+    """What stops this being accepted (ACC-1): the values still needed, in the paper log's order.
+    A draft is never refused for these; acceptance is the only thing withheld (ACC-8)."""
+    have = [f for f in IDENTITY_SET if row.get(f)]
+    out = []
+    if len(have) < IDENTITY_NEEDED:
+        out.append({'field': 'identity', 'label': '%d more of Member No., Vessel Name, Rego or Mobile'
+                    % (IDENTITY_NEEDED - len(have)), 'got': have})
+    for field in TRIP_SET:
+        if field == 'eta':
+            if not row.get('eta'):
+                out.append({'field': 'eta', 'label': 'A return day and time that reads as a deadline'})
+        elif not row.get(field):
+            out.append({'field': field, 'label': LABELS[field]})
+    return out
+
+
+def acceptable(row):
+    return not missing(row)
+
+
 def condition(row, now, approaching_minutes):
-    """The deadline condition (§3.3): nodeadline | notdue | approaching | overdue, plus minutes to go (negative when past)."""
+    """The deadline condition of an accepted log on (§3.3): notdue | approaching | overdue, and the
+    minutes to go. A draft is not watched, so it has no condition at all (ACC-2)."""
+    if row['watchStatus'] != 'watching':
+        return 'notwatched', None
     eta = row['eta']
     if eta is None:
         return 'nodeadline', None
@@ -181,33 +226,61 @@ def condition(row, now, approaching_minutes):
     return 'notdue', minutes
 
 
-def queue(cur, unit, now, approaching_minutes):
-    """The unit's open watch queue (WAT-1): every open record, Draft or Complete, overdue first, then
-    approaching, then records with no usable deadline, then the rest by deadline. Never ETA-only."""
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus IN ('pending', 'watching')", (unit,))
-    rows = [_row(r) for r in cur.fetchall() or []]
+def _decorate(rows, now, approaching_minutes):
     for r in rows:
         r['condition'], r['minutes'] = condition(r, now, approaching_minutes)
         r['gaps'] = len(gaps(r))
+        r['missing'] = missing(r)
         r['ageMinutes'] = int((now - r['createdAt']).total_seconds() // 60)
         r['callDayBox'], r['etaDayBox'] = box(r, 'callDay'), box(r, 'etaDay')
+    return rows
+
+
+def queue(cur, unit, now, approaching_minutes):
+    """The open watch queue (WAT-1): the accepted log ons this unit is watching, overdue first, then
+    approaching, then by deadline. Drafts are not in it, because a draft is not a watch (ACC-2)."""
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'watching'", (unit,))
+    rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
     rows.sort(key=lambda r: (RANK[r['condition']], r['eta'] or r['createdAt']))
     return rows
 
 
+def drafts(cur, unit, now, approaching_minutes):
+    """Unaccepted drafts, oldest first (WAT-1, ACC-5). Shown beside the queue and never in it: the
+    caller may be at sea believing otherwise, so the oldest needs chasing first."""
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'draft'", (unit,))
+    rows = _decorate([_row(r) for r in cur.fetchall() or []], now, approaching_minutes)
+    rows.sort(key=lambda r: -r['ageMinutes'])
+    return rows
+
+
 def recent_closed(cur, unit, limit=20):
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus IN ('loggedoff', 'cancelled') "
-                'ORDER BY loggedOffAt DESC, id DESC LIMIT %s', (unit, int(limit)))
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus IN ('loggedoff', 'discarded', 'cancelled') "
+                'ORDER BY id DESC LIMIT %s', (unit, int(limit)))
     return [_row(r) for r in cur.fetchall() or []]
 
 
 # ---------- writing ----------
 
 def create(cur, user, unit, now):
-    """An empty Draft, owned by the unit and on its queue from this moment (CAP-1, CAP-2, §3.3 Begin capture)."""
-    cur.execute('INSERT INTO LogOns (unit, createdBy, createdAt, updatedBy, updatedAt) VALUES (%s, %s, %s, %s, %s)',
-                (unit, str(user), _s(now), str(user), _s(now)))
-    return cur.lastrowid
+    """An empty draft, owned by the unit from this moment and chased until it is accepted or
+    discarded (CAP-1, CAP-2, ACC-5). It is not watched and it is not a log on.
+
+    The day number counts from one for each day (REC-9). A unique index makes a race fail rather
+    than hand two records the same number, so a clash is read again instead of being papered over."""
+    day = now.date().isoformat()
+    for _ in range(5):
+        cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s', (unit, day))
+        number = cur.fetchone()['n']
+        try:
+            cur.execute('INSERT INTO LogOns (unit, dayDate, dayNumber, createdBy, createdAt, updatedBy, updatedAt) '
+                        'VALUES (%s, %s, %s, %s, %s, %s, %s)', (unit, day, number, str(user), _s(now), str(user), _s(now)))
+        except Exception as e:                       # only a clash on that index is retried; anything else is a real fault
+            if 'uniq' not in str(e).lower() and 'unique' not in str(e).lower() and 'duplicate' not in str(e).lower():
+                raise
+            continue
+        return cur.lastrowid
+    raise Refused('Could not allocate a number for today after several attempts')
 
 
 def _open_row(cur, logon_id, version):
@@ -329,18 +402,52 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
     return out
 
 
+def open_for_vessel(cur, unit, row):
+    """The accepted log on this unit already holds for this vessel, if there is one (ACC-6).
+    A vessel is either out or it is not; two open log ons mean the same call twice, or a trip
+    that was never closed."""
+    key = identity.vessel_key(row)
+    if not key:
+        return None
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'watching' AND id <> %s",
+                (unit, row['id']))
+    for other in [_row(r) for r in cur.fetchall() or []]:
+        if identity.vessel_key(other) == key:
+            return other
+    return None
+
+
 def accept(cur, logon_id, user, now, version=None):
-    """Pending acceptance -> Watching (§3.3 Accept watch). Records who and when; changes nothing else."""
+    """Draft -> Watching (ACC-3). This is the moment the unit takes the watch and the moment the
+    vessel is told it is logged on, so it is one deliberate action and never a side effect of a
+    field being filled in. Deadlines count from here, so a return time already past is overdue
+    immediately (ACC-4)."""
     row = _open_row(cur, logon_id, version)
-    if row['watchStatus'] != 'pending':
-        raise Refused('Already accepted')
-    return _bump(cur, row, {'watchStatus': 'watching'}, user, now)
+    if row['watchStatus'] == 'watching':
+        raise Refused('This log on is already accepted and being watched')
+    short = missing(row)
+    if short:
+        raise Refused('Not enough to accept a log on yet. Still needed: %s.' % '; '.join(m['label'] for m in short))
+    other = open_for_vessel(cur, row['unit'], row)
+    if other:
+        raise Refused('%s is already logged on as %s. Open that record instead, or log it off first '
+                      'if that trip has ended.' % (identity.vessel_label(row), reference(other)))
+    return _bump(cur, row, {'watchStatus': 'watching', 'acceptedAt': _s(now), 'acceptedBy': str(user)}, user, now)
 
 
-def set_capture(cur, logon_id, complete, user, now, version=None):
-    """Draft <-> Complete. Gaps may remain (CAP-12); monitoring and ownership do not change (§3.3)."""
+def discard(cur, logon_id, user, now, reason, version=None):
+    """Throw away a draft that was never a log on (ACC-7): begun in error, or abandoned before
+    anything identifying was given. An accepted log on can never be discarded; it is logged off.
+    The record stays, searchable and auditable, and counts as evidence of no vessel or person."""
     row = _open_row(cur, logon_id, version)
-    return _bump(cur, row, {'captureStatus': 'complete' if complete else 'draft'}, user, now)
+    if row['watchStatus'] != 'draft':
+        raise Refused('This is an accepted log on. A log on that happened is logged off, not discarded.')
+    reason = (reason or '').strip()
+    if not reason:
+        raise Refused('Discarding needs a reason: what makes this not a log on?')
+    if len(reason) > 255:
+        raise Refused('Discard reason: too long to store')
+    return _bump(cur, row, {'watchStatus': 'discarded', 'discardedAt': _s(now), 'discardReason': reason}, user, now)
 
 
 def reopen(cur, logon_id, user, now, reason, version=None):
@@ -359,43 +466,32 @@ def reopen(cur, logon_id, user, now, reason, version=None):
         raise Refused('Reopening reason: too long to store')
     if version is not None and int(version) != row['version']:
         raise Stale('Changed by someone else since you loaded it (now version %d, you had %s).' % (row['version'], version))
-    # Watching, not pending: whoever reopens a record is taking responsibility for it.
-    return _bump(cur, row, {'watchStatus': 'watching', 'reopenedAt': _s(now), 'reopenReason': reason}, user, now)
+    # A reopened record goes back to being watched: whoever reopens it is taking it on. A discarded
+    # one returns as a draft, because discarding said it was never a log on.
+    back = 'draft' if row['watchStatus'] == 'discarded' else 'watching'
+    if back == 'watching':
+        other = open_for_vessel(cur, row['unit'], row)
+        if other:
+            raise Refused('%s is already logged on as %s, so this one cannot be reopened as a watch.'
+                          % (identity.vessel_label(row), reference(other)))
+    return _bump(cur, row, {'watchStatus': back, 'reopenedAt': _s(now), 'reopenReason': reason}, user, now)
 
 
-def cancel(cur, logon_id, user, now, reason, duplicate_of=None, overdue_disposition=False, version=None):
-    """Establish that no trip and no watch were required: no departure, an entry made by accident,
-    or the same call written down twice (§3.3, WAT-7). This is not a quiet log off, so it needs a
-    reason, and an overdue record needs the cancellation faced rather than used to tidy the queue.
-    The row stays, searchable and auditable; it simply stops standing for a trip that happened."""
+def log_off(cur, logon_id, user, now, note, reason='returned', version=None):
+    """End the watch on an accepted log on, with the time, the evidence and the reason: the paper's
+    'Time Arrived or Return' (§3.3, WAT-7). Every reason ends this way, the vessel having returned
+    or never departed, because a log on that happened is logged off."""
     row = _open_row(cur, logon_id, version)
-    reason = (reason or '').strip()
-    if not reason:
-        raise Refused('Cancelling needs a reason: what establishes that no trip was required?')
-    if len(reason) > 255:
-        raise Refused('Cancellation reason: too long to store')
-    if row['eta'] and row['eta'] <= now and not overdue_disposition:
-        raise Refused('This record is overdue. Cancelling one is a disposition, not a tidy-up: '
-                      'confirm explicitly that no trip was required.')
-    canonical = None
-    if duplicate_of not in (None, '', 0, '0'):
-        canonical = int(duplicate_of)
-        if canonical == logon_id:
-            raise Refused('A record cannot be a duplicate of itself')
-        other = get(cur, canonical)
-        if not other or other['unit'] != row['unit']:
-            raise Refused('No record #%s to point at' % duplicate_of)
-    return _bump(cur, row, {'watchStatus': 'cancelled', 'cancelledAt': _s(now),
-                            'cancelReason': reason, 'duplicateOf': canonical}, user, now)
-
-
-def log_off(cur, logon_id, user, now, note, version=None):
-    """Explicit closure of an open record with evidence and time: the paper's 'Time Arrived or Return' (§3.3, WAT-7)."""
-    row = _open_row(cur, logon_id, version)
+    if row['watchStatus'] != 'watching':
+        raise Refused('This is a draft, not a log on. Finish and accept it, or discard it.')
+    reason = (reason or 'returned').strip()
+    if reason not in dict(CLOSE_REASONS):
+        raise Refused('Log off reason must be one of: ' + ', '.join(k for k, _ in CLOSE_REASONS))
     note = (note or '').strip()
     if len(note) > 255:
         raise Refused('Log off note: too long to store')
-    return _bump(cur, row, {'watchStatus': 'loggedoff', 'loggedOffAt': _s(now), 'loggedOffNote': note or None}, user, now)
+    return _bump(cur, row, {'watchStatus': 'loggedoff', 'loggedOffAt': _s(now),
+                            'loggedOffNote': note or None, 'closeReason': reason}, user, now)
 
 
 def apply_profile(cur, logon_id, key, user, now, version=None):

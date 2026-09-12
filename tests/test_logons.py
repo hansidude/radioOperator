@@ -25,15 +25,112 @@ class LogOns(unittest.TestCase):
         L.set_field(self.cur, i, 'etaDay', day, who, at)
         return L.set_field(self.cur, i, 'eta', time, who, at)
 
-    def test_empty_record_persists_owned_and_queued(self):            # AC-1, CAP-1, CAP-2
+    def mandatory(self, i, rego='AB123Q', member='4471', day='today', time='1800', at=T0):
+        """Everything ACC-1 asks for, so the record can be accepted."""
+        for field, value in (('registration', rego), ('memberNumber', member), ('pob', '3'),
+                             ('departurePoint', 'Marina'), ('destination', 'Facing Island')):
+            L.set_field(self.cur, i, field, value, 'alice', at)
+        self.eta(i, day, time, at=at)
+        return i
+
+    def accepted(self, at=T0, **kw):
+        i = L.create(self.cur, 'alice', '', at)
+        self.mandatory(i, at=at, **kw)
+        L.accept(self.cur, i, 'alice', at)
+        return i
+
+    def test_an_empty_draft_persists_owned_and_is_not_watched(self):  # AC-1, CAP-1, CAP-2, ACC-2
         i = L.create(self.cur, 'alice', 'unitA', T0)
         row = L.get(self.cur, i)
-        self.assertEqual((row['captureStatus'], row['watchStatus'], row['unit']), ('draft', 'pending', 'unitA'))
+        self.assertEqual((row['watchStatus'], row['unit']), ('draft', 'unitA'))
         self.assertIsNone(row['eta']); self.assertIsNone(row['pob']); self.assertIsNone(row['destination'])   # CAP-4
-        q = L.queue(self.cur, 'unitA', T0, 30)
-        self.assertEqual([r['id'] for r in q], [i])
-        self.assertEqual(q[0]['condition'], 'nodeadline')
-        self.assertEqual(L.queue(self.cur, 'unitB', T0, 30), [])
+        self.assertEqual(L.queue(self.cur, 'unitA', T0, 30), [])          # a draft is not a watch
+        d = L.drafts(self.cur, 'unitA', T0, 30)
+        self.assertEqual([r['id'] for r in d], [i])
+        self.assertEqual(d[0]['condition'], 'notwatched')
+        self.assertEqual(L.drafts(self.cur, 'unitB', T0, 30), [])
+        self.assertEqual((row['dayNumber'], row['dayDate']), (1, T0.date()))       # REC-9
+        self.assertEqual(L.reference(row), '1')
+
+    def test_numbering_counts_from_one_each_day(self):                 # AC-56, REC-9
+        a = L.create(self.cur, 'alice', '', T0)
+        b = L.create(self.cur, 'alice', '', T0 + timedelta(hours=1))
+        c = L.create(self.cur, 'alice', '', T0 + timedelta(days=1))
+        self.assertEqual([L.get(self.cur, x)['dayNumber'] for x in (a, b, c)], [1, 2, 1])
+        self.assertEqual(L.get(self.cur, a)['dayDate'], T0.date())
+        self.assertEqual(L.get(self.cur, c)['dayDate'], (T0 + timedelta(days=1)).date())
+        other = L.create(self.cur, 'bob', 'unitB', T0)                 # numbering is per unit
+        self.assertEqual(L.get(self.cur, other)['dayNumber'], 1)
+
+    def test_acceptance_needs_the_mandatory_set(self):                 # AC-50, ACC-1, ACC-8
+        i = L.create(self.cur, 'alice', '', T0)
+        with self.assertRaises(L.Refused) as e:
+            L.accept(self.cur, i, 'alice', T0)
+        self.assertIn('Still needed', str(e.exception))
+        self.assertEqual([m['field'] for m in L.missing(L.get(self.cur, i))],
+                         ['identity', 'pob', 'departurePoint', 'destination', 'eta'])
+        L.set_field(self.cur, i, 'registration', 'AB123Q', 'alice', T0)
+        self.assertEqual(L.missing(L.get(self.cur, i))[0]['field'], 'identity')   # one identifier is not two
+        L.set_field(self.cur, i, 'memberNumber', '4471', 'alice', T0)
+        self.assertNotIn('identity', [m['field'] for m in L.missing(L.get(self.cur, i))])
+        for field, value in (('pob', '3'), ('departurePoint', 'Marina'), ('destination', 'Facing Island')):
+            L.set_field(self.cur, i, field, value, 'alice', T0)
+        self.assertEqual([m['field'] for m in L.missing(L.get(self.cur, i))], ['eta'])
+        L.set_field(self.cur, i, 'eta', '1800', 'alice', T0)            # a time with no day is no deadline
+        self.assertEqual([m['field'] for m in L.missing(L.get(self.cur, i))], ['eta'])
+        L.set_field(self.cur, i, 'etaDay', 'today', 'alice', T0)
+        self.assertTrue(L.acceptable(L.get(self.cur, i)))
+        L.accept(self.cur, i, 'alice', T0)
+        row = L.get(self.cur, i)
+        self.assertEqual((row['watchStatus'], row['acceptedBy']), ('watching', 'alice'))
+        self.assertEqual(row['acceptedAt'], T0)
+        self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [i])
+        self.assertEqual(L.drafts(self.cur, '', T0, 30), [])
+        with self.assertRaises(L.Refused):
+            L.accept(self.cur, i, 'alice', T0)                          # already accepted
+
+    def test_a_watch_starts_the_moment_it_is_accepted(self):            # AC-52, ACC-4
+        i = L.create(self.cur, 'alice', '', T0)
+        self.mandatory(i, time='0600')                                  # already past
+        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'notwatched')
+        L.accept(self.cur, i, 'alice', T0)
+        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'overdue')
+        self.assertEqual(L.queue(self.cur, '', T0, 30)[0]['condition'], 'overdue')
+
+    def test_one_vessel_one_log_on(self):                               # AC-53, ACC-6
+        first = self.accepted()
+        second = L.create(self.cur, 'alice', '', T0)
+        self.mandatory(second)
+        with self.assertRaises(L.Refused) as e:
+            L.accept(self.cur, second, 'alice', T0)
+        self.assertIn('already logged on', str(e.exception))
+        self.assertEqual(L.get(self.cur, second)['registration'], 'AB123Q')    # nothing captured is lost
+        L.log_off(self.cur, first, 'alice', T0, 'back')
+        L.accept(self.cur, second, 'alice', T0)                          # now the vessel is free
+        self.assertEqual(L.get(self.cur, second)['watchStatus'], 'watching')
+
+    def test_a_draft_is_discarded_and_a_log_on_is_logged_off(self):      # AC-54, ACC-7
+        d = L.create(self.cur, 'alice', '', T0)
+        with self.assertRaises(L.Refused):
+            L.discard(self.cur, d, 'alice', T0, '')                      # a reason is required
+        L.discard(self.cur, d, 'alice', T0, 'hit New by mistake')
+        row = L.get(self.cur, d)
+        self.assertEqual((row['watchStatus'], row['discardReason']), ('discarded', 'hit New by mistake'))
+        self.assertEqual(L.drafts(self.cur, '', T0, 30), [])
+        with self.assertRaises(L.Refused):
+            L.log_off(self.cur, d, 'alice', T0, 'x')
+        i = self.accepted(rego='CD456R', member='9001')
+        with self.assertRaises(L.Refused) as e:
+            L.discard(self.cur, i, 'alice', T0, 'tidying up')
+        self.assertIn('logged off, not discarded', str(e.exception))
+
+    def test_log_off_records_whether_the_trip_happened(self):            # §3.3
+        i = self.accepted()
+        L.log_off(self.cur, i, 'alice', T0, 'never left the marina', reason='notdeparted')
+        self.assertEqual(L.get(self.cur, i)['closeReason'], 'notdeparted')
+        j = self.accepted(rego='CD456R', member='9001')
+        with self.assertRaises(L.Refused):
+            L.log_off(self.cur, j, 'alice', T0, 'x', reason='cancelled')
 
     def test_any_order_any_subset_and_gaps_ranked(self):                # AC-2, AC-40, CAP-3, CAP-10, CAP-11
         i = L.create(self.cur, 'alice', '', T0)
@@ -47,18 +144,18 @@ class LogOns(unittest.TestCase):
         self.assertEqual(gaps[:2], ['etaDay', 'eta'])
         self.assertEqual([g['cls'] for g in out['gaps']], sorted(g['cls'] for g in out['gaps']))
 
-    def test_a_time_with_no_day_is_not_a_deadline(self):                # CAP-4, DAT-1, WAT-9
+    def test_a_time_with_no_day_is_not_a_deadline(self):                # CAP-4, ACC-1
         i = L.create(self.cur, 'alice', '', T0)
         out = L.set_field(self.cur, i, 'eta', '1500', 'alice', T0)
         self.assertIsNone(out['when']); self.assertIn('No day', out['warning'])
         row = L.get(self.cur, i)
         self.assertEqual(row['etaRaw'], '1500')                         # kept as heard
         self.assertIsNone(row['eta']); self.assertIsNone(row['etaDate'])
-        self.assertEqual(L.condition(row, T0, 30)[0], 'nodeadline')     # owned and visible, not counted down
-        self.assertIn('etaDay', [g['field'] for g in L.gaps(row)])      # and the day is still being asked for
+        self.assertIn('eta', [m['field'] for m in L.missing(row)])      # so it cannot be accepted
+        self.assertIn('etaDay', [g['field'] for g in L.gaps(row)])
         out = L.set_field(self.cur, i, 'etaDay', 'today', 'alice', T0)
         self.assertEqual(out['when'], datetime(2026, 9, 12, 15, 0))     # the day cell makes it a deadline
-        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'approaching')
+        self.assertNotIn('eta', [m['field'] for m in L.missing(L.get(self.cur, i))])
 
     def test_times_keep_raw_and_basis_and_drive_the_condition(self):    # AC-8, AC-21, AC-27, CAP-8, CAP-23
         i = L.create(self.cur, 'alice', '', T0)
@@ -67,14 +164,16 @@ class LogOns(unittest.TestCase):
         self.assertIn('entry time', out['basis'])
         row = L.get(self.cur, i)
         self.assertEqual((row['etaRaw'], row['eta']), ('+2h', T0 + timedelta(hours=2)))
+        L.accept(self.cur, i, 'alice', T0) if L.acceptable(row) else None
+        row = dict(L.get(self.cur, i), watchStatus='watching')
         self.assertEqual(L.condition(row, T0, 30)[0], 'notdue')
         self.assertEqual(L.condition(row, T0 + timedelta(hours=1, minutes=40), 30)[0], 'approaching')
-        self.assertEqual(L.condition(row, T0 + timedelta(hours=2), 30), ('overdue', 0))    # Draft + pending, still overdue
+        self.assertEqual(L.condition(row, T0 + timedelta(hours=2), 30), ('overdue', 0))
         out = L.set_field(self.cur, i, 'eta', '25:70', 'alice', T0)
         self.assertIsNone(out['when']); self.assertIn('Not understood', out['warning'])
         row = L.get(self.cur, i)
         self.assertEqual(row['etaRaw'], '25:70'); self.assertIsNone(row['eta'])
-        self.assertEqual(L.condition(row, T0, 30)[0], 'nodeadline')
+        self.assertIn('eta', [m['field'] for m in L.missing(row)])
         out = L.set_field(self.cur, i, 'pob', 'about four', 'alice', T0)
         self.assertIn('kept as heard', out['warning'])
         self.assertEqual(L.get(self.cur, i)['pob'], 'about four')
@@ -89,7 +188,7 @@ class LogOns(unittest.TestCase):
         self.assertEqual(out['when'], datetime(2026, 9, 14, 6, 0))
         out = L.set_field(self.cur, i, 'eta', '', 'alice', T0)                 # a day without a time is not a deadline
         self.assertIsNone(out['when']); self.assertIn('not a deadline', out['warning'])
-        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'nodeadline')
+        self.assertIn('eta', [m['field'] for m in L.missing(L.get(self.cur, i))])
         out = L.set_field(self.cur, i, 'etaDay', 'someday', 'alice', T0)
         self.assertIn('Not understood', out['warning'])
         L.set_field(self.cur, i, 'callDay', '11/9', 'alice', T0); out = L.set_field(self.cur, i, 'callTime', '2300', 'alice', T0)
@@ -147,12 +246,14 @@ class LogOns(unittest.TestCase):
         L.set_field(self.cur, i, 'mobile', '0412 345 678', 'alice', T0)
         self.assertEqual([r['normalized'] for r in L.identifiers(self.cur, i) if r['kind'] == 'mobile'], ['0412345678'])
 
-    def test_queue_order_never_hides_overdue_or_unresolved(self):       # WAT-1
-        a = L.create(self.cur, 'alice', '', T0); self.eta(a, 'today', '1800')
-        b = L.create(self.cur, 'alice', '', T0); self.eta(b, 'today', '1400')
-        c = L.create(self.cur, 'alice', '', T0)
-        d = L.create(self.cur, 'alice', '', T0); self.eta(d, 'today', '1450')
-        self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [b, d, c, a])
+    def test_queue_order_never_hides_overdue(self):                     # WAT-1
+        a = self.accepted(rego='AA111A', member='1', time='1800')
+        b = self.accepted(rego='BB222B', member='2', time='1400')
+        c = self.accepted(rego='CC333C', member='3', time='1450')
+        self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [b, c, a])
+        draft = L.create(self.cur, 'alice', '', T0)
+        self.assertNotIn(draft, [r['id'] for r in L.queue(self.cur, '', T0, 30)])
+        self.assertEqual([r['id'] for r in L.drafts(self.cur, '', T0, 30)], [draft])
 
     def test_stale_version_and_closed_records_refuse(self):             # CAP-22, WAT-7
         i = L.create(self.cur, 'alice', '', T0)
@@ -160,10 +261,10 @@ class LogOns(unittest.TestCase):
         with self.assertRaises(L.Stale):
             L.set_field(self.cur, i, 'pob', '3', 'bob', T0, version=0)
         self.assertEqual(L.get(self.cur, i)['pob'], '2')
+        self.mandatory(i)
         L.accept(self.cur, i, 'alice', T0)
         with self.assertRaises(L.Refused):
             L.accept(self.cur, i, 'alice', T0)
-        L.set_capture(self.cur, i, True, 'alice', T0)
         L.log_off(self.cur, i, 'alice', T0 + timedelta(hours=3), 'radio call, alongside')
         row = L.get(self.cur, i)
         self.assertEqual((row['watchStatus'], row['loggedOffNote']), ('loggedoff', 'radio call, alongside'))

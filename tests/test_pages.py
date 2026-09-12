@@ -59,6 +59,24 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 302)
         return int(r.location.rsplit('/', 1)[-1])
 
+    def field(self, i, name, value, client=None):
+        r = (client or self.a).post('/api/logon/%d' % i, json={'field': name, 'value': value})
+        self.assertEqual(r.status_code, 200, r.data)
+        return r.json
+
+    def mandatory(self, i, rego='AB123Q', member='4471', day='today', time='1800'):
+        """Everything ACC-1 asks for. Without it there is a draft, not a log on."""
+        for name, value in (('registration', rego), ('memberNumber', member), ('pob', '3'),
+                            ('departurePoint', 'Marina'), ('destination', 'Facing Island'),
+                            ('etaDay', day), ('eta', time)):
+            self.field(i, name, value)
+        return i
+
+    def accepted(self, **kw):
+        i = self.mandatory(self.new(), **kw)
+        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 302)
+        return i
+
     def test_not_logged_in_goes_to_the_hosts_login(self):
         c = self.app.test_client()
         r = c.get('/logons')
@@ -71,9 +89,10 @@ class Pages(unittest.TestCase):
         j = self.new()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('id="queuePane"', page)
-        self.assertIn('data-id="%d"' % j, page)                # the other Draft is on the queue while this one is captured
+        self.assertIn('data-draft="%d"' % j, page)             # the other draft is visible while this one is captured
         self.assertIn('data-field="eta"', page)
         self.assertIn('Still to ask', page)
+        self.assertIn('This is a draft, not a log on', page)
         r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '3pm', 'version': 0})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.json['version'], 1)
@@ -89,13 +108,75 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 2}).status_code, 200)
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Sea Dog', listing)
-        self.assertIn('15:00', listing)
+        self.assertIn('2 drafts not logged on', listing)
         self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
+
+    def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
+        i = self.new()
+        for name, value in (('etaDay', 'today'), ('eta', '0001'), ('pob', '3'), ('destination', 'Facing Island')):
+            self.field(i, name, value)
+        r = self.a.post('/logon/%d/accept' % i)                           # short of the mandatory set
+        self.assertEqual(r.status_code, 400)
+        body = r.get_data(as_text=True)
+        self.assertIn('Still needed', body)
+        self.assertIn('Member No.', body)
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertIn('NOT WATCHED', page)
+        self.assertNotIn('OVERDUE', page)                                 # the return time passed hours ago
+        listing = self.a.get('/logons').get_data(as_text=True)
+        self.assertNotIn('OVERDUE', listing)
+        self.assertIn('Nobody is counting these down', listing)
+        self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])
+        self.assertEqual(len(self.a.get('/api/logons/queue').json['drafts']), 1)
+
+    def test_accepting_takes_the_watch_and_starts_it_at_once(self):       # AC-51, AC-52, ACC-3, ACC-4
+        i = self.mandatory(self.new(), time='0001')                       # a return time already long past
+        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 302)
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertIn('Logged on and watched', page)
+        self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
+        self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))
+        self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
+        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 400)
+
+    def test_one_vessel_one_log_on(self):                                 # AC-53, ACC-6
+        first = self.accepted()
+        second = self.mandatory(self.new())
+        r = self.a.post('/logon/%d/accept' % second)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('already logged on', r.get_data(as_text=True))
+        page = self.a.get('/logon/%d' % second).get_data(as_text=True)
+        self.assertIn('One vessel has one log on', page)
+        self.assertIn('AB123Q', page)                                     # nothing captured was discarded
+        self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
+        self.assertEqual(self.a.post('/logon/%d/accept' % second).status_code, 302)
+
+    def test_a_draft_is_discarded_and_a_log_on_is_logged_off(self):       # AC-54, ACC-7
+        d = self.new()
+        self.assertEqual(self.a.post('/logon/%d/discard' % d, data={'reason': ''}).status_code, 400)
+        self.assertEqual(self.a.post('/logon/%d/discard' % d,
+                                     data={'reason': 'hit New by mistake', 'back': '/logons'}).status_code, 302)
+        page = self.a.get('/logon/%d' % d).get_data(as_text=True)
+        self.assertIn('This was never a log on', page)
+        self.assertIn('hit New by mistake', page)
+        self.assertIn('Discarded', self.a.get('/logons').get_data(as_text=True))
+        self.assertEqual(self.a.post('/api/logon/%d' % d, json={'field': 'pob', 'value': '1'}).status_code, 400)
+        i = self.accepted(rego='CD456R', member='9001')
+        r = self.a.post('/logon/%d/discard' % i, data={'reason': 'tidying'})
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('logged off, not discarded', r.get_data(as_text=True))
+
+    def test_numbering_counts_from_one_each_day(self):                    # AC-56, REC-9
+        first, second = self.new(), self.new()
+        page = self.a.get('/logon/%d' % second).get_data(as_text=True)
+        self.assertIn('Draft 2', page)
+        self.assertIn('draft 2 of', page)
+        self.assertIn('>1</a>', self.a.get('/logons').get_data(as_text=True))
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by
         the capture form and its submit handler returning false: the button did nothing at all."""
-        i = self.new()
+        i = self.accepted()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         inside = page[page.index('<form id="capture"'):]
         inside = inside[inside.index('>') + 1:]                  # past the opening tag itself
@@ -109,7 +190,6 @@ class Pages(unittest.TestCase):
         for f, v in [('registration', 'AB123Q'), ('memberNumber', '4471'), ('mobile', '0412 345 678'),
                      ('vesselDetails', '6m white Quintrex'), ('destination', 'Facing Island')]:
             self.assertEqual(self.a.post('/api/logon/%d' % first, json={'field': f, 'value': v}).status_code, 200)
-        self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
 
         self.assertEqual(self.a.get('/api/logons/search?q=a').json['hits'], [])          # one letter is not a search
         hits = self.a.get('/api/logons/search?q=ab123').json['hits']
@@ -124,8 +204,9 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.data)
         self.assertIn('Mobile Phone Number', r.json['filled'])
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
-        self.assertIn('0412 345 678', page)
-        self.assertNotIn('Facing Island', page)                                   # a past trip is not this trip
+        form = page[page.index('<form id="capture"'):page.index('</form>')]
+        self.assertIn('0412 345 678', form)
+        self.assertNotIn('Facing Island', form)                                   # a past trip is not this trip
         self.assertIn('does not corroborate', page)                               # IDV-1, said plainly
         self.assertIn('Unverified', page)                                         # applied values prove nothing
         self.assertEqual(self.a.post('/logon/%d/apply' % second, json={'key': 'rego:NOPE'}).status_code, 400)
@@ -135,7 +216,6 @@ class Pages(unittest.TestCase):
             i = self.new()
             self.a.post('/api/logon/%d' % i, json={'field': 'registration', 'value': rego})
             self.a.post('/api/logon/%d' % i, json={'field': 'memberNumber', 'value': member})
-            self.a.post('/logon/%d/logoff' % i, data={'note': 'back'})
         mixed = self.new()
         self.a.post('/api/logon/%d' % mixed, json={'field': 'registration', 'value': 'AB123Q'})
         r = self.a.post('/api/logon/%d' % mixed, json={'field': 'memberNumber', 'value': '8802'})
@@ -144,57 +224,17 @@ class Pages(unittest.TestCase):
         self.assertIn('CONFLICT', page)
         self.assertIn('different boats or people', page)
         self.assertIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))   # and on the queue
-        self.assertEqual(self.a.post('/logon/%d/capture' % mixed, data={'complete': '1'}).status_code, 302)  # IDV-5: blocks nothing
-        self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)
+        for name, value in (('pob', '2'), ('departurePoint', 'Marina'), ('destination', 'Bay'),
+                            ('etaDay', 'today'), ('eta', '2300')):
+            self.field(mixed, name, value)
+        self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)     # IDV-5: a conflict blocks nothing
+        self.assertIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))
 
-    def test_cancel_needs_a_reason_and_faces_an_overdue_record(self):     # §3.3 Cancel, WAT-7
-        i = self.new()
-        self.assertEqual(self.a.post('/logon/%d/cancel' % i, data={'reason': ''}).status_code, 400)
-        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
-        self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})     # long past: overdue
-        r = self.a.post('/logon/%d/cancel' % i, data={'reason': 'entered twice'})
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('disposition, not a tidy-up', r.get_data(as_text=True))
-        r = self.a.post('/logon/%d/cancel' % i, data={'reason': 'entered twice', 'overdue': '1', 'back': '/logons'})
-        self.assertEqual(r.status_code, 302, r.get_data(as_text=True))
-        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('No trip and no watch were required', page)
-        self.assertIn('entered twice', page)
-        self.assertNotIn('data-id="%d"' % i, self.a.get('/logons').get_data(as_text=True))
-        self.assertIn('No trip', self.a.get('/logons').get_data(as_text=True))       # shown as closed, not hidden
-        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 400)
 
-    def test_a_cancelled_record_stands_for_no_boat_but_stays_findable(self):
-        ghost = self.new()
-        for f, v in [('registration', 'GH0ST1'), ('memberNumber', '1234')]:
-            self.a.post('/api/logon/%d' % ghost, json={'field': f, 'value': v})
-        self.assertTrue([h for h in self.a.get('/api/logons/search?q=GH0ST1').json['hits'] if h['kind'] == 'vessel'])
-        self.assertEqual(self.a.post('/logon/%d/cancel' % ghost,
-                                     data={'reason': 'never sailed', 'duplicateOf': ''}).status_code, 302)
-        hits = self.a.get('/api/logons/search?q=GH0ST1').json['hits']
-        self.assertEqual([h for h in hits if h['kind'] == 'vessel'], [])              # no longer a known boat
-        self.assertTrue([h for h in hits if h['kind'] == 'trip'])                      # but still findable
-        real = self.new()
-        for f, v in [('registration', 'GH0ST1'), ('memberNumber', '1234')]:
-            self.a.post('/api/logon/%d' % real, json={'field': f, 'value': v})
-        self.assertIn('Unverified', self.a.get('/logon/%d' % real).get_data(as_text=True))   # cancelled is not evidence
 
-    def test_a_duplicate_points_at_the_record_that_stands(self):
-        canonical = self.new()
-        dup = self.new()
-        self.assertEqual(self.a.post('/logon/%d/cancel' % dup,
-                                     data={'reason': 'same call written twice', 'duplicateOf': str(canonical)}).status_code, 302)
-        self.assertIn('/logon/%d' % canonical, self.a.get('/logon/%d' % dup).get_data(as_text=True))
-        other = self.new()
-        r = self.a.post('/logon/%d/cancel' % other, data={'reason': 'x', 'duplicateOf': '9999'})
-        self.assertEqual(r.status_code, 400)
-        r = self.a.post('/logon/%d/cancel' % other, data={'reason': 'x', 'duplicateOf': str(other)})
-        self.assertEqual(r.status_code, 400)
 
     def test_a_closure_made_in_error_is_corrected_not_erased(self):       # §3.3 Correct mistaken closure
-        i = self.new()
-        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
-        self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})     # long past
+        i = self.accepted(time='0001')                                                # a return time long past
         self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'note': 'thought it was back'}).status_code, 302)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': ''}).status_code, 400)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'wrong boat'}).status_code, 302)
@@ -205,8 +245,8 @@ class Pages(unittest.TestCase):
         self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))         # time did not stop
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
-        self.assertEqual(self.a.post('/logon/%d/cancel' % i,
-                                     data={'reason': 'never sailed', 'overdue': '1'}).status_code, 302)
+        self.assertEqual(self.a.post('/logon/%d/logoff' % i,
+                                     data={'reason': 'notdeparted', 'note': 'never sailed'}).status_code, 302)
 
     def test_units_do_not_see_each_others_records(self):
         i = self.new()
@@ -214,28 +254,6 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.b.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 403)
         self.assertNotIn('data-id="%d"' % i, self.b.get('/logons').get_data(as_text=True))
         self.assertEqual(self.a.get('/logon/999').status_code, 404)
-
-    def test_overdue_shows_on_the_queue_without_operator_action(self):    # AC-21, AC-27
-        i = self.new()
-        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
-        r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})    # long past: overdue at once (§3.3)
-        self.assertEqual(r.status_code, 200)
-        self.assertIn('Already past', r.json['warning'])
-        self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))
-        self.assertEqual(self.a.get('/api/logons/queue').json['logons'][0]['condition'], 'overdue')
-
-    def test_accept_complete_and_log_off_are_explicit_actions(self):      # AC-36 (log off part), §3.3
-        i = self.new()
-        self.assertEqual(self.a.post('/logon/%d/accept' % i, data={'back': '/logon/%d' % i}).status_code, 302)
-        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 400)
-        self.assertEqual(self.a.post('/logon/%d/capture' % i, data={'complete': '1'}).status_code, 302)
-        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('Watching', page); self.assertIn('Reopen capture', page)
-        self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'note': 'alongside', 'back': '/logons'}).status_code, 302)
-        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('Logged off', page); self.assertIn('alongside', page); self.assertIn('disabled', page)
-        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '1'}).status_code, 400)
-        self.assertIn('Recently closed', self.a.get('/logons').get_data(as_text=True))
 
 
 if __name__ == '__main__':

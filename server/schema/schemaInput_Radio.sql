@@ -12,8 +12,14 @@
 CREATE TABLE IF NOT EXISTS `LogOns` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `unit` VARCHAR(64) NOT NULL DEFAULT '',
-  `captureStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',       -- draft | complete (§3.3; never gates monitoring)
-  `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'pending',       -- pending | watching | loggedoff | cancelled
+  -- One state, not two (§3.3): a draft is saved and not watched; accepting it is what starts the
+  -- watch and what the unit tells the vessel; it then ends by log off. A draft that was never a
+  -- log on is discarded instead (ACC-7).
+  `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | watching | loggedoff | discarded
+  `dayNumber` INT DEFAULT NULL,                               -- counts from 1 each day: what operators say out loud (REC-9)
+  `dayDate` DATE DEFAULT NULL,                                -- the day that number belongs to
+  `acceptedAt` DATETIME DEFAULT NULL,                         -- the moment the unit took the watch (ACC-3)
+  `acceptedBy` VARCHAR(255) DEFAULT NULL,
   `channel` VARCHAR(16) DEFAULT NULL,                         -- radio | phone | person | self (OC-1)
   `callDayRaw` VARCHAR(64) DEFAULT NULL,                      -- paper column 1 'Date', as written ('today', '12/9')
   `callDate` DATE DEFAULT NULL,                               -- that day resolved when it was written; never re-derived later
@@ -52,10 +58,16 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `verifyBasis` VARCHAR(255) DEFAULT NULL,                    -- the reason in words, recomputed from current evidence (IDV-3)
   `loggedOffAt` DATETIME DEFAULT NULL,
   `loggedOffNote` VARCHAR(255) DEFAULT NULL,
-  -- Cancel is not a tidy log off: it establishes that no trip and no watch were required (§3.3).
+  `closeReason` VARCHAR(16) DEFAULT NULL,                     -- returned | notdeparted | other: a trip that happened or did not
+  -- A draft that was never a log on: begun in error, or abandoned before anything identifying (ACC-7).
+  `discardedAt` DATETIME DEFAULT NULL,
+  `discardReason` VARCHAR(255) DEFAULT NULL,
+  -- Superseded by v1.0 and no longer written. Cancelling an accepted log on is gone (a log on that
+  -- happened is logged off), and duplicates cannot be created at all (ACC-6). Kept, not dropped,
+  -- because the rows that used them are still auditable.
   `cancelledAt` DATETIME DEFAULT NULL,
   `cancelReason` VARCHAR(255) DEFAULT NULL,
-  `duplicateOf` INT DEFAULT NULL,                             -- the canonical record, when this one was entered twice
+  `duplicateOf` INT DEFAULT NULL,
   -- A closure made in error is corrected, not erased: the closure event stays and this records the undo.
   `reopenedAt` DATETIME DEFAULT NULL,
   `reopenReason` VARCHAR(255) DEFAULT NULL,
@@ -67,6 +79,7 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `isActive` BOOL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS `idx_logons_open` ON `LogOns`(`unit`, `watchStatus`, `isActive`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uniq_logons_daynumber` ON `LogOns`(`unit`, `dayDate`, `dayNumber`);
 
 -- Every identifying value as the operator heard it, kept whatever it later resolves to (DAT-5, IDV-1).
 -- A corrected value supersedes the previous row for that kind; the old row stays, inactive (IDV-3).

@@ -4,9 +4,9 @@
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
-    <span class="small text-secondary">{{ queue|length }} open</span>
+    <span class="small text-secondary">{{ queue|length }} logged on</span>
     {% set overdue = queue|selectattr('condition', 'equalto', 'overdue')|list|length %}{% if overdue %}<span class="badge text-bg-danger">{{ overdue }} overdue</span>{% endif %}
-    {% set unusable = queue|selectattr('condition', 'equalto', 'nodeadline')|list|length %}{% if unusable %}<span class="badge text-bg-secondary">{{ unusable }} without a usable ETA</span>{% endif %}
+    {% if drafts %}<span class="badge text-bg-warning" title="Saved, not watched, and nobody is counting them down">{{ drafts|length }} draft{{ '' if drafts|length == 1 else 's' }} not logged on</span>{% endif %}
     <span id="queueNote" class="small text-secondary">approaching = {{ window }} min</span>
   </div>
   {{ ui.find() }}
@@ -15,14 +15,17 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-<div id="queuePane" class="mt-2">{{ ui.queue(queue, now) }}</div>
+<div id="queuePane" class="mt-2">{{ ui.draft_list(drafts, now, reference) }}{{ ui.queue(queue, now) }}</div>
 {% if closed %}
 <details class="mt-3"><summary class="small text-secondary">Recently closed ({{ closed|length }})</summary>
-<table class="table table-sm ro-queue mt-1"><thead><tr><th>Closed</th><th>How</th><th>Vessel</th><th>ETA was</th><th>POB</th><th>Destination</th><th>Reason / evidence</th><th></th></tr></thead><tbody>
-{% for r in closed %}<tr><td>{{ ui.when(r.cancelledAt or r.loggedOffAt, now) }}</td>
-  <td>{% if r.watchStatus == 'cancelled' %}<span class="badge text-bg-warning">No trip</span>{% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}</td>
-  <td>#{{ r.id }} {{ r.memberNumber or r.vesselName or r.registration or '' }}</td><td>{{ ui.when(r.eta, now) }}</td><td>{{ r.pob or '' }}</td><td class="wrap">{{ r.destination or '' }}</td>
-  <td class="wrap">{{ r.cancelReason or r.loggedOffNote or '' }}{% if r.duplicateOf %} · see #{{ r.duplicateOf }}{% endif %}</td>
+<table class="table table-sm ro-queue mt-1"><thead><tr><th>No.</th><th>Closed</th><th>How</th><th>Vessel</th><th>Return was</th><th>Going to</th><th>Reason / evidence</th><th></th></tr></thead><tbody>
+{% for r in closed %}<tr><td class="fw-semibold">{{ reference(r) }}</td>
+  <td>{{ ui.when(r.discardedAt or r.cancelledAt or r.loggedOffAt, now) }}</td>
+  <td>{% if r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary" title="Never a log on">Discarded</span>
+      {% elif r.closeReason == 'notdeparted' %}<span class="badge text-bg-warning">Never departed</span>
+      {% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}</td>
+  <td>{{ r.memberNumber or r.vesselName or r.registration or '' }}</td><td>{{ ui.when(r.eta, now) }}</td><td class="wrap">{{ r.destination or '' }}</td>
+  <td class="wrap">{{ r.discardReason or r.cancelReason or r.loggedOffNote or '' }}</td>
   <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td></tr>{% endfor %}
 </tbody></table></details>
 {% endif %}

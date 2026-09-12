@@ -56,13 +56,23 @@ def variants(value):
 
 # ---------- the unit's own history, read as identity ----------
 
+def vessel_key(row):
+    """The vessel a record stands for, or None when nothing identifying has been said yet."""
+    if row.get('registration'):
+        return 'rego:' + normalize('registration', row['registration'])
+    if row.get('vesselName'):
+        return 'name:' + normalize('vesselName', row['vesselName'])
+    return None
+
+
+def vessel_label(row):
+    """What to call that vessel in a message to an operator."""
+    return row.get('registration') or row.get('vesselName') or 'This vessel'
+
+
 def _keys(row):
     """The vessel and person this past trip stands for, or None where it said nothing."""
-    vessel = person = None
-    if row.get('registration'):
-        vessel = 'rego:' + normalize('registration', row['registration'])
-    elif row.get('vesselName'):
-        vessel = 'name:' + normalize('vesselName', row['vesselName'])
+    vessel, person = vessel_key(row), None
     if row.get('memberNumber'):
         person = 'member:' + normalize('memberNumber', row['memberNumber'])
     elif row.get('mobile'):
@@ -70,14 +80,15 @@ def _keys(row):
     return vessel, person
 
 
-def past(cur, unit, exclude_id=None, cancelled=False):
+def past(cur, unit, exclude_id=None, discarded=False):
     """Every earlier trip of this unit, newest first. The register this app has instead of a register.
 
-    A cancelled record says no trip was required, so it is not evidence of a boat or a person and
-    is left out by default. It stays searchable and auditable, which is why `cancelled` exists."""
+    A discarded record was never a log on, so it is not evidence of a boat or a person and is left
+    out by default. It stays searchable and auditable, which is why `discarded` exists. A log on
+    that never departed is kept: the boat and the caller were real, only the trip was not."""
     from . import logons                 # loaded by now; one definition of how a stored row is typed
     cur.execute('SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND id <> %s'
-                + ('' if cancelled else " AND watchStatus <> 'cancelled'") + ' ORDER BY id DESC',
+                + ('' if discarded else " AND watchStatus NOT IN ('discarded', 'cancelled')") + ' ORDER BY id DESC',
                 (unit, int(exclude_id or 0)))
     rows = [logons._row(r) for r in cur.fetchall() or []]
     for r in rows:
@@ -214,10 +225,10 @@ def search(cur, unit, q, limit=25):
     q = (q or '').strip()
     if len(q) < 2:
         return []
-    rows = past(cur, unit)                      # cancelled records stand for no boat and no person
+    rows = past(cur, unit)                      # discarded records stand for no boat and no person
     vessels, people = known(rows)
-    open_ids = {r['vesselKey'] for r in rows if r['watchStatus'] in ('pending', 'watching')} | \
-               {r['personKey'] for r in rows if r['watchStatus'] in ('pending', 'watching')}
+    at_sea = [r for r in rows if r['watchStatus'] == 'watching']       # a draft is not at sea
+    open_ids = {r['vesselKey'] for r in at_sea} | {r['personKey'] for r in at_sea}
     needle = q.lower()
     loose = normalize('registration', q)
     hits = []
@@ -226,14 +237,14 @@ def search(cur, unit, q, limit=25):
             haystack = ' '.join(str(x) for x in (item['label'], item['sublabel'], item['detail']) if x).lower()
             if needle in haystack or (loose and loose in normalize('registration', haystack)):
                 hits.append(dict(item, atSea=key in open_ids))
-    for r in past(cur, unit, cancelled=True):   # but they remain findable, marked for what they are
+    for r in past(cur, unit, discarded=True):   # but they remain findable, marked for what they are
         text = ' '.join(str(x) for x in (r.get('registration'), r.get('vesselName'), r.get('memberNumber'),
                                          r.get('mobile'), r.get('destination'), r.get('departurePoint')) if x).lower()
         if needle in text or (loose and loose in normalize('registration', text)):
             hits.append({'kind': 'trip', 'key': 'trip:%d' % r['id'], 'id': r['id'],
                          'label': '#%d %s' % (r['id'], r.get('registration') or r.get('vesselName') or r.get('memberNumber') or ''),
                          'sublabel': r.get('destination'), 'detail': r.get('vesselDetails'),
-                         'state': r['watchStatus'], 'atSea': r['watchStatus'] in ('pending', 'watching'),
+                         'state': r['watchStatus'], 'atSea': r['watchStatus'] == 'watching',
                          'lastTrip': r['id'], 'lastSeen': r.get('createdAt'), 'trips': 1})
     hits.sort(key=lambda h: ({'vessel': 0, 'person': 1, 'trip': 2}[h['kind']], -(h.get('lastTrip') or 0)))
     return hits[:limit]

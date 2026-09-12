@@ -21,6 +21,14 @@
 .ro-ro{font-size:.85rem;padding:.2rem 0;color:var(--bs-secondary-color)}
 .ro-sys{font-size:.75rem;color:var(--bs-secondary-color)}
 .ro-cancel{font-size:.8rem;border:1px solid var(--bs-danger);border-radius:.4rem;padding:.5rem;margin-top:.4rem}
+.ro-drafts{margin:.4rem 0 .8rem}
+.ro-drafts.has{border-left:3px solid var(--bs-warning);padding-left:.5rem}
+.ro-drafts-head strong,.ro-queue-head strong{font-size:.86rem}
+.ro-drafts-head span,.ro-queue-head span{font-size:.75rem;color:var(--bs-secondary-color);margin-left:.4rem}
+.ro-queue-head{margin:.4rem 0 .2rem}
+.ro-gate{font-size:.82rem;border-left:3px solid var(--bs-warning);padding:.3rem .6rem;margin:.5rem 0}
+.ro-gate.ready{border-color:var(--bs-success)}
+.ro-gate ul{margin:.2rem 0 0;padding-left:1.1rem}
 .ro-verify{font-size:.82rem;border-left:3px solid var(--bs-border-color);padding:.2rem .6rem;margin:.5rem 0}
 .ro-verify.conflict{border-color:var(--bs-danger)}
 .ro-verify.verified{border-color:var(--bs-success)}
@@ -49,8 +57,36 @@
 {% macro cond(r) %}
 {% if r.condition == 'overdue' %}<span class="badge text-bg-danger ro-cond">OVERDUE {{ minutes(r.minutes) }}</span>
 {% elif r.condition == 'approaching' %}<span class="badge text-bg-warning ro-cond">Due in {{ minutes(r.minutes) }}</span>
-{% elif r.condition == 'nodeadline' %}<span class="badge text-bg-secondary ro-cond" title="Not time-monitorable for vessel return (DAT-1)">{% if r.etaRaw %}ETA not understood{% else %}No ETA{% endif %}</span>
+{% elif r.condition == 'notwatched' %}<span class="badge text-bg-secondary ro-cond" title="A draft is not a log on and is not watched (ACC-2)">NOT WATCHED</span>
+{% elif r.condition == 'nodeadline' %}<span class="badge text-bg-secondary ro-cond">No deadline</span>
 {% else %}<span class="badge border text-secondary ro-cond">Due in {{ minutes(r.minutes) }}</span>{% endif %}
+{% endmacro %}
+
+{# ACC-5: drafts are shown wherever the queue is, never mixed into it, oldest first, each saying
+   what it still needs. The caller may be at sea believing they are logged on. #}
+{% macro draft_list(rows, now, reference, current=None) %}
+<div class="ro-drafts{{ ' has' if rows else '' }}">
+  <div class="ro-drafts-head"><strong>{{ rows|length }} draft{{ '' if rows|length == 1 else 's' }} not logged on</strong>
+    <span>Saved, not watched. Nobody is counting these down, and the caller may think otherwise.</span></div>
+  {% if rows %}
+  <table class="table table-sm ro-queue">
+    <thead><tr><th>No.</th><th>Age</th><th>Member No. OR Vessel Name</th><th>Rego</th><th>Going to</th><th>Return</th><th>Identity</th><th>Still needed before it is a log on</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}<tr class="{% if r.id == current %}ro-current{% endif %}" data-draft="{{ r.id }}">
+      <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ reference(r) }}</a></td>
+      <td class="{{ 'text-warning' if r.ageMinutes > 30 else 'text-secondary' }}">{{ minutes(r.ageMinutes) }}</td>
+      <td>{{ r.memberNumber or r.vesselName or '' }}</td>
+      <td>{{ r.registration or '' }}</td>
+      <td class="wrap">{{ r.destination or '' }}</td>
+      <td>{{ r.etaDayBox }} {{ r.etaRaw or '' }}</td>
+      <td>{{ outcome(r.verifyOutcome, r.verifyBasis or '') }}</td>
+      <td class="wrap">{{ r.missing|map(attribute='label')|join(' · ') }}</td>
+      <td><a class="btn btn-outline-primary btn-sm py-0" href="/logon/{{ r.id }}">Finish</a></td>
+    </tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
 {% endmacro %}
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
@@ -140,14 +176,16 @@
 {# The queue is the paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. The
    deadline condition comes first because it is what the watch is for; it is not a paper cell. #}
 {% macro queue(rows, now, current=None) %}
+<div class="ro-queue-head"><strong>{{ rows|length }} logged on and watched</strong>
+  <span>Accepted, deadlines counting down.</span></div>
 <table class="table table-sm ro-queue" id="queueTable">
-  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>Record</th><th>Identity</th><th>Capture</th><th>Watch</th><th></th></tr></thead>
+  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>No.</th><th>Identity</th><th>Accepted</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
     <td>{{ cond(r) }}</td>
     <td>{{ cell(r.callDayBox) }}</td>
     <td>{{ cell(r.callTimeRaw) }}</td>
-    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.memberNumber or r.vesselName or ('#' ~ r.id) }}</a>{% if r.memberNumber and r.vesselName %} <span class="text-secondary">{{ r.vesselName }}</span>{% endif %}</td>
+    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.memberNumber or r.vesselName or ('log on ' ~ r.dayNumber) }}</a>{% if r.memberNumber and r.vesselName %} <span class="text-secondary">{{ r.vesselName }}</span>{% endif %}</td>
     <td>{{ cell(r.registration) }}</td>
     <td>{{ cell(r.mobile) }}</td>
     <td class="wrap">{{ cell(r.vesselDetails) }}</td>
@@ -156,12 +194,11 @@
     <td class="wrap">{{ cell(r.destination) }}</td>
     <td>{% if r.etaDayBox %}<span title="{{ r.etaDayRaw }}">{{ r.etaDayBox }}</span>{% endif %}</td>
     <td>{% if r.eta %}<span title="{{ r.etaBasis }}">{{ when(r.eta, now) }}</span>{% elif r.etaRaw %}<span class="text-danger" title="{{ r.etaBasis }}">{{ r.etaRaw }}</span>{% endif %}</td>
-    <td class="text-secondary">#{{ r.id }}</td>
+    <td class="fw-semibold">{{ r.dayNumber if r.dayNumber is not none else ('#' ~ r.id) }}</td>
     <td>{{ outcome(r.verifyOutcome, r.verifyBasis or '') }}</td>
-    <td>{{ 'Complete' if r.captureStatus == 'complete' else 'Draft' }}{% if r.gaps %} <span class="badge text-bg-secondary" title="Fields still to ask">{{ r.gaps }}</span>{% endif %}</td>
-    <td>{% if r.watchStatus == 'pending' %}<span class="text-warning">Pending</span>{% else %}Watching{% endif %} <span class="text-secondary" title="Age">{{ minutes(r.ageMinutes) }}</span></td>
+    <td class="text-secondary">{{ r.acceptedAt.strftime('%H:%M') if r.acceptedAt }} {{ r.acceptedBy or '' }}</td>
     <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td>
-  </tr>{% else %}<tr><td colspan="17" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
+  </tr>{% else %}<tr><td colspan="16" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
   </tbody>
 </table>
 {% endmacro %}

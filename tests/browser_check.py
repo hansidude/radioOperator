@@ -47,11 +47,9 @@ def main():
         record = page.url.rsplit('/', 1)[-1]
         print('record #%s at %s' % (record, page.url))
 
-        forms = page.evaluate("[...document.forms].map(f => f.id || f.getAttribute('action'))")
-        check('the log off form exists in its own right', 'logoffForm' in forms, forms)
-        owner = page.evaluate("(()=>{const b=[...document.querySelectorAll('button')]"
-                              ".find(b=>/Log off now/.test(b.textContent)); return b && (b.form.id||b.form.getAttribute('action'));})()")
-        check('the log off button belongs to it', owner == 'logoffForm', owner)
+        check('a new record starts as a draft, not a log on',
+              'This is a draft, not a log on' in page.content())
+        check('and nothing about it is watched', 'NOT WATCHED' in page.content())
 
         # type the way an operator does: every field, one after another, without waiting
         for field, value in FIELDS:
@@ -77,8 +75,17 @@ def main():
         check('the search box returns something', rows and 'Nothing matches' not in rows[0], rows[:2])
         check('and the verification panel is on the page', page.locator('.ro-verify').count() == 1)
 
+        page.reload()
+        check('the gate now says everything needed is here',
+              'Everything needed is here' in page.content())
+        page.click('button:has-text("Accept the log on")')
+        page.wait_for_load_state()
+        check('accepting puts it on the watch queue', page.locator('tr[data-id="%s"]' % record).count() == 1)
+        check('and it reads as logged on', 'Logged on and watched' in page.content())
+        check('and it is no longer a draft', page.locator('tr[data-draft="%s"]' % record).count() == 0)
+
         page.fill('#logoffNote', 'browser check')
-        page.click('button:has-text("Log off now")')
+        page.click('button:has-text("Log off")')
         page.wait_for_load_state()
         check('log off leaves the open queue', page.locator('tr[data-id="%s"]' % record).count() == 0)
         check('and appears as logged off', 'browser check' in page.content())

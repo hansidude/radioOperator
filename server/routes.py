@@ -62,15 +62,21 @@ def _queue(cur, h):
     return L.queue(cur, h.unit(), _now(), h.approaching_minutes)
 
 
+def _drafts(cur, h):
+    return L.drafts(cur, h.unit(), _now(), h.approaching_minutes)
+
+
 # ---------- pages ----------
 
 @bp.route('/logons')
 def logons_page():
     h, (conn, cur) = _open()
     rows = _queue(cur, h)
+    unaccepted = _drafts(cur, h)
     closed = L.recent_closed(cur, h.unit())
     cur.close()
-    return _page('logons.html', queue=rows, closed=closed, window=h.approaching_minutes)
+    return _page('logons.html', queue=rows, drafts=unaccepted, closed=closed, window=h.approaching_minutes,
+                 reference=L.reference)
 
 
 @bp.route('/logons/rows')
@@ -81,13 +87,16 @@ def logons_rows():
         cur.close()
         return redirect('/logons')
     rows = _queue(cur, h)
+    unaccepted = _drafts(cur, h)
     cur.close()
-    return _page('_queue.html', queue=rows, current=request.args.get('current', type=int), window=h.approaching_minutes)
+    return _page('_queue.html', queue=rows, drafts=unaccepted, current=request.args.get('current', type=int),
+                 window=h.approaching_minutes, reference=L.reference)
 
 
 @bp.route('/logons/new', methods=['POST'])
 def logons_new():
-    """Begin capture: an empty Draft exists, owned and on the queue, before a word is typed (CAP-1)."""
+    """Begin capture: an empty draft exists and is owned before a word is typed (CAP-1). It is not a
+    log on and is not watched until it is accepted (ACC-2)."""
     h, (conn, cur) = _open()
     new_id = L.create(cur, h.user(), h.unit(), _now())
     conn.commit()
@@ -102,12 +111,15 @@ def logon_page(logon_id):
     rows = _queue(cur, h)
     idents = L.identifiers(cur, logon_id)
     verified = ID.verify(cur, row, idents)
+    unaccepted = _drafts(cur, h)
+    clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] == 'draft' else None
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
-    return _page('logon.html', logon=row, queue=rows, identifiers=idents, gaps=L.gaps(row), condition=cond, minutes=minutes,
-                 verified=verified,
-                 extra=L.EXTRA, mandatory=L.MANDATORY, labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS,
-                 column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, window=h.approaching_minutes)
+    return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, identifiers=idents, gaps=L.gaps(row),
+                 condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
+                 extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
+                 day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
+                 close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes)
 
 
 def _action(logon_id, do):
@@ -127,13 +139,15 @@ def _action(logon_id, do):
 
 @bp.route('/logon/<int:logon_id>/accept', methods=['POST'])
 def logon_accept(logon_id):
+    """Take the watch (ACC-3). Refused until the mandatory set is there and no other log on holds
+    this vessel; the refusal says which, and discards nothing."""
     return _action(logon_id, lambda cur, v: L.accept(cur, logon_id, host().user(), _now(), v))
 
 
-@bp.route('/logon/<int:logon_id>/capture', methods=['POST'])
-def logon_capture(logon_id):
-    complete = request.form.get('complete') == '1'
-    return _action(logon_id, lambda cur, v: L.set_capture(cur, logon_id, complete, host().user(), _now(), v))
+@bp.route('/logon/<int:logon_id>/discard', methods=['POST'])
+def logon_discard(logon_id):
+    """Throw away a draft that was never a log on (ACC-7)."""
+    return _action(logon_id, lambda cur, v: L.discard(cur, logon_id, host().user(), _now(), request.form.get('reason'), v))
 
 
 @bp.route('/logon/<int:logon_id>/reopen', methods=['POST'])
@@ -152,17 +166,10 @@ def logon_reopen(logon_id):
     return redirect(request.form.get('back') or '/logon/%d' % logon_id)
 
 
-@bp.route('/logon/<int:logon_id>/cancel', methods=['POST'])
-def logon_cancel(logon_id):
-    """No trip, no watch: an accidental entry, a call that never sailed, or the same one twice."""
-    return _action(logon_id, lambda cur, v: L.cancel(
-        cur, logon_id, host().user(), _now(), request.form.get('reason'),
-        request.form.get('duplicateOf'), request.form.get('overdue') == '1', v))
-
-
 @bp.route('/logon/<int:logon_id>/logoff', methods=['POST'])
 def logon_logoff(logon_id):
-    return _action(logon_id, lambda cur, v: L.log_off(cur, logon_id, host().user(), _now(), request.form.get('note'), v))
+    return _action(logon_id, lambda cur, v: L.log_off(cur, logon_id, host().user(), _now(),
+                                                      request.form.get('note'), request.form.get('reason'), v))
 
 
 # ---------- API ----------
@@ -232,12 +239,17 @@ def logon_apply(logon_id):
 def api_queue():
     h, (conn, cur) = _open()
     rows = _queue(cur, h)
+    unaccepted = _drafts(cur, h)
     cur.close()
-    for r in rows:
+    for r in rows + unaccepted:
         for k in L.DATETIMES:
             if r.get(k):
                 r[k] = r[k].isoformat()
-    return jsonify({'now': _now().isoformat(), 'approachingMinutes': h.approaching_minutes, 'logons': rows})
+        for k in L.DATES:
+            if r.get(k):
+                r[k] = r[k].isoformat()
+    return jsonify({'now': _now().isoformat(), 'approachingMinutes': h.approaching_minutes,
+                    'watching': rows, 'drafts': unaccepted})
 
 
 @bp.errorhandler(NotLoggedIn)
