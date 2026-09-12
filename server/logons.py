@@ -266,11 +266,16 @@ def create(cur, user, unit, now):
     """An empty draft, owned by the unit from this moment and chased until it is accepted or
     discarded (CAP-1, CAP-2, ACC-5). It is not watched and it is not a log on.
 
-    The day number counts from one for each day (REC-9). A unique index makes a race fail rather
-    than hand two records the same number, so a clash is read again instead of being papered over."""
+    The day number counts from one for each day (REC-9). Two operators creating at the same moment
+    must not be handed the same number, so the read of the highest number so far takes a row lock
+    and the insert is retried if a unique index rejects it anyway. Both are needed: the lock is the
+    real defence, because a host may apply this schema with the uniqueness dropped (quackit's
+    migration generator emits CREATE INDEX for a CREATE UNIQUE INDEX), and the retry covers the
+    hosts where the constraint does exist."""
     day = now.date().isoformat()
     for _ in range(5):
-        cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s', (unit, day))
+        cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s '
+                    'FOR UPDATE', (unit, day))
         number = cur.fetchone()['n']
         try:
             cur.execute('INSERT INTO LogOns (unit, dayDate, dayNumber, createdBy, createdAt, updatedBy, updatedAt) '

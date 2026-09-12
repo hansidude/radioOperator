@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `isActive` BOOL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS `idx_logons_open` ON `LogOns`(`unit`, `watchStatus`, `isActive`);
+-- One number per unit per day (REC-9). Note: quackit's migration generator emits this as a plain
+-- CREATE INDEX, dropping the uniqueness, so the allocation in logons.create() locks rather than
+-- relying on this constraint. Standalone on SQLite does get the constraint.
 CREATE UNIQUE INDEX IF NOT EXISTS `uniq_logons_daynumber` ON `LogOns`(`unit`, `dayDate`, `dayNumber`);
 
 -- Every identifying value as the operator heard it, kept whatever it later resolves to (DAT-5, IDV-1).
