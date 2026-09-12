@@ -200,7 +200,7 @@ class Pages(unittest.TestCase):
         self.assertIn('class="ro-paper-grid ro-paper-head"', page)
         self.assertIn('<span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
         self.assertIn('<span>Time</span><span>Trip ID No.</span><span></span>', page)
-        self.assertIn('class="ro-record-card ro-paper-grid ro-paper-row draft', page)
+        self.assertIn('class="dc-record-card ro-record-card ro-paper-grid ro-paper-row draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)
         draft_at = page.index('data-record="%d"' % draft)
@@ -212,11 +212,15 @@ class Pages(unittest.TestCase):
         on = self.a.get('/logons?f=1&status=loggedon').get_data(as_text=True)
         self.assertIn('data-record="%d"' % watching, on)
         self.assertNotIn('data-record="%d"' % draft, on)
-        self.assertIn('class="ro-record-card ro-paper-grid ro-paper-row watching', on)
+        # Same card class as the draft above -- one renderer. The state word after it depends on
+        # the clock (an 1800 return is overdue after 1800), so it is not pinned here.
+        self.assertIn('class="dc-record-card ro-record-card ro-paper-grid ro-paper-row', on)
         self.assertIn('class="ro-paper-grid ro-paper-head"', on)
 
         # Counts do not sit beside the filters (a number on a filter nobody picked is noise).
         self.assertNotIn('class="ro-status-counts"', page)
+        # The site's own record classes, not a second look invented for radio.
+        self.assertIn('class="dc-record-toolbar ro-toolbar"', page)
 
     def test_the_date_filter_is_a_tick_you_can_turn_off(self):
         i = self.new()
@@ -317,8 +321,8 @@ class Pages(unittest.TestCase):
         self.assertIn('Draft 2', page)
         self.assertIn('draft 2 of', page)
         page = self.a.get('/logons').get_data(as_text=True)
-        self.assertIn('data-l="No." title="Record 1 of that day">1</span>', page)
-        self.assertIn('data-l="No." title="Record 2 of that day">2</span>', page)
+        self.assertIn('class="dc-record-index ro-paper-num" data-l="No." title="Record 1 of that day">1</span>', page)
+        self.assertIn('class="dc-record-index ro-paper-num" data-l="No." title="Record 2 of that day">2</span>', page)
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by

@@ -12,28 +12,18 @@
 .ro-form fieldset{border:0;padding:0;margin:0}
 .ro-form .mandatory .form-control{background:var(--bs-tertiary-bg)}
 .ro-form .paper-col{min-width:0}
-.ro-ro{font-size:.85rem;padding:.2rem 0;color:var(--bs-secondary-color)}
 .ro-sys{font-size:.75rem;color:var(--bs-secondary-color)}
 .ro-cancel{font-size:.8rem;border:1px solid var(--bs-danger);border-radius:.4rem;padding:.5rem;margin-top:.4rem}
-.ro-list-head{display:flex;align-items:baseline;gap:.4rem;margin:0 0 .35rem}
-.ro-list-head strong{font-size:.88rem}
-.ro-list-head span{font-size:.78rem;color:var(--bs-secondary-color)}
-.ro-card-list{display:grid;gap:.18rem;width:100%}
-.ro-record-card{display:flex;align-items:center;flex-wrap:wrap;gap:.2rem .55rem;border:1px solid var(--bs-border-color);border-left:4px solid var(--bs-secondary);border-radius:.25rem;background:var(--bs-body-bg);padding:.28rem .45rem;font-size:.82rem;line-height:1.3}
+/* The card itself is the site's dc-record-card (border, radius, wrapping). Radio adds only the
+   one thing that is its own: a left edge that says what state the record is in. */
+.ro-record-card{border-left:4px solid var(--bs-secondary);background:var(--bs-body-bg);line-height:1.3}
 .ro-record-card.draft{border-left-color:var(--bs-warning)}
 .ro-record-card.overdue{border-left-color:var(--bs-danger)}
 .ro-record-card.approaching{border-left-color:var(--bs-warning)}
 .ro-record-card.watching{border-left-color:var(--bs-primary)}
 .ro-record-card.closed{border-left-color:var(--bs-success)}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
-.ro-card-top{display:contents}
-.ro-card-top .ro-card-action{order:3;margin-left:auto}
-.ro-card-title{font-size:.82rem;font-weight:600;padding:0 5px;line-height:1.3}
-.ro-card-meta{order:2;display:flex;align-items:baseline;flex:1 1 42rem;flex-wrap:wrap;gap:.1rem .75rem;margin:0}
-.ro-card-field{display:flex;align-items:baseline;gap:.2rem;min-width:0;white-space:nowrap}
-.ro-card-field .k{color:var(--bs-secondary-color);font-size:.68rem;text-transform:uppercase}
-.ro-card-field .v{font-size:.82rem;overflow-wrap:anywhere}
-.ro-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem .6rem;margin:0 0 .5rem}
+/* Layout comes from dc-record-toolbar; only the control widths are radio's. */
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
 .ro-toolbar select,.ro-toolbar .ro-toolbar-date{width:auto;min-width:7.5rem}
 .ro-toolbar .ro-toolbar-tick{display:flex;align-items:center;gap:.3rem;margin:0;min-height:0;padding-left:1.4rem}
@@ -42,27 +32,22 @@
 .ro-paper-grid{display:grid;grid-template-columns:4fr 8fr 5fr 11fr 8fr 10fr 11fr 5fr 10fr 10fr 8fr 5fr 7fr 2.8rem;min-width:56rem}
 .ro-paper-head{color:var(--bs-secondary-color);font-size:.62rem;font-weight:600;line-height:1.1;text-transform:uppercase}
 .ro-paper-head>span{display:flex;align-items:end;min-width:0;padding:.18rem .3rem}
-.ro-record-card.ro-paper-row{display:grid;gap:0;min-height:2.2rem;padding:0;border-left-width:1px;border-left-color:var(--bs-border-color);font-size:.78rem;line-height:1.15}
+.ro-record-card.ro-paper-row{display:grid;gap:0;min-height:2.2rem;padding:0;border-left-width:1px;border-left-color:var(--bs-border-color);font-size:var(--dc-record-font,.82rem);line-height:1.15}
 .ro-paper-row+.ro-paper-row{margin-top:.18rem}
 .ro-paper-row>*{display:flex;align-items:center;min-width:0;padding:.28rem .3rem;border-right:1px solid var(--bs-border-color)}
 .ro-paper-row>*:last-child{border-right:0}
 .ro-paper-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.ro-paper-num{justify-content:flex-end;font-weight:600;font-variant-numeric:tabular-nums}
-.ro-paper-trip{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:var(--bs-secondary-color)}
+/* dc-record-index already gives tabular numerals and the muted colour. */
+.ro-paper-num{justify-content:flex-end;font-weight:600;color:inherit}
+.ro-paper-trip{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .ro-paper-who{display:flex;align-items:center;gap:.3rem;min-width:0}
 .ro-paper-who .badge{font-size:.6rem;padding:.12rem .3rem;flex:none}
 .ro-paper-link{color:inherit;font-weight:600;overflow:hidden;text-decoration:none;white-space:nowrap;text-overflow:ellipsis}
 .ro-paper-link:hover{text-decoration:underline}
 .ro-paper-action{justify-content:center;padding:0}
 .ro-paper-action .btn{display:inline-flex;align-items:center;justify-content:center;width:1.8rem;height:1.8rem;padding:0}
-.ro-empty{color:var(--bs-secondary-color);padding:.35rem 0}
-.ro-zero{font-size:1.05rem;color:var(--bs-secondary-color);padding:.35rem 0}
-.ro-status-counts{display:grid;grid-template-columns:repeat(3,minmax(9rem,1fr));gap:.45rem;margin:.65rem 0 .8rem}
-.ro-status-count{display:flex;align-items:center;gap:.65rem;min-height:3.8rem;border:1px solid var(--bs-border-color);border-left:4px solid var(--bs-success);border-radius:.25rem;padding:.4rem .7rem;background:var(--bs-body-bg)}
-.ro-status-count.overdue{border-left-color:var(--bs-danger)}
-.ro-status-count.drafts{border-left-color:var(--bs-warning)}
-.ro-status-count .number{font-size:2rem;font-weight:600;line-height:1}
-.ro-status-count .label{font-size:.82rem;color:var(--bs-secondary-color)}
+/* The empty state is dc-record-empty; a zero count is just said louder. */
+.ro-zero{font-size:1.05rem}
 .ro-gate{font-size:.82rem;border-left:3px solid var(--bs-warning);padding:.3rem .6rem;margin:.5rem 0}
 .ro-gate.ready{border-color:var(--bs-success)}
 .ro-gate ul{margin:.2rem 0 0;padding-left:1.1rem}
@@ -107,15 +92,10 @@
 .ro-detail-form .form-control,.ro-detail-form .form-select{font-size:1rem;min-height:2.8rem}
 .ro-view-tabs{display:flex;flex-wrap:wrap}
 .ro-view-tabs .btn{min-width:5.5rem}
-.ro-draft-filter{display:flex;align-items:center;gap:.4rem;margin:0 0 .55rem}
-.ro-draft-filter label{font-size:.75rem;color:var(--bs-secondary-color)}
-.ro-draft-filter input{width:10rem}
-.ro-row-number{flex:0 0 2.25rem;text-align:center;font-weight:600}
 @media (max-width:575.98px){
   .ro-workspace-pane{padding-top:.6rem}
   .ro-primary-form .form-control,.ro-primary-form .form-select{font-size:1.1rem}
   .ro-view-tabs .btn{min-width:0}
-  .ro-status-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
   .ro-record-card{align-items:flex-start}
   .ro-card-meta{flex-basis:100%}
   .ro-card-field{white-space:normal}
@@ -238,8 +218,8 @@
   {% set who = r.memberNumber or r.vesselName or ('Record ' ~ reference(r)) %}
   {% set vessel = vessel_summary(r, '') %}
   {% set trip = r.tripRef or '' %}
-  <article class="ro-record-card ro-paper-grid ro-paper-row {{ state(r)|trim }}{% if r.id == current %} ro-current{% endif %}" data-record="{{ r.id }}">
-    <span class="ro-paper-num" data-l="No." title="Record {{ reference(r) }} of that day">{{ reference(r) }}</span>
+  <article class="dc-record-card ro-record-card ro-paper-grid ro-paper-row {{ state(r)|trim }}{% if r.id == current %} ro-current{% endif %}" data-record="{{ r.id }}">
+    <span class="dc-record-index ro-paper-num" data-l="No." title="Record {{ reference(r) }} of that day">{{ reference(r) }}</span>
     <span class="ro-paper-value{{ ' ro-blank' if not r.callDayBox }}" data-l="Date" title="{{ r.callDayBox or '' }}">{{ cell(r.callDayBox) }}</span>
     <span class="ro-paper-value{{ ' ro-blank' if not r.callTimeRaw }}" data-l="Time" title="{{ r.callTimeRaw or '' }}">{{ cell(r.callTimeRaw) }}</span>
     <span class="ro-paper-who" data-l="Member / Vessel"><a class="ro-paper-link" href="/logon/{{ r.id }}" title="{{ who }}">{{ who }}</a>{{ state_label(r) }}</span>
@@ -254,7 +234,7 @@
     <span class="ro-paper-trip{{ ' ro-blank' if not trip }}" data-l="Trip ID No." title="{{ trip }}">{{ trip }}</span>
     <span class="ro-paper-action"><a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open {{ who }}" aria-label="Open {{ who }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a></span>
   </article>
-{% else %}<div class="ro-zero">{{ empty }}</div>
+{% else %}<div class="dc-record-empty ro-zero">{{ empty }}</div>
 {% endfor %}
 </div>
 {% endmacro %}
@@ -307,7 +287,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var KIND = { vessel: 'boat', person: 'member', trip: 'trip' };
   function render(d) {
-    if (!d.hits.length) { pane.innerHTML = '<div class="ro-empty">Nothing matches “' + esc(d.query) + '”.</div>'; pane.hidden = false; return; }
+    if (!d.hits.length) { pane.innerHTML = '<div class="dc-record-empty">Nothing matches “' + esc(d.query) + '”.</div>'; pane.hidden = false; return; }
     pane.innerHTML = d.hits.map(function (h) {
       var offers = (h.offers || []).length ? '<div class="text-secondary">fills ' + esc(h.offers.join(', ')) + '</div>' : '';
       var state = h.kind === 'trip' ? esc(h.state) : (h.trips + ' trip' + (h.trips === 1 ? '' : 's'));
@@ -328,7 +308,7 @@
       fetch('/api/logons/search?q=' + encodeURIComponent(q) + (current ? '&for=' + current : ''), { credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) throw new Error('Search failed (' + r.status + ')'); return r.json(); })
         .then(render)
-        .catch(function (e) { pane.innerHTML = '<div class="ro-empty text-danger">' + esc(e.message) + '</div>'; pane.hidden = false; });
+        .catch(function (e) { pane.innerHTML = '<div class="dc-record-empty text-danger">' + esc(e.message) + '</div>'; pane.hidden = false; });
     }, 180);
   });
   document.addEventListener('click', function (ev) {

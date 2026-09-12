@@ -1,5 +1,8 @@
-{# Standalone base. A host passes its own layout as `base_template`; it only has to offer these blocks
-   and the two navbar-row classes below (quackit's live in static/css/navbar_controls.css). #}
+{# Standalone base. A host passes its own layout as `base_template`; it only has to offer these
+   blocks, the two navbar-row classes, and the record vocabulary below -- quackit's live in
+   static/css/navbar_controls.css and static/css/record_views.css, which is why the pages look
+   like the rest of that site instead of carrying a second look of their own. Standalone has no
+   host, so the same handful of rules is restated here and nowhere else. #}
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
 <head>
@@ -16,6 +19,15 @@
     .entity-nav { order: 98; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .4rem; }
     .entity-nav .btn { font-size: .75rem; }
     .entity-nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-right: auto; }
+    /* The host's record vocabulary, for when there is no host. Values match quackit's
+       static/css/record_views.css; change them there first. */
+    :root { --dc-record-font: .82rem; --dc-record-meta-font: .75rem; --dc-record-gap: .35rem;
+            --dc-record-padding: .3rem .65rem; --dc-record-radius: .375rem; }
+    .dc-record-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+    .dc-record-toolbar .btn { font-size: var(--dc-record-font); padding: .15rem .4rem; }
+    .dc-record-card { min-width: 0; border: 1px solid var(--bs-border-color); border-radius: var(--dc-record-radius); box-shadow: none; overflow-wrap: anywhere; font-size: var(--dc-record-font); }
+    .dc-record-index { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--bs-secondary-color); }
+    .dc-record-empty { color: var(--bs-secondary-color); padding: .5rem 0; }
   </style>
 </head>
 <body>
