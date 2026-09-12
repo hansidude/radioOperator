@@ -161,6 +161,14 @@ class Pages(unittest.TestCase):
         self.assertIn('data-id="%d"' % watching, page)
         self.assertIn('data-draft="%d"' % draft, page)
         self.assertIn('class="ro-record-card', page)
+        self.assertIn('class="ro-paper-grid ro-paper-head"', page)
+        self.assertIn('class="ro-record-card ro-paper-grid ro-paper-row draft', page)
+        self.assertIn('<span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
+        self.assertNotIn('Still needed', page)
+        draft_at = page.index('data-draft="%d"' % draft)
+        draft_row = page[page.rfind('<article', 0, draft_at):page.index('</article>', draft_at)]
+        self.assertNotIn('Unverified', draft_row)
+        self.assertNotIn(' old', draft_row)
         self.assertIn('class="ro-status-counts"', page)
         self.assertIn('data-ro-count="loggedon">1</span><span class="label">Logged on</span>', page)
         self.assertNotIn('<table', page)
@@ -292,7 +300,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % mixed).get_data(as_text=True)
         self.assertIn('CONFLICT', page)
         self.assertIn('different boats or people', page)
-        self.assertIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))   # and on the queue
+        self.assertNotIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))  # draft rows are paper fields only
         for name, value in (('pob', '2'), ('departurePoint', 'Marina'), ('destination', 'Bay'),
                             ('etaDay', 'today'), ('eta', '2300')):
             self.field(mixed, name, value)
