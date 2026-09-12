@@ -1,6 +1,6 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.6 (draft)<br>
+**Version:** 0.7 (draft)<br>
 **Revised:** 12 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
@@ -45,6 +45,7 @@
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
 - [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 0.7 — changes from 0.6](#section-version-07-changes-from-06)
     - [Version 0.6 — changes from 0.5](#section-version-06-changes-from-05)
     - [Version 0.5 — changes from 0.4](#section-version-05-changes-from-04)
 - [Appendix F — Evidence figures](#section-appendix-f-evidence-figures)
@@ -138,14 +139,14 @@ justification. **May** — optional.
 | **Unit** | A marine rescue base holding the watch for a geographic area. |
 | **Member** | A person with a standing record held by the organisation. |
 | **Public user** | A person without a standing record, logging on as a non-member. |
-| **Identifier** | Any value that resolves to a stored record: member number, vessel registration, mobile number, vessel name, person name. |
+| **Identifier** | A captured identifying value, whether or not it resolves: member number, vessel registration, mobile number, vessel name, person name. |
 | **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
 | **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
 | **Draft** | Capture is incomplete. This does not disable watch monitoring. |
 | **Active** | An open record: watch status Pending acceptance or Watching, whatever its capture status or deadline condition. |
 | **Open watch queue** | The owning unit's list of every open record, Draft or Complete, with its deadline condition, escalation status and verification outcome. Also called the active list. |
-| **Approaching** | A usable deadline falls within the approved approaching window (WAT-2) and has not yet passed. |
-| **Overdue** | At least one open timed obligation has passed its due time without satisfaction or explicit amendment. |
+| **Approaching** | A usable deadline is within the approved approaching window and current time is strictly earlier than its due time (WAT-2). |
+| **Overdue** | Current time is at or after the due time of an unsatisfied effective obligation. Internal follow-up misses are labeled separately from vessel-return/report misses. |
 | **Escalated** | An open escalation exists. This is independent of capture completeness and deadline amendment. |
 | **ETA** | A supplied expected return or report date/time, represented by a timed obligation. |
 | **Obligation** | An expected return, position report, crossing completion, or operator follow-up, with its own status and deadline. |
@@ -216,10 +217,13 @@ long a record may remain pending before follow-up, are unit policy (Appendix D q
 
 **Deadline condition:** No usable vessel deadline, Not yet due, Approaching, or Overdue.
 Conditions derive from open obligations, independently of Draft/Complete and pending
-acceptance. Approaching applies within the approved approaching window (WAT-2). A usable deadline on any open record is monitored immediately. Entering a
+acceptance. Approaching applies within the approved approaching window (WAT-2). A usable
+deadline on any open record is monitored immediately. Entering a
 past deadline raises the overdue condition immediately; missing POB or identity does not
 inhibit it. Missing or uninterpretable times create a conspicuous unresolved condition
-and operator follow-up, not a fabricated vessel ETA (WAT-9).
+and operator follow-up, not a fabricated vessel ETA (WAT-9). Unresolved replacement input
+does not silently remove an existing effective deadline (WAT-10). At the due instant the
+condition is Overdue, not Approaching; alert delivery remains subject to WAT-3 latency.
 
 **Escalation status:** None, Open, or Closed. An open escalation remains open after an
 ETA change until an authorized operator records its disposition. Alert acknowledgment,
@@ -353,7 +357,8 @@ including 24-hour (`1500`), 12-hour (`3pm`), and relative (`+2h`).
 *Rationale: callers name places that exist in local usage and in no list.*
 
 **CAP-10.** The system **shall** display, during capture, which fields remain unpopulated.
-*Rationale: OC-3. In the absence of a procedure, the visible gap list is the procedure.*
+*Rationale: the visible gap list supports an interrupted interview; it does not replace
+approved operating procedures (OC-3).*
 
 **CAP-11.** The system **shall** rank unpopulated fields by the priority in §6.1, giving
 greatest prominence to fields serving PSO and least to vessel description.
@@ -371,7 +376,8 @@ to be populated or amended, with the same interaction cost as initial capture.
 without first classifying the caller, and **shall not** require vessel description fields
 before the log on is created.
 *Rationale: classification is a decision the operator cannot make until identity is
-known, which is late (OC-6).*
+known, which is late (OC-6). Volunteered description or contact details may be captured
+at any point, including while identity remains unknown (CAP-3).*
 
 **CAP-15.** Where vessel or contact detail has been captured previously for the same
 vessel or person, the system **shall** offer it rather than requesting it again.
@@ -431,7 +437,9 @@ that another operator is working on the same open record.
 **shall** remain distinguishable. Unparsed or implausible input shall be retained as
 captured with a warning rather than silently discarded, rounded or converted into a
 credible-looking operational value. Only a usable, explicitly interpreted deadline can
-drive vessel overdue detection; unresolved time input invokes WAT-9.
+drive vessel overdue detection; unresolved time input invokes WAT-9. When amending an
+existing deadline, saving unresolved input is distinct from replacing the effective
+monitored deadline (WAT-10).
 
 ---
 
@@ -460,8 +468,10 @@ Class C contact, and prioritised accordingly.
 *Rationale: it serves double duty — it identifies the caller and is the first action on
 overdue.*
 
-**DAT-3.** Class D fields **shall not** be requested during capture where the vessel
-resolves to an existing record carrying them.
+**DAT-3.** Previously stored Class D fields **shall not** be routinely requested again
+solely to populate the form. They shall be offered with provenance under CAP-4/CAP-15.
+The operator may clarify stale or conflicting details or use description to distinguish
+candidates (IDV-7), and may retain volunteered corrections without blocking capture.
 
 **DAT-4.** The system **shall** retain Class D detail captured for a person without a
 standing record, and associate it with the vessel for reuse.
@@ -487,13 +497,16 @@ the first match shall not count as independent corroboration. Record whether eac
 was supplied on this call, imported, selected from a profile, or corrected after clarification.
 
 **IDV-2.** Resolution **shall** operate over compatible person/vessel associations, with
-explicit handling of non-unique identifiers. Outcomes shall be:
+explicit handling of non-unique identifiers. The following decision order shall yield
+exactly one outcome: Conflict first; otherwise Unverified when fewer than two independent
+identifiers are supplied or none resolve exactly; otherwise Verified if its conditions
+hold; otherwise Partial. Candidate detail remains visible under every outcome.
 
 | Outcome | Condition |
 |---|---|
 | **Verified** | At least two independent supplied identifiers have exact normalized matches whose intersection uniquely identifies one person/vessel association; no captured identifying evidence contradicts it or remains unresolved. |
 | **Conflict** | Exact resolving evidence has incompatible candidate associations, or retained evidence explicitly contradicts the selected association. |
-| **Partial** | Some exact evidence resolves but other evidence is unmatched or only approximate, or more than one compatible association remains. Display the unresolved/ambiguous reason. |
+| **Partial** | At least two independent identifiers are supplied, at least one resolves exactly, no conflict exists, and Verified is not established because evidence is unmatched/approximate or the association remains ambiguous. Display the reason. |
 | **Unverified** | Fewer than two independent identifiers, or no exact evidence resolves. |
 
 Conflict takes precedence over other outcomes. A member with several vessels is not a
@@ -587,8 +600,11 @@ Age, watch owner, capture status and synchronization health shall remain visible
 
 **WAT-2.** The system **shall** indicate log ons approaching their ETA before that ETA
 passes. The approaching window is an approved configuration value, not a constant of this
-specification (Appendix D question 9). An approaching indication is not an alert under WAT-3
-and shall not be presented as one.
+specification (Appendix D question 9). For effective due time D, current time T, and
+approved window W, Approaching means D − W ≤ T < D; an unsatisfied obligation is Overdue
+when T ≥ D. An approaching indication shall be distinct from a missed-obligation alert
+under WAT-3. The next-deadline display shall cover report and crossing obligations as
+well as return, without hiding an already-missed obligation.
 
 **WAT-3.** A missed obligation **shall** produce an alert independent of the operator
 observing a list change. Deadline evaluation shall continue without an open capture page
@@ -626,17 +642,29 @@ Stale acceptance shall require review of intervening changes. Rejected, timed-ou
 or disconnected transfer attempts shall retain source responsibility until reconciled;
 the transfer itself shall never fulfill a deadline or close escalation.
 
-**WAT-9.** Every open record without a usable vessel deadline, including an empty Draft,
-**shall** have an accountable operator follow-up under the unit's approved policy. The
-policy shall define the follow-up interval, recipient, reminder and escalation for an
-unresolved capture, including operator interruption or shift end. Label it as an internal
-follow-up, not an inferred ETA. Draft status shall never exempt a supplied usable vessel
-deadline from monitoring.
+**WAT-9.** Every open record without a usable vessel deadline, with an unresolved deadline
+amendment, or still pending operator acceptance **shall** have accountable follow-up under
+the owning unit's approved policy. Pending acceptance requires follow-up even when a
+usable future vessel deadline exists. The policy shall name the responsible duty role,
+interval, recipient, reminder and escalation, including interruption or shift end. Unit
+responsibility must not depend on the absent operator accepting a record.
+
+Label the follow-up and any missed follow-up alert as internal, not as a caller-supplied
+ETA or evidence that the vessel has failed to return. Vessel deadlines continue to be
+monitored independently. Accepting the record resolves only the acceptance follow-up;
+missing-deadline or unresolved-amendment follow-up remains until explicitly resolved.
 
 **WAT-10.** Each obligation **shall** retain its own fulfillment/amendment evidence.
 A later report or revised ETA shall not erase a previous miss. An ETA change following
 escalation shall retain the open escalation until explicit authorized disposition.
-A new due time shall be shown with its source and the previous due time accessible.
+A new effective due time shall be shown with its source and the previous due time accessible.
+Saving a blank, unparsed or ambiguous replacement retains that input and its warning but
+shall not silently cancel or replace the last effective deadline. Show both the effective
+monitored deadline and the unresolved proposed change. Replacing or withdrawing the
+effective deadline requires an explicit operator action with source/reason; a valid past
+replacement is evaluated immediately. If a deadline is explicitly withdrawn without a
+usable replacement, retain the miss/history and invoke the no-usable-deadline follow-up
+under WAT-9. Withdrawing a deadline never implicitly closes an open escalation.
 
 ---
 
@@ -716,7 +744,7 @@ within a section is not always contiguous.
 | **AC-11** | Measure eligible unknown-caller captures under the approved peak-load protocol. | 95th percentile ≤ 90 seconds with the same reporting (CAP-17, CAP-18). |
 | **AC-12** | Add a registration to a log on created an hour earlier. | Same interaction cost as initial capture. |
 | **AC-40** | Begin a log on and populate only Class D fields. Mark capture complete. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; completion is not prevented (CAP-10 to CAP-12). |
-| **AC-41** | Take a log on from a caller with no standing record, without classifying the caller and without any vessel description. | Record created, owned and watched; classification and Class D fields are requested, if at all, only after identity is known (CAP-14). |
+| **AC-41** | Begin an unclassified caller capture with no description, then receive a hull colour before an identifier. | Record retained in the owning unit's open queue; classification/description never gate creation, and the volunteered colour is retained immediately while identity remains unknown (CAP-3, CAP-14). |
 | **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
 
 <a id="section-102-verification-and-search"></a>
@@ -734,7 +762,7 @@ within a section is not always contiguous.
 | **AC-19** | Save a log on with a **Conflict** outcome. | Save succeeds; conflict remains visible on the record. |
 | **AC-20** | View the active watch list. | Verification outcome visible per row. |
 | **AC-43** | Type the first characters of a registration; apply the result for a historical trip, then for an open trip. | Results return on partial input; the historical trip supplies identity and profile detail only, never current trip facts; the open trip offers resumption, not a duplicate (SRCH-5, SRCH-6). |
-| **AC-44** | Resolve an identifier that returns more than one candidate. | All candidates shown in one comparison view with match basis, profile freshness and total count; none pre-selected (IDV-8). |
+| **AC-44** | Resolve an identifier with several candidates, including a set larger than one result page. | Candidates accessible in one comparison view, with match basis, freshness and visible counts; pagination has no hidden truncation and no candidate is pre-selected (IDV-8). |
 
 <a id="section-103-watch-record-and-audit"></a>
 
@@ -747,6 +775,7 @@ within a section is not always contiguous.
 | **AC-23** | Amend an ETA, then inspect history. | Both original and amended values retrievable. |
 | **AC-24** | Perform a shift handover with an unresolved Draft, a pending transfer and an open escalation present. | All open records, missed obligations, pending saves/transfers and escalation history are presented and acknowledged without re-entry; outgoing and incoming operators recorded; monitoring continues throughout (WAT-6). |
 | **AC-25** | Run the operational report. | Proportion of live-captured versus later-entered log ons is reported. |
+| **AC-47** | Evaluate a return, report and crossing deadline just before, at and after D − W and D using the approved clock/window. Include another already-overdue obligation. | Approaching exactly when D − W ≤ T < D; Overdue at T ≥ D; missed-obligation alerts meet WAT-3 limits and remain distinguishable from approach indications; existing misses remain visible (WAT-1, WAT-2). |
 
 <a id="section-104-adoption-and-release-acceptance"></a>
 
@@ -771,7 +800,7 @@ of workflow, policy and trust rather than assuming operator resistance.
 | **AC-28** | Begin an empty Draft; interrupt operator until the approved follow-up deadline passes. | Unresolved record has an owner; internal follow-up alerts without fabricating a vessel ETA. |
 | **AC-29** | Fail a save, disconnect, close/reopen the browser, reconnect and retry. | Status never falsely claims shared persistence; recovery meets the approved envelope; no duplicate trip or silent loss/overwrite. |
 | **AC-30** | Two operators amend ETA or identity from the same version; one closes the record while the other is editing. | Stale/conflicting changes require explicit resolution; both evidence histories remain; closure is not silently undone. |
-| **AC-31** | Supply shared phone numbers, a member with several vessels, unmatched evidence and incompatible exact matches. | Outcomes follow IDV-2; ambiguity is explained; conflict takes precedence; raw inputs remain. |
+| **AC-31** | Test one exact identifier, two independently supplied identifiers with one exact/unmatched, two exact but ambiguous, uniquely corroborating exact evidence, and incompatible exact evidence; include shared phones/multi-vessel members. | Respectively Unverified, Partial, Partial, Verified and Conflict; exactly one outcome per current evidence set; candidate detail and raw inputs retained (IDV-2). |
 | **AC-32** | Request transfer, pass ETA before acceptance, retry after disconnect, then accept after an intervening edit. | Source remains responsible until current-state acceptance; alert is delivered without a gap; one ownership change; stale state cannot silently be accepted. |
 | **AC-33** | Miss a position report on a long-term trip with a later return ETA; complete a nested bar crossing. | Missed report remains visible/alerted; crossing completion does not fulfill report or return obligations. |
 | **AC-34** | Change ETA on an escalated trip and acknowledge its alert. | Old miss and actions remain; escalation closes only through explicit authorized disposition. |
@@ -780,6 +809,8 @@ of workflow, policy and trust rather than assuming operator resistance.
 | **AC-37** | Expire a session, attempt cross-unit/private search/export without permission, and submit through self-service. | Capture recovery and shared monitoring persist; access boundaries enforced; submission does not falsely acknowledge watch acceptance. |
 | **AC-38** | Restore a backup and reconcile outage records in isolation. | REC-8 recovery limits met; audit and ownership preserved; pending/missed obligations recovered without duplicate actions. |
 | **AC-39** | Change a vessel/person profile after a completed call. | Historical identifiers, applied details and verification evidence remain as known at the call; current profile changes are distinguishable. |
+| **AC-45** | Leave a saved record pending acceptance with a valid ETA well after its acceptance follow-up deadline. | Owning duty role receives internal follow-up on time without implying vessel-return failure; operator acceptance resolves that follow-up but neither removes the vessel deadline nor unrelated unresolved follow-ups (WAT-9). |
+| **AC-46** | Amend an effective ETA with blank, `25:70`, or ambiguous text; let the original deadline pass. Then explicitly withdraw it without a replacement while escalation is open. | Raw proposal and warning saved; original deadline still monitored/alerted until explicit withdrawal; withdrawal reason/history retained, no-usable-deadline follow-up starts, and escalation remains open (CAP-23, WAT-9, WAT-10). |
 
 <a id="section-106-operational-release-gate"></a>
 
@@ -831,8 +862,10 @@ surrenders last. CAP-2, CAP-13 and CAP-14 address this.
 **A.4 Default values that fail validation.** The observed new-log-on form pre-populates
 departure time and ETA with the same value, then rejects the record on the grounds that
 the ETA must be later than the departure. The form's initial state fails its own
-validation, so every log on begins from an error condition, and the operator must edit both
-times before any save is possible: a fixed cost in attention at the start of every call. The
+validation: the operator must correct the time relationship before that validation can
+pass. The screenshots do not establish that both time fields must be edited; changing the
+ETA alone could resolve the shown time errors if it is later than departure and current
+time. Other displayed validation errors still require resolution. The
 screenshots show this rejection only on the new-log-on path. Whether other paths (amendment,
 import, self-service) accept the paired defaults, and how the overdue engine would then treat
 a zero-duration trip, is not established by the screenshots and requires a runtime check.
@@ -947,8 +980,9 @@ revisions add identifiers; they do not renumber.
    a missed report?
 7. Which approved procedures govern escalation, early escalation, alert acknowledgment,
    closure/reopening and handover? Who may authorize deviations and which version applies?
-8. Who owns pending acceptance and unresolved drafts? What internal follow-up intervals,
-   recipients and overdue/unacknowledged-alert behavior should apply at each operating period?
+8. Which duty role at the owning unit receives pending-acceptance, missing-deadline and
+   unresolved-amendment follow-ups? What intervals, recipients and unacknowledged-alert
+   behavior apply, including when an ETA is present but no operator has accepted?
 9. What detection/delivery latency, approaching window, clock-error bounds, monitoring-health notification,
    recovery-time and data-loss limits can the intended deployment demonstrate?
 10. How do source and receiving units accept transfers, including after hours, refusal,
@@ -967,6 +1001,26 @@ revisions add identifiers; they do not renumber.
 <a id="section-appendix-e-revision-history"></a>
 
 ## Appendix E — Revision history
+
+<a id="section-version-07-changes-from-06"></a>
+
+### Version 0.7 — changes from 0.6
+
+- Accepted the v0.6 direction: ownership clarity, approaching-state configuration, stable
+  IDs and AC-40–44 coverage are retained. This is acceptance of specification changes,
+  not approval of operational readiness; Appendix D decisions remain open.
+- Made IDV-2 outcomes mutually exclusive with an explicit decision order and strengthened
+  AC-31. A lone exact identifier stays Unverified while its useful candidate remains visible.
+- Aligned AC-41 with free-order capture; volunteered description may arrive before identity.
+  DAT-3 now permits necessary clarification of stale/conflicting stored descriptions.
+  AC-44 preserves the permitted pagination rule. CAP-10 no longer calls its gap list a procedure.
+- Extended WAT-9 to pending acceptance even with a usable ETA, and unresolved amendments.
+  Internal follow-up misses are distinguishable from missed vessel obligations (AC-45).
+- Kept an effective deadline monitored while an unresolved replacement is saved; explicit
+  withdrawal retains history and starts follow-up without closing escalation (AC-46).
+- Defined approaching/overdue boundary instants and added AC-47 for all vessel obligation
+  kinds. Corrected A.4: the screenshots do not prove both time fields must be edited.
+- Updated the index and regenerated the linked PDF with the existing four evidence figures.
 
 <a id="section-version-06-changes-from-05"></a>
 

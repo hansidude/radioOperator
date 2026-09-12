@@ -1,11 +1,11 @@
-# Vessel Log On — Functional Specification, v0.6
+# Vessel Log On — Functional Specification, v0.7
 
 ## Table of contents
 
 - [Files](#files)
 - [Figures](#figures)
 - [Reading order](#reading-order)
-- [Revision 0.6](#revision-06)
+- [Revision 0.7](#revision-07)
 - [Updating the documents](#updating-the-documents)
 
 ## Files
@@ -37,16 +37,15 @@ practice**.
 4. §10 — acceptance criteria.
 5. Appendix A with the figures alongside, for why the requirements are as they are.
 
-## Revision 0.6
+## Revision 0.7
 
-Review pass on 0.5. Clarifies that unit ownership begins at creation and that pending
-acceptance means no operator has yet taken the record. Defines the open watch queue and
-the approaching condition, with the approaching window an approved configuration value.
-Corrects the self-contradicting A.4 observation. Adds AC-40 to AC-44 for requirements that
-had no acceptance criterion (gap prompting, unclassified callers, unknown/unavailable
-values, partial search with apply/resume, multi-candidate comparison) and strengthens
-AC-24. Appendix E is now a revision history covering 0.5 and 0.6; Appendix D lists the
-operational decisions still open.
+Accepts the v0.6 direction and retains its added acceptance coverage. This review makes
+verification outcomes mutually exclusive, preserves free-order capture, and keeps an
+existing deadline monitored while an invalid replacement is retained for clarification.
+Pending acceptance now requires follow-up even with a usable ETA. AC-45–47 cover those
+cases and the exact approaching/overdue boundaries. A.4 no longer claims the screenshots
+prove that both time fields must be edited. Appendix E records the review decisions;
+Appendix D still holds the operational questions. This remains a specification draft.
 
 ## Updating the documents
 
