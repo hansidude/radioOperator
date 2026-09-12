@@ -17,8 +17,8 @@
 {% block body %}
 {{ ui.styles() }}
 {% macro field(name, cols='col') %}
-{% set raw = logon[column(name)] %}
-{% set basis = logon[time_fields[name][3]] if name in time_fields else '' %}
+{% set raw = box(logon, name) %}
+{% set basis = logon[time_fields[name][4]] if name in time_fields else '' %}
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
   {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
@@ -49,7 +49,7 @@
       <div class="row g-2 mt-0">
         {{ field('departurePoint', 'col-12 col-md-4') }}{{ field('destination', 'col-12 col-md-4') }}
         <div class="col-12 col-md-4"><label>ETA/ETR</label><div class="row g-1">
-          <div class="col-6 paper-col"><input id="f-etaDay" class="form-control" data-field="etaDay" value="{{ logon.etaDayRaw or '' }}" placeholder="Return Day or Date" aria-label="Return Day or Date" {% if not open %}disabled{% endif %}><div class="ro-basis" id="b-etaDay"></div><div class="ro-warn" id="w-etaDay"></div></div>
+          <div class="col-6 paper-col"><input id="f-etaDay" class="form-control" data-field="etaDay" value="{{ box(logon, 'etaDay') }}" placeholder="today · tomorrow · Mon · 14/9" aria-label="Return Day or Date" {% if not open %}disabled{% endif %}><div class="ro-basis" id="b-etaDay"></div><div class="ro-warn" id="w-etaDay"></div></div>
           <div class="col-6 paper-col"><input id="f-eta" class="form-control" data-field="eta" value="{{ logon.etaRaw or '' }}" placeholder="Time" aria-label="Time" {% if not open %}disabled{% endif %}><div class="ro-warn" id="w-eta"></div></div>
           <div class="col-12"><div class="ro-basis" id="b-eta">{{ logon.etaBasis or '' }}</div></div>
         </div></div>
@@ -114,6 +114,7 @@
         version = x.d.version;
         var shown = pair[field] || field;
         var b = document.getElementById('b-' + shown), w = document.getElementById('w-' + field);
+        if (x.d.display != null) el.value = x.d.display;     // a day cell settles to the date it meant
         if (b) b.textContent = x.d.basis || '';
         if (w) w.textContent = x.d.warning || '';
         renderGaps(x.d.gaps);

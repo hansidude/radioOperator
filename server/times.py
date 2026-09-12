@@ -1,9 +1,11 @@
 """
 Times the way operators say and write them, read against a stated reference instant.
 
-`parse` never guesses (CAP-8, CAP-23, REC-6): what it cannot read stays raw with the reason;
-a time that has already passed today stays today, marked, rather than sliding to tomorrow;
-an hour that could be morning or afternoon is read as 24-hour and says so.
+`parse` never guesses (CAP-4, CAP-8, CAP-23, REC-6). What it cannot read stays raw with the
+reason. **A day is never assumed**: a time with no day is a time, not an instant, and says so —
+blank does not silently mean today. An hour that could be morning or afternoon is read as
+24-hour and says so. A resolved day is a date from that moment on, so "tomorrow" written on
+Saturday stays Sunday when the row is read on Monday.
 
 Forms read: `1500` `15:00` `3pm` `3:30pm` `0730 tomorrow` `12/9 1500` `2026-09-12 15:00`
 and, relative to the reference, `+2h` `+90m` `+2h30` `+1:30`.
@@ -33,25 +35,48 @@ def _no(raw, why):
 _WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
 
 
+def fmt_day(day, this_year=None):
+    """A resolved day as the day box and the queue show it: 'Sun 13/9', with the year when it differs.
+    This is what replaces the word the operator typed, so nothing relative is ever stored or re-read."""
+    if day is None:
+        return ''
+    out = '%s %d/%d' % (day.strftime('%a'), day.day, day.month)
+    return out if this_year is None or day.year == this_year else out + '/%02d' % (day.year % 100)
+
+
 def parse_day(raw, reference):
-    """The paper log's 'Return Day or Date' cell on its own: {'day': date or None, 'basis', 'warning'}.
-    Reads today, tomorrow, a weekday name (the next one, today included), 13/9, 13/9/26, 2026-09-13."""
+    """The paper log's 'Return Day or Date' cell on its own:
+    {'day': date or None, 'label': how it was given, 'basis', 'warning'}.
+
+    Reads today, tomorrow, a weekday name (the next one, today included), a date (13/9, 13/9/26,
+    2026-09-13), and a weekday written in front of a date ('Sun 13/9') — that last form is what the
+    box shows once a day is resolved, so whatever is displayed can always be typed back in."""
     text = (raw or '').strip()
     if not text:
         return {'day': None, 'label': '', 'basis': '', 'warning': None}
-    s = re.sub(r'\s+', ' ', text.lower())
+
+    def no(why):
+        return {'day': None, 'label': '', 'basis': 'Not understood: %s. Kept as typed: "%s".' % (why, text),
+                'warning': 'Not understood: ' + why}
+
+    s = re.sub(r'\s+', ' ', text.lower()).strip('.,')
     day, basis = None, ''
     if s in ('today', 'tdy'):
         day, basis = reference.date(), 'today'
     elif s in ('tomorrow', 'tmrw', 'tmw', 'tmr'):
         day, basis = reference.date() + timedelta(days=1), 'tomorrow'
-    elif s[:3] in _WEEKDAYS and s.isalpha():
-        ahead = (_WEEKDAYS.index(s[:3]) - reference.weekday()) % 7
-        day, basis = reference.date() + timedelta(days=ahead), ('today' if ahead == 0 else 'next %s' % s[:3].capitalize())
     else:
+        # A weekday word on its own is the day; in front of a date it only labels it ('Sun 13/9').
+        m = re.match(r'^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\s*(.*)$', s)
+        if m and not m.group(2).strip():
+            ahead = (_WEEKDAYS.index(m.group(1)) - reference.weekday()) % 7
+            day, basis = reference.date() + timedelta(days=ahead), ('today' if ahead == 0 else 'next %s' % m.group(1).capitalize())
+        elif m:
+            s = m.group(2).strip()
+    if day is None:
         m = _DATE_ISO.fullmatch(s) or _DATE_DMY.fullmatch(s)
         if not m:
-            return {'day': None, 'basis': 'Not understood: not a day or date. Kept as typed: "%s".' % text, 'warning': 'Not understood: not a day or date'}
+            return no('not a day or date')
         try:
             if m.re is _DATE_ISO:
                 day = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -60,10 +85,12 @@ def parse_day(raw, reference):
                 year = reference.year if year is None else (int(year) + 2000 if len(year) == 2 else int(year))
                 day = date(year, int(m.group(2)), int(m.group(1)))
         except ValueError:
-            return {'day': None, 'basis': 'Not understood: not a calendar date. Kept as typed: "%s".' % text, 'warning': 'Not understood: not a calendar date'}
+            return no('not a calendar date')
         basis = 'date given'
     warning = 'Before today. Check the date.' if day < reference.date() else None
-    return {'day': day, 'label': basis, 'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' — ' + warning if warning else ''), 'warning': warning}
+    return {'day': day, 'label': basis,
+            'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' \u2014 ' + warning if warning else ''),
+            'warning': warning}
 
 
 def parse(raw, reference, reference_label='entry time', day=None, day_label=None):
@@ -152,16 +179,16 @@ def parse(raw, reference, reference_label='entry time', day=None, day_label=None
     if hour > 23 or minute > 59:
         return _no(text, 'hour %d, minute %02d is not a time of day' % (hour, minute))
 
-    explicit_day = day is not None
-    if not explicit_day:
-        day, day_label = reference.date(), 'today assumed'
+    # CAP-4: no day, no instant. Blank never means today.
+    if day is None:
+        return {'when': None,
+                'basis': 'Read as %02d:%02d, but no day yet. Fill the day cell. Kept as typed: "%s".' % (hour, minute, text),
+                'warning': 'No day: fill the day cell before this is a deadline.'}
     when = datetime.combine(day, datetime.min.time()).replace(hour=hour, minute=minute)
     basis = '%s (%s)' % (when.strftime(FMT), day_label)
     warning = None
-    if ambiguous and not explicit_day and when < reference:
-        warning = 'Read as 24-hour %02d:%02d, which is before the %s (%s) and so already due. Say %d:%02dpm if you mean the afternoon.' % (hour, minute, reference_label, reference.strftime('%H:%M'), hour, minute)
-    elif not explicit_day and when < reference:
-        warning = 'Before the %s (%s); today assumed, so it is already due. Add a date or "tomorrow" if you mean later.' % (reference_label, reference.strftime('%H:%M'))
+    if when < reference:
+        warning = 'Already past the %s (%s).' % (reference_label, reference.strftime('%a %d %b %H:%M'))
     elif ambiguous:
         warning = 'Read as 24-hour %02d:%02d. Say %d:%02dpm if you mean the afternoon.' % (hour, minute, hour, minute)
     if warning:

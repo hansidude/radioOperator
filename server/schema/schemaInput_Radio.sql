@@ -4,9 +4,10 @@
 
 -- One row per trip (§3.1 LogOn). Every fact is a column; an unsupplied fact stays NULL (CAP-2, CAP-4).
 -- `unit` is the watch owner: an opaque tag from the host ('' when there is one unit).
--- Columns follow the paper radio log (spec A.1, DAT-6): its day and time are separate cells, so the
--- call and the ETA/ETR each keep a raw day, a raw time, the interpreted instant and the basis of
--- that interpretation (REC-6). Numbers that could arrive as words (POB, length) are kept as
+-- Columns follow the paper radio log (spec A.1, DAT-6): its day and time are separate cells. Each
+-- time therefore keeps four things (REC-6): the day as written, the day resolved to a real date, the
+-- time as spoken, and the instant the two make together, plus the basis of that reading. A day is
+-- never assumed: no day cell, no instant, and the trip is not time-monitorable (DAT-1, WAT-9). Numbers that could arrive as words (POB, length) are kept as
 -- heard rather than refused (CAP-23).
 CREATE TABLE IF NOT EXISTS `LogOns` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -14,17 +15,21 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `captureStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',       -- draft | complete (§3.3; never gates monitoring)
   `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'pending',       -- pending | watching | loggedoff | cancelled
   `channel` VARCHAR(16) DEFAULT NULL,                         -- radio | phone | person | self (OC-1)
-  `callDayRaw` VARCHAR(64) DEFAULT NULL,                      -- paper column 1 'Date', as written
+  `callDayRaw` VARCHAR(64) DEFAULT NULL,                      -- paper column 1 'Date', as written ('today', '12/9')
+  `callDate` DATE DEFAULT NULL,                               -- that day resolved when it was written; never re-derived later
   `callTimeRaw` VARCHAR(64) DEFAULT NULL,                     -- paper column 2 'Time'
   `callTime` DATETIME DEFAULT NULL,                           -- when the call came in, as reported; createdAt is the entry time (REC-2)
   `callTimeBasis` VARCHAR(255) DEFAULT NULL,
   `etaDayRaw` VARCHAR(64) DEFAULT NULL,                       -- 'ETA/ETR Return Day or Date', as spoken: tomorrow, Sat, 13/9
+  `etaDate` DATE DEFAULT NULL,                                -- resolved at the moment it was written: 'tomorrow' is a date, not a word
   `etaRaw` VARCHAR(64) DEFAULT NULL,                          -- 'ETA/ETR Time', as spoken: 1500, 3pm, +2h (CAP-8)
   `eta` DATETIME DEFAULT NULL,                                -- the interpreted return deadline; NULL = not time-monitorable (DAT-1)
   `etaBasis` VARCHAR(255) DEFAULT NULL,
   `pob` VARCHAR(32) DEFAULT NULL,                             -- persons on board, as heard
   `destination` VARCHAR(255) DEFAULT NULL,
   `departurePoint` VARCHAR(255) DEFAULT NULL,
+  `departureDayRaw` VARCHAR(64) DEFAULT NULL,                 -- not on the paper log; a departure time needs a day like any other
+  `departureDate` DATE DEFAULT NULL,
   `departureRaw` VARCHAR(64) DEFAULT NULL,
   `departureTime` DATETIME DEFAULT NULL,
   `departureBasis` VARCHAR(255) DEFAULT NULL,

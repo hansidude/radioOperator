@@ -104,7 +104,7 @@ def logon_page(logon_id):
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, identifiers=idents, gaps=L.gaps(row), condition=cond, minutes=minutes,
                  extra=L.EXTRA, mandatory=L.MANDATORY, labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS,
-                 column=L.column, pair={'etaDay': 'eta', 'callDay': 'callTime'}, channels=L.CHANNELS, window=h.approaching_minutes)
+                 column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, window=h.approaching_minutes)
 
 
 def _action(logon_id, do):

@@ -50,7 +50,7 @@
   <tbody>
   {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
     <td>{{ cond(r) }}</td>
-    <td>{{ cell(r.callDayRaw) }}</td>
+    <td>{{ cell(r.callDayBox) }}</td>
     <td>{{ cell(r.callTimeRaw) }}</td>
     <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.memberNumber or r.vesselName or ('T-' ~ r.id) }}</a>{% if r.memberNumber and r.vesselName %} <span class="text-secondary">{{ r.vesselName }}</span>{% endif %}</td>
     <td>{{ cell(r.registration) }}</td>
@@ -59,7 +59,7 @@
     <td>{{ cell(r.pob) }}</td>
     <td class="wrap">{{ cell(r.departurePoint) }}</td>
     <td class="wrap">{{ cell(r.destination) }}</td>
-    <td>{{ cell(r.etaDayRaw) }}</td>
+    <td>{% if r.etaDayBox %}<span title="{{ r.etaDayRaw }}">{{ r.etaDayBox }}</span>{% endif %}</td>
     <td>{% if r.eta %}<span title="{{ r.etaBasis }}">{{ when(r.eta, now) }}</span>{% elif r.etaRaw %}<span class="text-danger" title="{{ r.etaBasis }}">{{ r.etaRaw }}</span>{% endif %}</td>
     <td class="text-secondary">T-{{ r.id }}</td>
     <td>{{ 'Complete' if r.captureStatus == 'complete' else 'Draft' }}{% if r.gaps %} <span class="badge text-bg-secondary" title="Fields still to ask">{{ r.gaps }}</span>{% endif %}</td>

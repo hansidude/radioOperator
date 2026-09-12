@@ -1,6 +1,7 @@
 """Real Flask routes and SQL on an isolated database with a test host; never uses a host's data."""
 import sys
 import tempfile
+from datetime import date
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -76,11 +77,16 @@ class Pages(unittest.TestCase):
         r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '3pm', 'version': 0})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.json['version'], 1)
+        self.assertIsNone(r.json['when'])                          # a time with no day is not a deadline
+        self.assertIn('No day', r.json['warning'])
+        r = self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today', 'version': 1})
+        self.assertEqual(r.status_code, 200, r.data)
         self.assertTrue(r.json['when'].endswith('T15:00:00'))
+        self.assertEqual(r.json['display'][:3], date.today().strftime('%a'))   # the box now shows the date
         self.assertNotIn('eta', [g['field'] for g in r.json['gaps']])
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '4pm', 'version': 0}).status_code, 409)
-        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'nope', 'value': '1', 'version': 1}).status_code, 400)
-        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 1}).status_code, 200)
+        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'nope', 'value': '1', 'version': 2}).status_code, 400)
+        self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 2}).status_code, 200)
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Sea Dog', listing)
         self.assertIn('15:00', listing)
@@ -95,9 +101,10 @@ class Pages(unittest.TestCase):
 
     def test_overdue_shows_on_the_queue_without_operator_action(self):    # AC-21, AC-27
         i = self.new()
-        r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})    # today, long past: overdue at once (§3.3)
+        self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today'})
+        r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '0001'})    # long past: overdue at once (§3.3)
         self.assertEqual(r.status_code, 200)
-        self.assertIn('already due', r.json['warning'])
+        self.assertIn('Already past', r.json['warning'])
         self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))
         self.assertEqual(self.a.get('/api/logons/queue').json['logons'][0]['condition'], 'overdue')
 

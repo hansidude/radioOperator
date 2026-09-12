@@ -2,7 +2,7 @@
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import logons as L
@@ -20,6 +20,11 @@ class LogOns(unittest.TestCase):
         self.conn = Connection(path)
         self.cur = self.conn.cursor()
 
+    def eta(self, i, day, time, who='alice', at=T0):
+        """A deadline needs both cells, so the tests set both, as an operator must."""
+        L.set_field(self.cur, i, 'etaDay', day, who, at)
+        return L.set_field(self.cur, i, 'eta', time, who, at)
+
     def test_empty_record_persists_owned_and_queued(self):            # AC-1, CAP-1, CAP-2
         i = L.create(self.cur, 'alice', 'unitA', T0)
         row = L.get(self.cur, i)
@@ -32,15 +37,28 @@ class LogOns(unittest.TestCase):
 
     def test_any_order_any_subset_and_gaps_ranked(self):                # AC-2, AC-40, CAP-3, CAP-10, CAP-11
         i = L.create(self.cur, 'alice', '', T0)
-        self.assertEqual([g['field'] for g in L.gaps(L.get(self.cur, i))][:5], ['eta', 'pob', 'destination', 'departurePoint', 'memberNumber'])
+        self.assertEqual([g['field'] for g in L.gaps(L.get(self.cur, i))][:5], ['etaDay', 'eta', 'pob', 'destination', 'departurePoint'])
         L.set_field(self.cur, i, 'vesselDetails', '6 m white Quintrex', 'alice', T0)
         L.set_field(self.cur, i, 'pob', '3', 'alice', T0)
         out = L.set_field(self.cur, i, 'destination', 'Tangalooma', 'alice', T0)
         self.assertEqual(out['version'], 3)
         gaps = [g['field'] for g in out['gaps']]
         self.assertNotIn('pob', gaps); self.assertNotIn('vesselDetails', gaps)
-        self.assertEqual(gaps[0], 'eta')
+        self.assertEqual(gaps[:2], ['etaDay', 'eta'])
         self.assertEqual([g['cls'] for g in out['gaps']], sorted(g['cls'] for g in out['gaps']))
+
+    def test_a_time_with_no_day_is_not_a_deadline(self):                # CAP-4, DAT-1, WAT-9
+        i = L.create(self.cur, 'alice', '', T0)
+        out = L.set_field(self.cur, i, 'eta', '1500', 'alice', T0)
+        self.assertIsNone(out['when']); self.assertIn('No day', out['warning'])
+        row = L.get(self.cur, i)
+        self.assertEqual(row['etaRaw'], '1500')                         # kept as heard
+        self.assertIsNone(row['eta']); self.assertIsNone(row['etaDate'])
+        self.assertEqual(L.condition(row, T0, 30)[0], 'nodeadline')     # owned and visible, not counted down
+        self.assertIn('etaDay', [g['field'] for g in L.gaps(row)])      # and the day is still being asked for
+        out = L.set_field(self.cur, i, 'etaDay', 'today', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 12, 15, 0))     # the day cell makes it a deadline
+        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'approaching')
 
     def test_times_keep_raw_and_basis_and_drive_the_condition(self):    # AC-8, AC-21, AC-27, CAP-8, CAP-23
         i = L.create(self.cur, 'alice', '', T0)
@@ -63,9 +81,7 @@ class LogOns(unittest.TestCase):
 
     def test_return_day_and_time_are_separate_cells_read_together(self):     # DAT-6, REC-6, AC-48
         i = L.create(self.cur, 'alice', '', T0)
-        out = L.set_field(self.cur, i, 'eta', '0600', 'alice', T0)
-        self.assertEqual(out['when'], datetime(2026, 9, 12, 6, 0)); self.assertIn('already due', out['warning'])
-        out = L.set_field(self.cur, i, 'etaDay', 'tomorrow', 'alice', T0)
+        out = self.eta(i, 'tomorrow', '0600')
         self.assertEqual(out['when'], datetime(2026, 9, 13, 6, 0)); self.assertIsNone(out['warning'])
         row = L.get(self.cur, i)
         self.assertEqual((row['etaDayRaw'], row['etaRaw'], row['eta']), ('tomorrow', '0600', datetime(2026, 9, 13, 6, 0)))
@@ -79,8 +95,28 @@ class LogOns(unittest.TestCase):
         L.set_field(self.cur, i, 'callDay', '11/9', 'alice', T0); out = L.set_field(self.cur, i, 'callTime', '2300', 'alice', T0)
         self.assertEqual(out['when'], datetime(2026, 9, 11, 23, 0))
 
+    def test_a_resolved_day_is_a_date_from_then_on(self):                # the point of storing the date
+        i = L.create(self.cur, 'alice', '', T0)
+        out = self.eta(i, 'tomorrow', '0600')
+        self.assertEqual(out['when'], datetime(2026, 9, 13, 6, 0))
+        row = L.get(self.cur, i)
+        self.assertEqual(row['etaDate'], date(2026, 9, 13))
+        self.assertEqual(L.box(row, 'etaDay'), 'Sun 13/9')               # the box shows the date, not the word
+        self.assertEqual(row['etaDayRaw'], 'tomorrow')                   # the word is still what was heard
+        # the next day, an unrelated edit must not re-read "tomorrow" as the day after
+        out = L.set_field(self.cur, i, 'pob', '4', 'alice', T0 + timedelta(days=1))
+        self.assertEqual(L.get(self.cur, i)['eta'], datetime(2026, 9, 13, 6, 0))
+        out = L.set_field(self.cur, i, 'eta', '0700', 'alice', T0 + timedelta(days=1))
+        self.assertEqual(out['when'], datetime(2026, 9, 13, 7, 0))
+        # a date typed into the time cell fills the day cell
+        j = L.create(self.cur, 'alice', '', T0)
+        out = L.set_field(self.cur, j, 'eta', '14/9 0800', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 14, 8, 0))
+        self.assertEqual(L.box(L.get(self.cur, j), 'etaDay'), 'Mon 14/9')
+
     def test_call_time_is_the_reference_once_known(self):               # REC-6
         i = L.create(self.cur, 'alice', '', T0)
+        L.set_field(self.cur, i, 'callDay', 'today', 'alice', T0)
         L.set_field(self.cur, i, 'callTime', '1400', 'alice', T0)
         out = L.set_field(self.cur, i, 'eta', '+1h', 'alice', T0)
         self.assertEqual(out['when'], datetime(2026, 9, 12, 15, 0))
@@ -88,8 +124,9 @@ class LogOns(unittest.TestCase):
 
     def test_eta_before_departure_warns_and_saves(self):                # AC-4, CAP-5
         i = L.create(self.cur, 'alice', '', T0)
+        L.set_field(self.cur, i, 'departureDay', 'today', 'alice', T0)
         L.set_field(self.cur, i, 'departureTime', '1600', 'alice', T0)
-        out = L.set_field(self.cur, i, 'eta', '1500', 'alice', T0)
+        out = self.eta(i, 'today', '1500')
         self.assertEqual(out['when'], datetime(2026, 9, 12, 15, 0))
         self.assertIn('before the departure', out['warning'])
 
@@ -105,10 +142,10 @@ class LogOns(unittest.TestCase):
         self.assertEqual([r['normalized'] for r in L.identifiers(self.cur, i) if r['kind'] == 'mobile'], ['0412345678'])
 
     def test_queue_order_never_hides_overdue_or_unresolved(self):       # WAT-1
-        a = L.create(self.cur, 'alice', '', T0); L.set_field(self.cur, a, 'eta', '1800', 'alice', T0)
-        b = L.create(self.cur, 'alice', '', T0); L.set_field(self.cur, b, 'eta', '1400', 'alice', T0)
+        a = L.create(self.cur, 'alice', '', T0); self.eta(a, 'today', '1800')
+        b = L.create(self.cur, 'alice', '', T0); self.eta(b, 'today', '1400')
         c = L.create(self.cur, 'alice', '', T0)
-        d = L.create(self.cur, 'alice', '', T0); L.set_field(self.cur, d, 'eta', '1450', 'alice', T0)
+        d = L.create(self.cur, 'alice', '', T0); self.eta(d, 'today', '1450')
         self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [b, d, c, a])
 
     def test_stale_version_and_closed_records_refuse(self):             # CAP-22, WAT-7

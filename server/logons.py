@@ -8,9 +8,15 @@ job a host wants to run. Every write that cannot be honoured refuses loudly (`Re
 
 The field set and its order are the unit's paper radio log (spec A.1, DAT-6): `PAPER` is the
 row as printed, `EXTRA` is what the system adds after it.
+
+A day is never assumed (CAP-4). Each time is a day cell plus a time cell; without a day there is
+no instant, and the trip is simply not time-monitorable (DAT-1) with an accountable follow-up
+(WAT-9). A day cell resolves the moment it is written and the date is stored, so a word like
+"tomorrow" cannot mean something else when the row is read the next day; the word itself is kept
+beside the date as what was heard (REC-6).
 """
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from . import times
 
@@ -35,7 +41,7 @@ PAPER = (
 MANDATORY = ('memberNumber', 'vesselName', 'registration', 'mobile')   # the paper's shaded columns: obtain before the call ends
 # Not on the paper log; shown after it, visibly additional (DAT-6).
 EXTRA = (
-    ('Call', ('channel', 'departureTime')),
+    ('Call and departure', ('channel', 'departureDay', 'departureTime')),
     ('Reach the vessel', ('radioChannel', 'contactName', 'contactNumber', 'ais')),
     ('Describe the vessel', ('length', 'hullColour', 'vesselType', 'make', 'model')),
     ('Notes', ('notes',)),
@@ -45,23 +51,24 @@ LABELS = {
     'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Vessel Details',
     'pob': 'POB', 'departurePoint': 'Departure Point', 'destination': 'Going to',
     'etaDay': 'Return Day or Date', 'eta': 'Time',
-    'channel': 'Channel', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
+    'channel': 'Channel', 'departureDay': 'Departure day', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
     'contactName': 'Contact (aboard / ashore)', 'contactNumber': 'Contact number', 'ais': 'AIS / MMSI',
     'length': 'Length (m)', 'hullColour': 'Hull colour', 'vesselType': 'Type', 'make': 'Make', 'model': 'Model', 'notes': 'Notes',
 }
 # §6.1 field priority classes, in the order the gap list prompts them (CAP-11). On the paper log
 # class D is the one 'Vessel Details' cell; the structured description fields are extras.
 CLASSES = (
-    ('A', 'Locate the vessel', ('eta', 'pob', 'destination', 'departurePoint')),
+    ('A', 'Locate the vessel', ('etaDay', 'eta', 'pob', 'destination', 'departurePoint')),
     ('B', 'Identify and verify', ('memberNumber', 'registration', 'mobile', 'vesselName')),
     ('C', 'Reach the vessel', ('radioChannel', 'contactName', 'contactNumber', 'ais')),
     ('D', 'Describe the vessel', ('vesselDetails',)),
 )
-# A time is read from a day cell and a time cell (either may be blank) into one instant (REC-6).
-TIME_FIELDS = {'eta': ('etaDayRaw', 'etaRaw', 'eta', 'etaBasis'),
-               'callTime': ('callDayRaw', 'callTimeRaw', 'callTime', 'callTimeBasis'),
-               'departureTime': (None, 'departureRaw', 'departureTime', 'departureBasis')}
-DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime'}
+# Each time: (day as written, day resolved, time as spoken, the instant they make, how it was read).
+TIME_FIELDS = {'eta': ('etaDayRaw', 'etaDate', 'etaRaw', 'eta', 'etaBasis'),
+               'callTime': ('callDayRaw', 'callDate', 'callTimeRaw', 'callTime', 'callTimeBasis'),
+               'departureTime': ('departureDayRaw', 'departureDate', 'departureRaw', 'departureTime', 'departureBasis')}
+DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime', 'departureDay': 'departureTime'}
+DATES = ('etaDate', 'callDate', 'departureDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
@@ -85,11 +92,20 @@ def _dt(v):
     return datetime.strptime(str(v)[:19], DT)
 
 
+def _d(v):
+    if v is None or isinstance(v, date) and not isinstance(v, datetime):
+        return v
+    return datetime.strptime(str(v)[:10], '%Y-%m-%d').date()
+
+
 def _row(r):
     if r:
         for k in DATETIMES:
             if k in r:
                 r[k] = _dt(r[k])
+        for k in DATES:
+            if k in r:
+                r[k] = _d(r[k])
     return r
 
 
@@ -97,13 +113,27 @@ def _s(dt):
     return dt.strftime(DT) if dt else None
 
 
+def _sd(day):
+    return day.isoformat() if day else None
+
+
 def column(field):
-    """The column a field's raw value lives in (a time field's raw cell, a day field's raw day cell)."""
+    """The column a field's value as heard lives in: a day cell's words, a time cell's words, else itself."""
     if field in DAY_FIELDS:
         return TIME_FIELDS[DAY_FIELDS[field]][0]
     if field in TIME_FIELDS:
-        return TIME_FIELDS[field][1]
+        return TIME_FIELDS[field][2]
     return field
+
+
+def box(row, field):
+    """What the input shows. A day cell shows its resolved date once it has one ('Sun 13/9'), so the
+    relative word the operator typed is never what anyone reads back; unresolved, it shows the words."""
+    if field in DAY_FIELDS:
+        day = row.get(TIME_FIELDS[DAY_FIELDS[field]][1])
+        if day:
+            return times.fmt_day(day, (row.get('createdAt') or datetime.now()).year)
+    return row.get(column(field)) or ''
 
 
 def normalize(kind, raw):
@@ -159,6 +189,7 @@ def queue(cur, unit, now, approaching_minutes):
         r['condition'], r['minutes'] = condition(r, now, approaching_minutes)
         r['gaps'] = len(gaps(r))
         r['ageMinutes'] = int((now - r['createdAt']).total_seconds() // 60)
+        r['callDayBox'], r['etaDayBox'] = box(r, 'callDay'), box(r, 'etaDay')
     rows.sort(key=lambda r: (RANK[r['condition']], r['eta'] or r['createdAt']))
     return rows
 
@@ -203,16 +234,29 @@ def _reference(row, field):
     return row['createdAt'], 'entry time'
 
 
-def interpret(row, field):
-    """Read a time field's day cell and time cell together: {'when', 'basis', 'warning'}."""
-    day_col, raw_col, _, _ = TIME_FIELDS[field]
+def interpret(row, field, resolve_day=False):
+    """Read a time field's day cell and time cell together: {'when', 'day', 'basis', 'warning'}.
+
+    The day is resolved only when the day cell itself is being written (`resolve_day`); after that
+    the stored date is used. Re-reading the words would let "tomorrow" drift a day every day."""
+    day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[field]
     ref, label = _reference(row, field)
-    day = times.parse_day(row.get(day_col), ref) if day_col else {'day': None, 'label': '', 'basis': '', 'warning': None}
+    written = (row.get(day_raw_col) or '').strip()
+    stored = row.get(day_date_col)
+    if resolve_day or (written and not stored):
+        day = times.parse_day(written, ref)
+    elif stored:
+        day = {'day': stored, 'label': 'as entered', 'basis': times.fmt_day(stored, ref.year) + ' (as entered)', 'warning': None}
+    else:
+        day = {'day': None, 'label': '', 'basis': '', 'warning': None}
     if not (row.get(raw_col) or '').strip():
         if day['day'] or day['warning']:
-            return {'when': None, 'basis': day['basis'] + ' — no time yet', 'warning': day['warning'] or 'A day without a time is not a deadline.'}
-        return {'when': None, 'basis': '', 'warning': None}
+            return dict(day, when=None, basis=day['basis'] + ' — no time yet',
+                        warning=day['warning'] or 'A day without a time is not a deadline.')
+        return {'when': None, 'day': None, 'basis': '', 'warning': None}
     got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['label'])
+    # a date written inside the time cell ('13/9 0630') fills the day cell too
+    got['day'] = day['day'] or (got['when'].date() if got['when'] else None)
     if day['warning'] and not got['warning']:
         got['warning'] = day['warning']
         got['basis'] += ' — ' + day['warning']
@@ -240,13 +284,16 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
     out = {'field': field, 'value': value or None, 'when': None, 'basis': None, 'warning': None}
     if field in TIME_FIELDS or field in DAY_FIELDS:
         tf = DAY_FIELDS.get(field, field)
-        day_col, raw_col, when_col, basis_col = TIME_FIELDS[tf]
+        day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[tf]
         if len(value) > 64:
             raise Refused('%s: more than 64 characters' % LABELS[field])
         after = dict(row, **{column(field): value or None})
-        got = interpret(after, tf)
-        sets = {column(field): value or None, when_col: _s(got['when']), basis_col: got['basis'] or None}
+        got = interpret(after, tf, resolve_day=field in DAY_FIELDS)
+        sets = {column(field): value or None, day_date_col: _sd(got['day']),
+                when_col: _s(got['when']), basis_col: got['basis'] or None}
         out.update(when=got['when'], basis=got['basis'], warning=got['warning'])
+        if field in DAY_FIELDS:      # the box stops showing the word and shows the date it meant
+            out['display'] = times.fmt_day(got['day'], row['createdAt'].year) if got['day'] else value
         # CAP-5: an ETA before the departure is information, shown beside the field, never a refusal.
         after[when_col] = got['when']
         if after['eta'] and after['departureTime'] and after['eta'] < after['departureTime'] and not out['warning']:
