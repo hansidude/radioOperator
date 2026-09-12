@@ -28,7 +28,7 @@ server/
   schema/schemaInput_Radio.sql
   templates/radio/ logons.html · logon.html · _queue.html · _ui.html · _base.html
 standalone/        the app on its own (SQLite by default, MariaDB with RADIO_DB=mysql://...)
-tests/             unittest over real routes and SQL on an isolated SQLite file
+tests/             unittest over real routes and SQL, plus browser_check.py against a running site
 ```
 
 ## Run it on its own
@@ -37,7 +37,11 @@ tests/             unittest over real routes and SQL on an isolated SQLite file
 python3 standalone/app.py                                    # http://localhost:8091
 docker compose -f standalone/docker-compose.yml up --build   # MariaDB + the app on quackit's Python/Flask versions
 python3 -m unittest discover -s tests
+RADIO_URL=http://localhost:8091 python3 tests/browser_check.py    # needs a running site + playwright
 ```
+
+The browser check is not optional cleverness: form nesting and autosave races are invisible to a
+test client that posts straight to an endpoint, and two defects reached the running site that way.
 
 ## Inside quackit (after `myUpdate`)
 
