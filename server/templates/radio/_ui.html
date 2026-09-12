@@ -33,10 +33,10 @@
 .ro-card-field .k{color:var(--bs-secondary-color);font-size:.68rem;text-transform:uppercase}
 .ro-card-field .v{font-size:.82rem;overflow-wrap:anywhere}
 .ro-empty{color:var(--bs-secondary-color);padding:.35rem 0}
-.ro-status-counts{display:grid;grid-template-columns:repeat(4,minmax(9rem,1fr));gap:.45rem;margin:.65rem 0 .8rem}
+.ro-status-counts{display:grid;grid-template-columns:repeat(3,minmax(9rem,1fr));gap:.45rem;margin:.65rem 0 .8rem}
 .ro-status-count{display:flex;align-items:center;gap:.65rem;min-height:3.8rem;border:1px solid var(--bs-border-color);border-left:4px solid var(--bs-success);border-radius:.25rem;padding:.4rem .7rem;background:var(--bs-body-bg)}
 .ro-status-count.overdue{border-left-color:var(--bs-danger)}
-.ro-status-count.approaching,.ro-status-count.drafts{border-left-color:var(--bs-warning)}
+.ro-status-count.drafts{border-left-color:var(--bs-warning)}
 .ro-status-count .number{font-size:2rem;font-weight:600;line-height:1}
 .ro-status-count .label{font-size:.82rem;color:var(--bs-secondary-color)}
 .ro-gate{font-size:.82rem;border-left:3px solid var(--bs-warning);padding:.3rem .6rem;margin:.5rem 0}
@@ -282,11 +282,9 @@
 {# The queue keeps the paper log's information, but presents one vessel per Quackit-style record card. #}
 {% macro status_counts(rows, drafts) %}
 {% set overdue = rows|selectattr('condition', 'equalto', 'overdue')|list %}
-{% set approaching = rows|selectattr('condition', 'equalto', 'approaching')|list %}
 <div class="ro-status-counts" id="roStatusCounts" aria-label="Radio log totals">
   <div class="ro-status-count logged-on"><span class="number" data-ro-count="loggedon">{{ rows|length }}</span><span class="label">Logged on</span></div>
   <div class="ro-status-count overdue"><span class="number" data-ro-count="overdue">{{ overdue|length }}</span><span class="label">Overdue</span></div>
-  <div class="ro-status-count approaching"><span class="number" data-ro-count="approaching">{{ approaching|length }}</span><span class="label">Approaching</span></div>
   <div class="ro-status-count drafts"><span class="number" data-ro-count="drafts">{{ drafts|length }}</span><span class="label">Drafts</span></div>
 </div>
 {% endmacro %}
