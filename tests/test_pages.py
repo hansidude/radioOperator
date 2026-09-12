@@ -97,9 +97,10 @@ class Pages(unittest.TestCase):
         the capture form and its submit handler returning false: the button did nothing at all."""
         i = self.new()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        capture = page[page.index('<form id="capture"'):]
-        capture = capture[:capture.index('</form>')]
-        self.assertNotIn('<form', capture)                       # nothing nested inside it
+        inside = page[page.index('<form id="capture"'):]
+        inside = inside[inside.index('>') + 1:]                  # past the opening tag itself
+        inside = inside[:inside.index('</form>')]
+        self.assertNotIn('<form', inside)                        # nothing nested inside it
         self.assertIn('form="logoffForm"', page)                 # the button is bound to its own form
         self.assertIn('action="/logon/%d/logoff"' % i, page)
 
