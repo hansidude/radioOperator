@@ -1,11 +1,11 @@
-# Vessel Log On — Functional Specification, v0.5
+# Vessel Log On — Functional Specification, v0.6
 
 ## Table of contents
 
 - [Files](#files)
 - [Figures](#figures)
 - [Reading order](#reading-order)
-- [Revision 0.5](#revision-05)
+- [Revision 0.6](#revision-06)
 - [Updating the documents](#updating-the-documents)
 
 ## Files
@@ -37,13 +37,16 @@ practice**.
 4. §10 — acceptance criteria.
 5. Appendix A with the figures alongside, for why the requirements are as they are.
 
-## Revision 0.5
+## Revision 0.6
 
-Capture completeness no longer gates deadline monitoring. The specification now defines
-unresolved-draft follow-up, acknowledged transfer, independently tracked deadlines,
-verification ambiguity, durable save/recovery behavior, and failure/concurrency acceptance
-criteria. Reported legal obligations and operational thresholds remain explicitly subject
-to confirmation. Appendix E records the changes; Appendix D lists operational decisions.
+Review pass on 0.5. Clarifies that unit ownership begins at creation and that pending
+acceptance means no operator has yet taken the record. Defines the open watch queue and
+the approaching condition, with the approaching window an approved configuration value.
+Corrects the self-contradicting A.4 observation. Adds AC-40 to AC-44 for requirements that
+had no acceptance criterion (gap prompting, unclassified callers, unknown/unavailable
+values, partial search with apply/resume, multi-candidate comparison) and strengthens
+AC-24. Appendix E is now a revision history covering 0.5 and 0.6; Appendix D lists the
+operational decisions still open.
 
 ## Updating the documents
 

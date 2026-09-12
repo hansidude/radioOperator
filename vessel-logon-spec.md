@@ -1,6 +1,6 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 0.5 (draft)<br>
+**Version:** 0.6 (draft)<br>
 **Revised:** 12 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
@@ -44,7 +44,9 @@
 - [Appendix B — Letter confusion set](#section-appendix-b-letter-confusion-set)
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
-- [Appendix E — Changes from version 0.4](#section-appendix-e-changes-from-version-04)
+- [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 0.6 — changes from 0.5](#section-version-06-changes-from-05)
+    - [Version 0.5 — changes from 0.4](#section-version-05-changes-from-04)
 - [Appendix F — Evidence figures](#section-appendix-f-evidence-figures)
     - [Figure 1 — Active log on list](#section-figure-1-active-log-on-list)
     - [Figure 2 — Validation error block](#section-figure-2-validation-error-block)
@@ -108,7 +110,7 @@ Requirements carry a priority reflecting current operational need, not importanc
 |---|---|
 | **P1** | Primary focus. Capture and verification of radio log ons — §5, §6, §7. |
 | **P2** | Required, but adequately served by existing practice — §8, §9. |
-| **P3** | Required for completeness; lowest urgency. |
+| **P3** | Required for completeness; lowest urgency. No requirement in this revision carries P3. |
 
 P2 means lower change urgency in the existing operation, not an optional release gate.
 A replacement capture system shall demonstrate a functioning path into the existing watch
@@ -136,11 +138,13 @@ justification. **May** — optional.
 | **Unit** | A marine rescue base holding the watch for a geographic area. |
 | **Member** | A person with a standing record held by the organisation. |
 | **Public user** | A person without a standing record, logging on as a non-member. |
-| **Identifier** | Any value that resolves to a stored record: member number, vessel registration, mobile number, vessel name. |
+| **Identifier** | Any value that resolves to a stored record: member number, vessel registration, mobile number, vessel name, person name. |
 | **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
 | **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
 | **Draft** | Capture is incomplete. This does not disable watch monitoring. |
-| **Active** | An open record in the watch queue, including pending acceptance and unresolved deadlines. |
+| **Active** | An open record: watch status Pending acceptance or Watching, whatever its capture status or deadline condition. |
+| **Open watch queue** | The owning unit's list of every open record, Draft or Complete, with its deadline condition, escalation status and verification outcome. Also called the active list. |
+| **Approaching** | A usable deadline falls within the approved approaching window (WAT-2) and has not yet passed. |
 | **Overdue** | At least one open timed obligation has passed its due time without satisfaction or explicit amendment. |
 | **Escalated** | An open escalation exists. This is independent of capture completeness and deadline amendment. |
 | **ETA** | A supplied expected return or report date/time, represented by a timed obligation. |
@@ -203,13 +207,16 @@ that the vessel is identified, the record is correct, or the watch is establishe
 record is immediately owned by the capturing unit and appears in its open watch queue,
 including an empty Draft. When shared creation is unavailable, CAP-19–20 require an
 explicit local-only/unsaved state and the approved operational fallback; a local capture
-is not falsely presented as present in the shared queue. Pending acceptance means responsibility for resolving the
-record has been assigned; it does not claim that a completed log on was acknowledged to
-the vessel. Acceptance is an explicit operator action and may occur before capture is complete.
+is not falsely presented as present in the shared queue. Unit ownership begins at creation and
+never depends on acceptance. Pending acceptance means that no operator at the owning unit has
+yet explicitly taken responsibility for resolving the record; it does not claim that a completed
+log on was acknowledged to the vessel. Acceptance is an explicit operator action, records the
+accepting operator and time, and may occur before capture is complete. Who may accept, and how
+long a record may remain pending before follow-up, are unit policy (Appendix D question 8).
 
 **Deadline condition:** No usable vessel deadline, Not yet due, Approaching, or Overdue.
 Conditions derive from open obligations, independently of Draft/Complete and pending
-acceptance. A usable deadline on any open record is monitored immediately. Entering a
+acceptance. Approaching applies within the approved approaching window (WAT-2). A usable deadline on any open record is monitored immediately. Entering a
 past deadline raises the overdue condition immediately; missing POB or identity does not
 inhibit it. Missing or uninterpretable times create a conspicuous unresolved condition
 and operator follow-up, not a fabricated vessel ETA (WAT-9).
@@ -541,7 +548,7 @@ Neither normalization nor profile selection shall overwrite the value as capture
 ### 7.3 Search
 
 **SRCH-1.** The system **shall** provide a single search input that returns results across
-all record types: members, public users, vessels, active log ons, draft log ons, and
+all record types: members, public users, vessels, open log ons (Draft or Complete), and
 historical log ons.
 *Rationale: cross-verification (IDV-2) requires two identifiers resolvable in one action.
 Separate searches per record type make verification cost more airtime than it saves, and
@@ -579,7 +586,9 @@ sort; records with usable deadlines shall show the next deadline and all missed 
 Age, watch owner, capture status and synchronization health shall remain visible.
 
 **WAT-2.** The system **shall** indicate log ons approaching their ETA before that ETA
-passes.
+passes. The approaching window is an approved configuration value, not a constant of this
+specification (Appendix D question 9). An approaching indication is not an alert under WAT-3
+and shall not be presented as one.
 
 **WAT-3.** A missed obligation **shall** produce an alert independent of the operator
 observing a list change. Deadline evaluation shall continue without an open capture page
@@ -684,7 +693,9 @@ a backup file existing is not evidence that recovery works.
 
 ## 10. Acceptance criteria
 
-Each criterion is a pass/fail test against a running system.
+Each criterion is a pass/fail test against a running system. Criterion identifiers are stable
+across revisions: criteria added after version 0.4 take the next free number, so numbering
+within a section is not always contiguous.
 
 <a id="section-101-capture"></a>
 
@@ -704,6 +715,9 @@ Each criterion is a pass/fail test against a running system.
 | **AC-10** | Measure eligible known-caller captures under the approved peak-load protocol. | 95th percentile ≤ 30 seconds; sample, maximum, errors and exclusions reported (CAP-16, CAP-18). |
 | **AC-11** | Measure eligible unknown-caller captures under the approved peak-load protocol. | 95th percentile ≤ 90 seconds with the same reporting (CAP-17, CAP-18). |
 | **AC-12** | Add a registration to a log on created an hour earlier. | Same interaction cost as initial capture. |
+| **AC-40** | Begin a log on and populate only Class D fields. Mark capture complete. | Unpopulated fields are listed, ranked with Class A most prominent and Class D least; completion is not prevented (CAP-10 to CAP-12). |
+| **AC-41** | Take a log on from a caller with no standing record, without classifying the caller and without any vessel description. | Record created, owned and watched; classification and Class D fields are requested, if at all, only after identity is known (CAP-14). |
+| **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
 
 <a id="section-102-verification-and-search"></a>
 
@@ -719,6 +733,8 @@ Each criterion is a pass/fail test against a running system.
 | **AC-18** | Search a member number, a registration, a mobile number and a vessel name in the same input. | All return results without changing search mode. |
 | **AC-19** | Save a log on with a **Conflict** outcome. | Save succeeds; conflict remains visible on the record. |
 | **AC-20** | View the active watch list. | Verification outcome visible per row. |
+| **AC-43** | Type the first characters of a registration; apply the result for a historical trip, then for an open trip. | Results return on partial input; the historical trip supplies identity and profile detail only, never current trip facts; the open trip offers resumption, not a duplicate (SRCH-5, SRCH-6). |
+| **AC-44** | Resolve an identifier that returns more than one candidate. | All candidates shown in one comparison view with match basis, profile freshness and total count; none pre-selected (IDV-8). |
 
 <a id="section-103-watch-record-and-audit"></a>
 
@@ -729,7 +745,7 @@ Each criterion is a pass/fail test against a running system.
 | **AC-21** | Allow an ETA to pass. | Overdue alert raised without operator action. |
 | **AC-22** | Trigger an overdue on an unverified record. | Verification state surfaced with the alert. |
 | **AC-23** | Amend an ETA, then inspect history. | Both original and amended values retrievable. |
-| **AC-24** | Perform a shift handover. | All active log ons and escalation history transfer without re-entry. |
+| **AC-24** | Perform a shift handover with an unresolved Draft, a pending transfer and an open escalation present. | All open records, missed obligations, pending saves/transfers and escalation history are presented and acknowledged without re-entry; outgoing and incoming operators recorded; monitoring continues throughout (WAT-6). |
 | **AC-25** | Run the operational report. | Proportion of live-captured versus later-entered log ons is reported. |
 
 <a id="section-104-adoption-and-release-acceptance"></a>
@@ -797,9 +813,9 @@ date; return time; *entered into the computer system*; *system record ID*; logge
 
 The presence of the last-but-two and last-but-one columns is decisive. **The paper log
 tracks the computer system as an outstanding task.** The operational record is paper; the
-computer record is a downstream transcription. The computer record therefore lags the operational one; its legal status remains
-subject to confirmation under OC-7. AC-26 exists to detect when this
-has been reversed.
+computer record is a downstream transcription. The computer record therefore lags the
+operational one; its legal status remains subject to confirmation under OC-7. AC-26 exists
+to detect when this has been reversed.
 
 **A.2 All-or-nothing saving produces the backlog.** The current system cannot persist an
 incomplete log on. An operator who has captured half the detail has nothing to save, so
@@ -815,9 +831,12 @@ surrenders last. CAP-2, CAP-13 and CAP-14 address this.
 **A.4 Default values that fail validation.** The observed new-log-on form pre-populates
 departure time and ETA with the same value, then rejects the record on the grounds that
 the ETA must be later than the departure. The form's initial state fails its own
-validation, so every log on begins from an error condition. If saved unnoticed, the paired defaults would record a zero-duration trip and
-could produce immediate or premature overdue handling. The screenshots do not establish
-how the existing overdue engine would behave; that requires a runtime check. CAP-4 and CAP-5 address this.
+validation, so every log on begins from an error condition, and the operator must edit both
+times before any save is possible: a fixed cost in attention at the start of every call. The
+screenshots show this rejection only on the new-log-on path. Whether other paths (amendment,
+import, self-service) accept the paired defaults, and how the overdue engine would then treat
+a zero-duration trip, is not established by the screenshots and requires a runtime check.
+CAP-4 and CAP-5 address this.
 
 **A.5 Validation errors are remote from their fields.** Errors are presented as a block at
 the top of the form, referring to fields several sections away, discovered only on
@@ -876,7 +895,10 @@ clarify local pronunciations (including Z) and identifier formats before tuning 
 
 ## Appendix C — Traceability from version 0.3
 
-| 0.3 | 0.4 |
+Identifiers introduced in version 0.4 are retained unchanged in later revisions. Later
+revisions add identifiers; they do not renumber.
+
+| 0.3 | 0.4 and later |
 |---|---|
 | §1 safety contract | §1.2 PSO |
 | §1.2 legal record | OC-7, REC-1 |
@@ -923,13 +945,11 @@ clarify local pronunciations (including Z) and identifier formats before tuning 
    integrity obligations under REC-1; do not presume a legislative basis.
 6. For long term log ons (§3.4), what reporting schedule is expected, and what constitutes
    a missed report?
-
-
 7. Which approved procedures govern escalation, early escalation, alert acknowledgment,
    closure/reopening and handover? Who may authorize deviations and which version applies?
 8. Who owns pending acceptance and unresolved drafts? What internal follow-up intervals,
    recipients and overdue/unacknowledged-alert behavior should apply at each operating period?
-9. What detection/delivery latency, clock-error bounds, monitoring-health notification,
+9. What detection/delivery latency, approaching window, clock-error bounds, monitoring-health notification,
    recovery-time and data-loss limits can the intended deployment demonstrate?
 10. How do source and receiving units accept transfers, including after hours, refusal,
     connectivity loss and changes while acceptance is pending?
@@ -944,9 +964,33 @@ clarify local pronunciations (including Z) and identifier formats before tuning 
 
 ---
 
-<a id="section-appendix-e-changes-from-version-04"></a>
+<a id="section-appendix-e-revision-history"></a>
 
-## Appendix E — Changes from version 0.4
+## Appendix E — Revision history
+
+<a id="section-version-06-changes-from-05"></a>
+
+### Version 0.6 — changes from 0.5
+
+- Clarified that unit ownership begins at creation and that Pending acceptance records the
+  absence of an accepting operator, not the absence of an owner (§3.3).
+- Defined the open watch queue and the Approaching condition. The approaching window is an
+  approved configuration value and is distinct from a WAT-3 alert (§2, WAT-2, Appendix D).
+- Corrected A.4, which asserted both that the form rejects its own defaults and that they
+  could be saved unnoticed. The runtime question is now stated as open.
+- Added AC-40 to AC-44 for ranked advisory gap prompting, unclassified public callers,
+  distinguishable unknown/unavailable/implausible values, partial-input search with
+  apply/resume, and multi-candidate comparison; these requirements previously had no
+  acceptance criterion. Strengthened AC-24 to match WAT-6.
+- Recorded that no requirement carries P3 and that identifiers are stable across revisions
+  (§1.4, §10, Appendix C).
+- Editorial: person name added to the Identifier definition; SRCH-1 refers to open and
+  historical log ons rather than active and draft; Appendix D numbering and Appendix A
+  wrapping repaired.
+
+<a id="section-version-05-changes-from-04"></a>
+
+### Version 0.5 — changes from 0.4
 
 - Separated capture completeness, watch acceptance/ownership, deadline condition and
   escalation. Drafts with usable deadlines are monitored; unresolved records get internal
