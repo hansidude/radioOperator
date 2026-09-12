@@ -30,11 +30,49 @@ def _no(raw, why):
     return {'when': None, 'basis': 'Not understood: %s. Kept as typed: "%s".' % (why, raw), 'warning': 'Not understood: ' + why}
 
 
-def parse(raw, reference, reference_label='entry time'):
+_WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
+
+
+def parse_day(raw, reference):
+    """The paper log's 'Return Day or Date' cell on its own: {'day': date or None, 'basis', 'warning'}.
+    Reads today, tomorrow, a weekday name (the next one, today included), 13/9, 13/9/26, 2026-09-13."""
+    text = (raw or '').strip()
+    if not text:
+        return {'day': None, 'basis': '', 'warning': None}
+    s = re.sub(r'\s+', ' ', text.lower())
+    day, basis = None, ''
+    if s in ('today', 'tdy'):
+        day, basis = reference.date(), 'today'
+    elif s in ('tomorrow', 'tmrw', 'tmw', 'tmr'):
+        day, basis = reference.date() + timedelta(days=1), 'tomorrow'
+    elif s[:3] in _WEEKDAYS and s.isalpha():
+        ahead = (_WEEKDAYS.index(s[:3]) - reference.weekday()) % 7
+        day, basis = reference.date() + timedelta(days=ahead), ('today' if ahead == 0 else 'next %s' % s[:3].capitalize())
+    else:
+        m = _DATE_ISO.fullmatch(s) or _DATE_DMY.fullmatch(s)
+        if not m:
+            return {'day': None, 'basis': 'Not understood: not a day or date. Kept as typed: "%s".' % text, 'warning': 'Not understood: not a day or date'}
+        try:
+            if m.re is _DATE_ISO:
+                day = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            else:
+                year = m.group(3)
+                year = reference.year if year is None else (int(year) + 2000 if len(year) == 2 else int(year))
+                day = date(year, int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return {'day': None, 'basis': 'Not understood: not a calendar date. Kept as typed: "%s".' % text, 'warning': 'Not understood: not a calendar date'}
+        basis = 'date given'
+    warning = 'Before today. Check the date.' if day < reference.date() else None
+    return {'day': day, 'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' — ' + warning if warning else ''), 'warning': warning}
+
+
+def parse(raw, reference, reference_label='entry time', day=None, day_label=None):
     """{'when': datetime or None, 'basis': how it was read, 'warning': what to check or None}.
 
     `reference` is the instant relative and time-only forms are read against (REC-6: the call
-    time when known, otherwise the entry time); `reference_label` names it in the basis text."""
+    time when known, otherwise the entry time); `reference_label` names it in the basis text.
+    `day` is the paper log's separate day cell already read by `parse_day`; it wins over a day
+    written inside the time."""
     text = (raw or '').strip()
     if not text:
         return {'when': None, 'basis': '', 'warning': None}
@@ -54,13 +92,15 @@ def parse(raw, reference, reference_label='entry time'):
             when = reference + delta
             h, rem = divmod(int(delta.total_seconds()), 3600)
             basis = '%s after the %s %s = %s' % (('%d h %d min' % (h, rem // 60)) if rem else ('%d h' % h), reference_label, reference.strftime(FMT), when.strftime(FMT))
-            return {'when': when, 'basis': basis, 'warning': None}
+            warning = 'A relative time ignores the return day cell (%s).' % day_label if day is not None else None
+            return {'when': when, 'basis': basis + (' — ' + warning if warning else ''), 'warning': warning}
     if s.startswith('+'):
         return _no(text, 'say +2h, +30m or +1:30')
 
     # ---- absolute: an optional day, then a time ----
-    day, day_label = None, None
-    if 'tomorrow' in s:
+    if day is not None:
+        day_label = day_label or 'day given'
+    elif 'tomorrow' in s:
         day, day_label = reference.date() + timedelta(days=1), 'tomorrow'
         s = s.replace('tomorrow', ' ')
     elif 'today' in s:

@@ -5,6 +5,9 @@ Pure SQL over `LogOns` and `Identifiers` through a dict cursor. No Flask, no hos
 so it is unit-testable on SQLite, and so the same functions serve the pages, the API and any
 job a host wants to run. Every write that cannot be honoured refuses loudly (`Refused`,
 `Stale`) rather than storing something other than what was heard.
+
+The field set and its order are the unit's paper radio log (spec A.1, DAT-6): `PAPER` is the
+row as printed, `EXTRA` is what the system adds after it.
 """
 import re
 from datetime import datetime, timedelta
@@ -15,28 +18,53 @@ DT = '%Y-%m-%d %H:%M:%S'
 OPEN = ('pending', 'watching')          # watch statuses that are on the open queue (§2 Active)
 CHANNELS = ('radio', 'phone', 'person', 'self')
 
-# §6.1 field priority classes, in the order the gap list prompts them (CAP-11). Vessel name is not in
-# §6.1; it is an Identifier (§2, SRCH-2) and is prompted with class B — confirm with the unit.
-CLASSES = (
-    ('A', 'Locate the vessel', ('eta', 'pob', 'destination', 'departurePoint', 'departureTime')),
-    ('B', 'Identify and verify', ('memberNumber', 'registration', 'mobile', 'vesselName')),
-    ('C', 'Reach the vessel', ('radioChannel', 'contactName', 'contactNumber', 'ais')),
-    ('D', 'Describe the vessel', ('length', 'hullColour', 'vesselType', 'make', 'model')),
+# The paper log's columns, in its order, under its headings (DAT-6). A column that is a heading
+# over several inputs (member number OR vessel name; ETA/ETR day and time) lists them together.
+PAPER = (
+    ('Date', ('callDay',)),
+    ('Time', ('callTime',)),
+    ('Member No. OR Vessel Name', ('memberNumber', 'vesselName')),
+    ('Vessel Rego. No.', ('registration',)),
+    ('Mobile Phone Number', ('mobile',)),
+    ('Vessel Details', ('vesselDetails',)),
+    ('POB', ('pob',)),
+    ('Departure Point', ('departurePoint',)),
+    ('Going to', ('destination',)),
+    ('ETA/ETR', ('etaDay', 'eta')),
+)
+MANDATORY = ('memberNumber', 'vesselName', 'registration', 'mobile')   # the paper's shaded columns: obtain before the call ends
+# Not on the paper log; shown after it, visibly additional (DAT-6).
+EXTRA = (
+    ('Call', ('channel', 'departureTime')),
+    ('Reach the vessel', ('radioChannel', 'contactName', 'contactNumber', 'ais')),
+    ('Describe the vessel', ('length', 'hullColour', 'vesselType', 'make', 'model')),
+    ('Notes', ('notes',)),
 )
 LABELS = {
-    'eta': 'ETA (return)', 'pob': 'POB', 'destination': 'Destination', 'departurePoint': 'Departure point',
-    'departureTime': 'Departure time', 'memberNumber': 'Member number', 'registration': 'Registration',
-    'mobile': 'Mobile', 'vesselName': 'Vessel name', 'radioChannel': 'Radio channel', 'contactName': 'Contact (aboard / ashore)',
-    'contactNumber': 'Contact number', 'ais': 'AIS / MMSI', 'length': 'Length (m)', 'hullColour': 'Hull colour',
-    'vesselType': 'Type', 'make': 'Make', 'model': 'Model', 'channel': 'Channel', 'callTime': 'Call time', 'notes': 'Notes',
+    'callDay': 'Date', 'callTime': 'Time', 'memberNumber': 'Member No.', 'vesselName': 'Vessel Name',
+    'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Vessel Details',
+    'pob': 'POB', 'departurePoint': 'Departure Point', 'destination': 'Going to',
+    'etaDay': 'Return Day or Date', 'eta': 'Time',
+    'channel': 'Channel', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
+    'contactName': 'Contact (aboard / ashore)', 'contactNumber': 'Contact number', 'ais': 'AIS / MMSI',
+    'length': 'Length (m)', 'hullColour': 'Hull colour', 'vesselType': 'Type', 'make': 'Make', 'model': 'Model', 'notes': 'Notes',
 }
-TIME_FIELDS = {'eta': ('etaRaw', 'eta', 'etaBasis'),
-               'departureTime': ('departureRaw', 'departureTime', 'departureBasis'),
-               'callTime': ('callTimeRaw', 'callTime', 'callTimeBasis')}
+# §6.1 field priority classes, in the order the gap list prompts them (CAP-11). On the paper log
+# class D is the one 'Vessel Details' cell; the structured description fields are extras.
+CLASSES = (
+    ('A', 'Locate the vessel', ('eta', 'pob', 'destination', 'departurePoint')),
+    ('B', 'Identify and verify', ('memberNumber', 'registration', 'mobile', 'vesselName')),
+    ('C', 'Reach the vessel', ('radioChannel', 'contactName', 'contactNumber', 'ais')),
+    ('D', 'Describe the vessel', ('vesselDetails',)),
+)
+# A time is read from a day cell and a time cell (either may be blank) into one instant (REC-6).
+TIME_FIELDS = {'eta': ('etaDayRaw', 'etaRaw', 'eta', 'etaBasis'),
+               'callTime': ('callDayRaw', 'callTimeRaw', 'callTime', 'callTimeBasis'),
+               'departureTime': (None, 'departureRaw', 'departureTime', 'departureBasis')}
+DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime'}
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
-RANKED = tuple(f for _, _, fs in CLASSES for f in fs)
-FIELDS = RANKED + ('channel', 'callTime', 'notes')
+FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
 DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'loggedOffAt', 'capturedAt')
 RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3}
 
@@ -69,6 +97,15 @@ def _s(dt):
     return dt.strftime(DT) if dt else None
 
 
+def column(field):
+    """The column a field's raw value lives in (a time field's raw cell, a day field's raw day cell)."""
+    if field in DAY_FIELDS:
+        return TIME_FIELDS[DAY_FIELDS[field]][0]
+    if field in TIME_FIELDS:
+        return TIME_FIELDS[field][1]
+    return field
+
+
 def normalize(kind, raw):
     """The comparable form of an identifier (IDV-9): formatting only, never a character substitution."""
     if kind == 'mobile':
@@ -92,8 +129,7 @@ def identifiers(cur, logon_id):
 
 def present(row, field):
     """Has anything been heard for this field? A time counts once its raw expression is there, understood or not."""
-    col = TIME_FIELDS[field][0] if field in TIME_FIELDS else field
-    return row.get(col) not in (None, '')
+    return row.get(column(field)) not in (None, '')
 
 
 def gaps(row):
@@ -167,6 +203,22 @@ def _reference(row, field):
     return row['createdAt'], 'entry time'
 
 
+def interpret(row, field):
+    """Read a time field's day cell and time cell together: {'when', 'basis', 'warning'}."""
+    day_col, raw_col, _, _ = TIME_FIELDS[field]
+    ref, label = _reference(row, field)
+    day = times.parse_day(row.get(day_col), ref) if day_col else {'day': None, 'basis': '', 'warning': None}
+    if not (row.get(raw_col) or '').strip():
+        if day['day'] or day['warning']:
+            return {'when': None, 'basis': day['basis'] + ' — no time yet', 'warning': day['warning'] or 'A day without a time is not a deadline.'}
+        return {'when': None, 'basis': '', 'warning': None}
+    got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['basis'])
+    if day['warning'] and not got['warning']:
+        got['warning'] = day['warning']
+        got['basis'] += ' — ' + day['warning']
+    return got
+
+
 def _record_identifier(cur, logon_id, kind, value, previous, user, now):
     """Every distinct value heard for an identifier is its own row (DAT-5); a change supersedes the last one (IDV-3)."""
     if (value or None) == (previous or None):
@@ -186,16 +238,17 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
     row = _open_row(cur, logon_id, version)
     value = value.strip() if isinstance(value, str) else ('' if value is None else str(value))
     out = {'field': field, 'value': value or None, 'when': None, 'basis': None, 'warning': None}
-    if field in TIME_FIELDS:
-        raw_col, when_col, basis_col = TIME_FIELDS[field]
+    if field in TIME_FIELDS or field in DAY_FIELDS:
+        tf = DAY_FIELDS.get(field, field)
+        day_col, raw_col, when_col, basis_col = TIME_FIELDS[tf]
         if len(value) > 64:
             raise Refused('%s: more than 64 characters' % LABELS[field])
-        ref, label = _reference(row, field)
-        got = times.parse(value, ref, label)
-        sets = {raw_col: value or None, when_col: _s(got['when']), basis_col: got['basis'] or None}
+        after = dict(row, **{column(field): value or None})
+        got = interpret(after, tf)
+        sets = {column(field): value or None, when_col: _s(got['when']), basis_col: got['basis'] or None}
         out.update(when=got['when'], basis=got['basis'], warning=got['warning'])
         # CAP-5: an ETA before the departure is information, shown beside the field, never a refusal.
-        after = dict(row, **{when_col: got['when']})
+        after[when_col] = got['when']
         if after['eta'] and after['departureTime'] and after['eta'] < after['departureTime'] and not out['warning']:
             out['warning'] = 'ETA %s is before the departure time %s.' % (after['eta'].strftime('%H:%M'), after['departureTime'].strftime('%H:%M'))
     else:
@@ -228,7 +281,7 @@ def set_capture(cur, logon_id, complete, user, now, version=None):
 
 
 def log_off(cur, logon_id, user, now, note, version=None):
-    """Explicit closure of an open record with evidence and time (§3.3 Log off, WAT-7)."""
+    """Explicit closure of an open record with evidence and time: the paper's 'Time Arrived or Return' (§3.3, WAT-7)."""
     row = _open_row(cur, logon_id, version)
     note = (note or '').strip()
     if len(note) > 255:

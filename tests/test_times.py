@@ -41,6 +41,18 @@ class Times(unittest.TestCase):
         self.assertEqual(self.when('')['when'], None)
         self.assertEqual(self.when('')['basis'], '')
 
+    def test_day_cell_on_its_own(self):
+        from datetime import date
+        d = lambda raw: times.parse_day(raw, REF)['day']
+        self.assertEqual(d('today'), date(2026, 9, 12)); self.assertEqual(d('tomorrow'), date(2026, 9, 13))
+        self.assertEqual(d('Sat'), date(2026, 9, 12)); self.assertEqual(d('sunday'), date(2026, 9, 13)); self.assertEqual(d('fri'), date(2026, 9, 18))
+        self.assertEqual(d('13/9'), date(2026, 9, 13)); self.assertEqual(d('2026-09-20'), date(2026, 9, 20))
+        self.assertIsNone(d('soon')); self.assertIsNone(d('31/2'))
+        self.assertIn('Before today', times.parse_day('1/9', REF)['warning'])
+        got = times.parse('0600', REF, 'call time', day=date(2026, 9, 13), day_label='tomorrow')
+        self.assertEqual(got['when'], datetime(2026, 9, 13, 6, 0)); self.assertIsNone(got['warning'])
+        self.assertIn('ignores the return day', times.parse('+2h', REF, 'call time', day=date(2026, 9, 13), day_label='tomorrow')['warning'])
+
     def test_past_time_stays_today_and_is_marked(self):
         got = self.when('0900')
         self.assertEqual(got['when'], datetime(2026, 9, 12, 9, 0))   # not shifted to tomorrow (REC-6)

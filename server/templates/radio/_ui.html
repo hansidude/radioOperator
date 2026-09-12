@@ -15,6 +15,10 @@
 .ro-gaps .A{--bs-btn-border-color:var(--bs-danger);--bs-btn-color:var(--bs-danger)}
 .ro-gaps .B{--bs-btn-border-color:var(--bs-warning);--bs-btn-color:var(--bs-warning)}
 .ro-form fieldset{border:1px solid var(--bs-border-color);border-radius:.4rem;padding:.4rem .6rem .5rem;margin:0 0 .6rem}
+.ro-form fieldset.paper{border-color:var(--bs-primary)}
+.ro-form .mandatory .form-control{background:var(--bs-tertiary-bg)}
+.ro-form .paper-col{min-width:0}
+.ro-ro{font-size:.85rem;padding:.2rem 0;color:var(--bs-secondary-color)}
 .ro-form legend{float:none;width:auto;font-size:.72rem;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
 .ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
 .ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
@@ -36,22 +40,32 @@
 {% else %}<span class="badge border text-secondary ro-cond">Due in {{ minutes(r.minutes) }}</span>{% endif %}
 {% endmacro %}
 
+{% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
+
+{# The queue is the paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. The
+   deadline condition comes first because it is what the watch is for; it is not a paper cell. #}
 {% macro queue(rows, now, current=None) %}
 <table class="table table-sm ro-queue" id="queueTable">
-  <thead><tr><th>Status</th><th>ETA</th><th>Vessel</th><th>POB</th><th>Destination</th><th>Mobile</th><th>Capture</th><th>Watch</th><th>Age</th><th></th></tr></thead>
+  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>Trip ID No.</th><th>Capture</th><th>Watch</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
     <td>{{ cond(r) }}</td>
-    <td>{{ when(r.eta, now) }}{% if not r.eta and r.etaRaw %}<span class="text-danger" title="Kept as typed">{{ r.etaRaw }}</span>{% endif %}</td>
-    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.vesselName or r.registration or ('#' ~ r.id) }}</a>{% if r.vesselName and r.registration %} <span class="text-secondary">{{ r.registration }}</span>{% endif %}</td>
-    <td>{{ r.pob or '' }}</td>
-    <td class="wrap">{{ r.destination or '' }}</td>
-    <td>{{ r.mobile or '' }}</td>
+    <td>{{ cell(r.callDayRaw) }}</td>
+    <td>{{ cell(r.callTimeRaw) }}</td>
+    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.memberNumber or r.vesselName or ('T-' ~ r.id) }}</a>{% if r.memberNumber and r.vesselName %} <span class="text-secondary">{{ r.vesselName }}</span>{% endif %}</td>
+    <td>{{ cell(r.registration) }}</td>
+    <td>{{ cell(r.mobile) }}</td>
+    <td class="wrap">{{ cell(r.vesselDetails) }}</td>
+    <td>{{ cell(r.pob) }}</td>
+    <td class="wrap">{{ cell(r.departurePoint) }}</td>
+    <td class="wrap">{{ cell(r.destination) }}</td>
+    <td>{{ cell(r.etaDayRaw) }}</td>
+    <td>{% if r.eta %}<span title="{{ r.etaBasis }}">{{ when(r.eta, now) }}</span>{% elif r.etaRaw %}<span class="text-danger" title="{{ r.etaBasis }}">{{ r.etaRaw }}</span>{% endif %}</td>
+    <td class="text-secondary">T-{{ r.id }}</td>
     <td>{{ 'Complete' if r.captureStatus == 'complete' else 'Draft' }}{% if r.gaps %} <span class="badge text-bg-secondary" title="Fields still to ask">{{ r.gaps }}</span>{% endif %}</td>
-    <td>{% if r.watchStatus == 'pending' %}<span class="text-warning">Pending acceptance</span>{% else %}Watching{% endif %}</td>
-    <td class="text-secondary">{{ minutes(r.ageMinutes) }}</td>
+    <td>{% if r.watchStatus == 'pending' %}<span class="text-warning">Pending</span>{% else %}Watching{% endif %} <span class="text-secondary" title="Age">{{ minutes(r.ageMinutes) }}</span></td>
     <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td>
-  </tr>{% else %}<tr><td colspan="10" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
+  </tr>{% else %}<tr><td colspan="16" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
   </tbody>
 </table>
 {% endmacro %}

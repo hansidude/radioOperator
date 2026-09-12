@@ -6,7 +6,8 @@ without anyone pressing anything, and the vessel is logged off when it is back.
 
 The specification is `vessel-logon-spec.md` (index: `INDEX.md`). Requirement ids (CAP-n, WAT-n, ...)
 are cited in code comments where code exists because of them. This is slice 1: capture and the open
-queue. Vessels, people, cross-verification, search and obligations are later slices.
+queue, laid out as the paper radio log's row under its headings in its order (DAT-6), with what the
+system adds after it. Vessels, people, cross-verification, search and obligations are later slices.
 
 ## Its own app, mounted by quackit
 

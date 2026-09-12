@@ -1,7 +1,7 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% set open = logon.watchStatus in ('pending', 'watching') %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>Log on #{{ logon.id }}{% endblock %}
+{% block page_title %}<i class="bi bi-broadcast me-1"></i>T-{{ logon.id }}{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
@@ -16,8 +16,17 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
+{% macro field(name, cols='col') %}
+{% set raw = logon[column(name)] %}
+{% set basis = logon[time_fields[name][3]] if name in time_fields else '' %}
+<div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
+  {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
+  {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+  {% else %}<input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if name in time_fields %}placeholder="1500 · 3pm · +2h"{% elif name in day_fields %}placeholder="today · Sat · 13/9"{% endif %} {% if not open %}disabled{% endif %}>{% endif %}
+  <div class="ro-basis" id="b-{{ name }}">{{ basis or '' }}</div><div class="ro-warn" id="w-{{ name }}"></div></div>
+{% endmacro %}
 <div class="row g-3 mt-0">
-<div class="col-12 col-xl-7">
+<div class="col-12 col-xxl-8">
   <div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>
   {% if not open %}<div class="alert alert-secondary py-1 px-2 small mt-2">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}. Closed records are read only; reopening is an authorised action (not in this slice).</div>{% endif %}
   <section class="ro-gaps mt-2" aria-label="Still to ask">
@@ -25,26 +34,45 @@
     <ol id="gaps">{% for g in gaps %}<li><button type="button" class="btn btn-outline-secondary {{ g.cls }}" data-focus="{{ g.field }}"><span class="me-1">{{ g.cls }}</span>{{ g.label }}</button></li>{% else %}<li class="small text-success">Nothing left to ask.</li>{% endfor %}</ol>
   </section>
   <form id="capture" class="ro-form mt-2" autocomplete="off" onsubmit="return false">
-    {% macro field(name, cols='col-6 col-md-4') %}
-    {% set raw = logon[time_fields[name][0]] if name in time_fields else logon[name] %}
-    {% set basis = logon[time_fields[name][2]] if name in time_fields else '' %}
-    <div class="{{ cols }}"><label for="f-{{ name }}">{{ labels[name] }}</label>
-      {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
-      {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-      {% else %}<input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if name in time_fields %}placeholder="1500 · 3pm · +2h"{% endif %} {% if not open %}disabled{% endif %}>{% endif %}
-      <div class="ro-basis" id="b-{{ name }}">{{ basis or '' }}</div><div class="ro-warn" id="w-{{ name }}"></div></div>
-    {% endmacro %}
-    {% for cls, title, names in classes %}
-    <fieldset><legend>{{ cls }} · {{ title }}</legend><div class="row g-2">{% for n in names %}{{ field(n) }}{% endfor %}</div></fieldset>
+    {# The paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. Shaded = the paper's mandatory columns. #}
+    <fieldset class="paper"><legend>Radio log · T-{{ logon.id }}</legend>
+      <div class="row g-2">
+        {{ field('callDay', 'col-6 col-md-2') }}{{ field('callTime', 'col-6 col-md-2') }}
+        <div class="col-12 col-md-8 mandatory"><label>Member No. OR Vessel Name</label><div class="row g-1">
+          <div class="col-5 paper-col"><input id="f-memberNumber" class="form-control" data-field="memberNumber" value="{{ logon.memberNumber or '' }}" placeholder="Member No." aria-label="Member No." {% if not open %}disabled{% endif %}><div class="ro-basis" id="b-memberNumber"></div><div class="ro-warn" id="w-memberNumber"></div></div>
+          <div class="col-7 paper-col"><input id="f-vesselName" class="form-control" data-field="vesselName" value="{{ logon.vesselName or '' }}" placeholder="Vessel Name" aria-label="Vessel Name" {% if not open %}disabled{% endif %}><div class="ro-basis" id="b-vesselName"></div><div class="ro-warn" id="w-vesselName"></div></div>
+        </div></div>
+      </div>
+      <div class="row g-2 mt-0">
+        {{ field('registration', 'col-6 col-md-3') }}{{ field('mobile', 'col-6 col-md-3') }}{{ field('vesselDetails', 'col-9 col-md-4') }}{{ field('pob', 'col-3 col-md-2') }}
+      </div>
+      <div class="row g-2 mt-0">
+        {{ field('departurePoint', 'col-12 col-md-4') }}{{ field('destination', 'col-12 col-md-4') }}
+        <div class="col-12 col-md-4"><label>ETA/ETR</label><div class="row g-1">
+          <div class="col-6 paper-col"><input id="f-etaDay" class="form-control" data-field="etaDay" value="{{ logon.etaDayRaw or '' }}" placeholder="Return Day or Date" aria-label="Return Day or Date" {% if not open %}disabled{% endif %}><div class="ro-basis" id="b-etaDay"></div><div class="ro-warn" id="w-etaDay"></div></div>
+          <div class="col-6 paper-col"><input id="f-eta" class="form-control" data-field="eta" value="{{ logon.etaRaw or '' }}" placeholder="Time" aria-label="Time" {% if not open %}disabled{% endif %}><div class="ro-warn" id="w-eta"></div></div>
+          <div class="col-12"><div class="ro-basis" id="b-eta">{{ logon.etaBasis or '' }}</div></div>
+        </div></div>
+      </div>
+      <div class="row g-2 mt-0 align-items-end">
+        <div class="col-12 col-md-6"><label>Time Arrived or Return</label>
+          {% if open %}<form method="post" action="/logon/{{ logon.id }}/logoff" class="d-flex gap-1" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"><input name="note" class="form-control" placeholder="Log off: contact / evidence" maxlength="255"><button class="btn btn-success btn-sm text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off now</button></form>
+          {% else %}<div class="ro-ro">{{ logon.loggedOffAt.strftime('%a %d %b %H:%M') if logon.loggedOffAt else '' }}{% if logon.loggedOffNote %} · {{ logon.loggedOffNote }}{% endif %}</div>{% endif %}</div>
+        <div class="col-4 col-md-2"><label>Trip ID No.</label><div class="ro-ro">T-{{ logon.id }}</div></div>
+        <div class="col-4 col-md-2"><label>Entered</label><div class="ro-ro" title="Entry time and operator (REC-2)">{{ logon.createdAt.strftime('%H:%M') }} · {{ logon.createdBy }}</div></div>
+        <div class="col-4 col-md-2"><label>Logged off · Initial</label><div class="ro-ro">{% if logon.loggedOffAt %}{{ logon.loggedOffAt.strftime('%H:%M') }} · {{ logon.updatedBy }}{% endif %}</div></div>
+      </div>
+    </fieldset>
+    {# Not on the paper log: visibly additional (DAT-6). #}
+    {% for title, names in extra %}
+    <fieldset><legend>{{ title }} <span class="fw-normal">· not on the paper log</span></legend><div class="row g-2">{% for n in names %}{{ field(n, 'col-12 col-md-6' if n == 'notes' else 'col-6 col-md-3') }}{% endfor %}</div></fieldset>
     {% endfor %}
-    <fieldset><legend>Call</legend><div class="row g-2">{{ field('channel', 'col-4 col-md-3') }}{{ field('callTime', 'col-8 col-md-3') }}{{ field('notes', 'col-12 col-md-6') }}</div>
-      <div class="ro-basis mt-1">Entered {{ logon.createdAt.strftime('%a %d %b %H:%M') }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}</div></fieldset>
+    <div class="ro-basis mb-2">Version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}</div>
   </form>
   {% if open %}
   <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
     {% if logon.watchStatus == 'pending' %}<form method="post" action="/logon/{{ logon.id }}/accept"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-outline-info btn-sm"><i class="bi bi-eye me-1"></i>Accept watch</button></form>{% endif %}
     <form method="post" action="/logon/{{ logon.id }}/capture"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="complete" value="{{ '0' if logon.captureStatus == 'complete' else '1' }}"><button class="btn btn-outline-secondary btn-sm">{% if logon.captureStatus == 'complete' %}<i class="bi bi-pencil me-1"></i>Reopen capture{% else %}<i class="bi bi-check2 me-1"></i>Mark capture complete{% endif %}</button></form>
-    <form method="post" action="/logon/{{ logon.id }}/logoff" class="d-flex gap-1 ms-auto" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"><input name="note" class="form-control form-control-sm" placeholder="Log off: contact / evidence" maxlength="255" style="width:16rem"><button class="btn btn-success btn-sm"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></form>
   </div>
   {% endif %}
   {% if identifiers %}
@@ -52,9 +80,9 @@
     <ul class="mb-0">{% for i in identifiers %}<li class="{{ '' if i.isActive else 'old' }}">{{ labels[i.kind] }}: <code>{{ i.raw }}</code> <span class="text-secondary">{{ i.capturedAt.strftime('%H:%M') }} {{ i.source }}{% if not i.isActive %} superseded{% endif %}</span></li>{% endfor %}</ul></div>
   {% endif %}
 </div>
-<div class="col-12 col-xl-5">
+<div class="col-12 col-xxl-4">
   <div class="small text-secondary mt-2">Open watch queue · approaching = {{ window }} min</div>
-  <div id="queuePane">{{ ui.queue(queue, now, logon.id) }}</div>
+  <div id="queuePane" style="overflow-x:auto">{{ ui.queue(queue, now, logon.id) }}</div>
 </div>
 </div>
 {{ ui.refresh_script(logon.id) }}
@@ -63,6 +91,7 @@
   var id = {{ logon.id }}, version = {{ logon.version }}, open = {{ 'true' if open else 'false' }};
   var status = document.getElementById('saveStatus'), stale = document.getElementById('stale');
   var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
+  var pair = {{ pair|tojson }};   // a day cell and a time cell share one basis line
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function setStatus(text, cls) { status.textContent = text; status.className = 'small ' + cls; }
   function renderGaps(gaps) {
@@ -83,7 +112,8 @@
         if (x.status === 409) { stale.hidden = false; setStatus('Not saved to the shared record: changed elsewhere', 'text-danger'); return; }
         if (!x.ok) { setStatus('Not saved to the shared record: ' + (x.d.error || ('HTTP ' + x.status)), 'text-danger'); return; }
         version = x.d.version;
-        var b = document.getElementById('b-' + field), w = document.getElementById('w-' + field);
+        var shown = pair[field] || field;
+        var b = document.getElementById('b-' + shown), w = document.getElementById('w-' + field);
         if (b) b.textContent = x.d.basis || '';
         if (w) w.textContent = x.d.warning || '';
         renderGaps(x.d.gaps);

@@ -32,13 +32,13 @@ class LogOns(unittest.TestCase):
 
     def test_any_order_any_subset_and_gaps_ranked(self):                # AC-2, AC-40, CAP-3, CAP-10, CAP-11
         i = L.create(self.cur, 'alice', '', T0)
-        self.assertEqual([g['field'] for g in L.gaps(L.get(self.cur, i))][:5], ['eta', 'pob', 'destination', 'departurePoint', 'departureTime'])
-        L.set_field(self.cur, i, 'hullColour', 'white', 'alice', T0)
+        self.assertEqual([g['field'] for g in L.gaps(L.get(self.cur, i))][:5], ['eta', 'pob', 'destination', 'departurePoint', 'memberNumber'])
+        L.set_field(self.cur, i, 'vesselDetails', '6 m white Quintrex', 'alice', T0)
         L.set_field(self.cur, i, 'pob', '3', 'alice', T0)
         out = L.set_field(self.cur, i, 'destination', 'Tangalooma', 'alice', T0)
         self.assertEqual(out['version'], 3)
         gaps = [g['field'] for g in out['gaps']]
-        self.assertNotIn('pob', gaps); self.assertNotIn('hullColour', gaps)
+        self.assertNotIn('pob', gaps); self.assertNotIn('vesselDetails', gaps)
         self.assertEqual(gaps[0], 'eta')
         self.assertEqual([g['cls'] for g in out['gaps']], sorted(g['cls'] for g in out['gaps']))
 
@@ -60,6 +60,24 @@ class LogOns(unittest.TestCase):
         out = L.set_field(self.cur, i, 'pob', 'about four', 'alice', T0)
         self.assertIn('kept as heard', out['warning'])
         self.assertEqual(L.get(self.cur, i)['pob'], 'about four')
+
+    def test_return_day_and_time_are_separate_cells_read_together(self):     # DAT-6, REC-6, AC-48
+        i = L.create(self.cur, 'alice', '', T0)
+        out = L.set_field(self.cur, i, 'eta', '0600', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 12, 6, 0)); self.assertIn('already due', out['warning'])
+        out = L.set_field(self.cur, i, 'etaDay', 'tomorrow', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 13, 6, 0)); self.assertIsNone(out['warning'])
+        row = L.get(self.cur, i)
+        self.assertEqual((row['etaDayRaw'], row['etaRaw'], row['eta']), ('tomorrow', '0600', datetime(2026, 9, 13, 6, 0)))
+        out = L.set_field(self.cur, i, 'etaDay', 'mon', 'alice', T0)          # T0 is a Saturday
+        self.assertEqual(out['when'], datetime(2026, 9, 14, 6, 0))
+        out = L.set_field(self.cur, i, 'eta', '', 'alice', T0)                 # a day without a time is not a deadline
+        self.assertIsNone(out['when']); self.assertIn('not a deadline', out['warning'])
+        self.assertEqual(L.condition(L.get(self.cur, i), T0, 30)[0], 'nodeadline')
+        out = L.set_field(self.cur, i, 'etaDay', 'someday', 'alice', T0)
+        self.assertIn('Not understood', out['warning'])
+        L.set_field(self.cur, i, 'callDay', '11/9', 'alice', T0); out = L.set_field(self.cur, i, 'callTime', '2300', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 11, 23, 0))
 
     def test_call_time_is_the_reference_once_known(self):               # REC-6
         i = L.create(self.cur, 'alice', '', T0)
