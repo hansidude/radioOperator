@@ -3,29 +3,36 @@
 
 {% macro styles() %}
 <style>
-.ro-queue{--bs-table-bg:transparent;font-size:.82rem;font-variant-numeric:tabular-nums;margin:0}
-.ro-queue th,.ro-queue td{padding:.15rem .35rem;white-space:nowrap;vertical-align:middle;border-width:0 0 1px 0}
-.ro-queue th{font-weight:600;font-size:.72rem;color:var(--bs-secondary-color)}
-.ro-queue tr.ro-current td{outline:2px solid var(--bs-primary);outline-offset:-2px}
-.ro-queue td.wrap{white-space:normal;min-width:8rem}
 .ro-cond{font-size:.72rem;letter-spacing:.02em}
 .ro-gaps{font-size:.82rem}
 .ro-gaps ol{display:flex;flex-wrap:wrap;gap:.3rem;padding:0;margin:.2rem 0 0;list-style:none}
 .ro-gaps button{font-size:.75rem;padding:.05rem .45rem}
 .ro-gaps .A{--bs-btn-border-color:var(--bs-danger);--bs-btn-color:var(--bs-danger)}
 .ro-gaps .B{--bs-btn-border-color:var(--bs-warning);--bs-btn-color:var(--bs-warning)}
-.ro-form fieldset{border:1px solid var(--bs-border-color);border-radius:.4rem;padding:.4rem .6rem .5rem;margin:0 0 .6rem}
-.ro-form fieldset.paper{border-color:var(--bs-primary)}
+.ro-form fieldset{border:0;padding:0;margin:0}
 .ro-form .mandatory .form-control{background:var(--bs-tertiary-bg)}
 .ro-form .paper-col{min-width:0}
 .ro-ro{font-size:.85rem;padding:.2rem 0;color:var(--bs-secondary-color)}
 .ro-sys{font-size:.75rem;color:var(--bs-secondary-color)}
 .ro-cancel{font-size:.8rem;border:1px solid var(--bs-danger);border-radius:.4rem;padding:.5rem;margin-top:.4rem}
-.ro-drafts{margin:.4rem 0 .8rem}
-.ro-drafts.has{border-left:3px solid var(--bs-warning);padding-left:.5rem}
-.ro-drafts-head strong,.ro-queue-head strong{font-size:.86rem}
-.ro-drafts-head span,.ro-queue-head span{font-size:.75rem;color:var(--bs-secondary-color);margin-left:.4rem}
-.ro-queue-head{margin:.4rem 0 .2rem}
+.ro-list-head{display:flex;align-items:baseline;gap:.6rem;margin:0 0 .75rem}
+.ro-list-head strong{font-size:1rem}
+.ro-list-head span{font-size:.8rem;color:var(--bs-secondary-color)}
+.ro-card-list{display:grid;gap:.65rem;max-width:72rem}
+.ro-record-card{border:1px solid var(--bs-border-color);border-left:4px solid var(--bs-secondary);border-radius:.35rem;background:var(--bs-body-bg);box-shadow:0 .125rem .25rem rgba(0,0,0,.08);padding:.7rem .8rem}
+.ro-record-card.draft{border-left-color:var(--bs-warning)}
+.ro-record-card.overdue{border-left-color:var(--bs-danger)}
+.ro-record-card.approaching{border-left-color:var(--bs-warning)}
+.ro-record-card.closed{border-left-color:var(--bs-success)}
+.ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
+.ro-card-top{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem}
+.ro-card-top .ro-card-action{margin-left:auto}
+.ro-card-title{font-size:1rem;font-weight:600}
+.ro-card-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.5rem 1rem;margin-top:.65rem}
+.ro-card-field{min-width:0}
+.ro-card-field .k{display:block;color:var(--bs-secondary-color);font-size:.68rem;text-transform:uppercase}
+.ro-card-field .v{display:block;font-size:.88rem;overflow-wrap:anywhere}
+.ro-empty{color:var(--bs-secondary-color);border:1px dashed var(--bs-border-color);border-radius:.35rem;padding:1rem}
 .ro-gate{font-size:.82rem;border-left:3px solid var(--bs-warning);padding:.3rem .6rem;margin:.5rem 0}
 .ro-gate.ready{border-color:var(--bs-success)}
 .ro-gate ul{margin:.2rem 0 0;padding-left:1.1rem}
@@ -46,16 +53,19 @@
 .ro-verify.partial{border-color:var(--bs-warning)}
 .ro-verify ul{margin:.2rem 0 0;padding-left:1.1rem}
 .ro-verify li{margin:.1rem 0}
-.ro-find{position:relative}
-.ro-hits{position:absolute;z-index:1030;right:0;top:100%;width:min(34rem,92vw);max-height:60vh;overflow:auto;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.4rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.3);font-size:.8rem}
-.ro-hits table{margin:0;width:100%}
-.ro-hits td{padding:.25rem .45rem;vertical-align:middle;border-bottom:1px solid var(--bs-border-color)}
-.ro-hits .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--bs-secondary-color)}
+.ro-find{position:relative;max-width:48rem}
+.ro-find>input{width:100%;font-size:1rem;min-height:2.8rem}
+.ro-hits{position:absolute;z-index:1030;left:0;top:calc(100% + .3rem);width:100%;max-height:60vh;overflow:auto;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.35rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.3);padding:.35rem}
+.ro-search-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .65rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-search-card:last-child{border-bottom:0}
+.ro-search-card .k{font-size:.68rem;text-transform:uppercase;color:var(--bs-secondary-color)}
+.ro-search-card .body{flex:1 1 auto;min-width:0}
 .ro-form legend{float:none;width:auto;font-size:.72rem;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
 .ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
 .ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
-.ro-entry-shell{max-width:72rem;margin:0 auto;padding:.75rem 0 1.25rem}
-.ro-primary-form .capture-row{padding:.7rem 0 1rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-workspace-pane{max-width:72rem;margin:0 auto;padding:1rem 0 1.25rem}
+.ro-entry-shell{max-width:72rem;margin:0 auto}
+.ro-primary-form .capture-row{padding:.65rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-primary-form .capture-row:first-child{padding-top:.25rem}
 .ro-primary-form label,.ro-primary-form .group-label{display:block;font-size:1rem;font-weight:600;color:var(--bs-body-color);margin:0 0 .35rem}
 .ro-primary-form .form-control,.ro-primary-form .form-select{min-height:3.15rem;font-size:1.2rem;line-height:1.35;padding:.65rem .75rem}
@@ -65,12 +75,18 @@
 .ro-primary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:1rem 0}
 .ro-primary-actions .btn{font-size:1rem;padding:.55rem .9rem}
 .ro-primary-actions .form-control,.ro-primary-actions .form-select{font-size:1rem;min-height:2.75rem}
-.ro-more-pane{padding-top:.5rem}
-.ro-view-tabs .btn{min-width:6.5rem}
+.ro-section-title{font-size:1.05rem;font-weight:600;margin:0 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-detail-form .row{margin-bottom:1rem}
+.ro-detail-form label{display:block;font-size:.9rem;font-weight:600;margin-bottom:.3rem}
+.ro-detail-form .form-control,.ro-detail-form .form-select{font-size:1rem;min-height:2.8rem}
+.ro-view-tabs{display:flex;flex-wrap:wrap}
+.ro-view-tabs .btn{min-width:5.5rem}
 @media (max-width:575.98px){
-  .ro-entry-shell{padding-top:.4rem}
+  .ro-workspace-pane{padding-top:.6rem}
   .ro-primary-form .form-control,.ro-primary-form .form-select{font-size:1.1rem}
   .ro-view-tabs .btn{min-width:0}
+  .ro-card-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ro-card-top .ro-card-action{margin-left:0}
 }
 .ro-basis{font-size:.72rem;color:var(--bs-secondary-color);min-height:1em}
 .ro-warn{font-size:.72rem;color:var(--bs-warning)}
@@ -166,27 +182,26 @@
 {% endmacro %}
 
 {% macro draft_list(rows, now, reference, current=None) %}
-<div class="ro-drafts{{ ' has' if rows else '' }}">
-  <div class="ro-drafts-head"><strong>{{ rows|length }} draft{{ '' if rows|length == 1 else 's' }} not logged on</strong>
-    <span>Saved, not watched. Nobody is counting these down, and the caller may think otherwise.</span></div>
-  {% if rows %}
-  <table class="table table-sm ro-queue">
-    <thead><tr><th>No.</th><th>Age</th><th>Member No. OR Vessel Name</th><th>Rego</th><th>Going to</th><th>Return</th><th>Identity</th><th>Still needed before it is a log on</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rows %}<tr class="{% if r.id == current %}ro-current{% endif %}" data-draft="{{ r.id }}">
-      <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ reference(r) }}</a></td>
-      <td class="{{ 'text-warning' if r.ageMinutes > 30 else 'text-secondary' }}">{{ minutes(r.ageMinutes) }}</td>
-      <td>{{ r.memberNumber or r.vesselName or '' }}</td>
-      <td>{{ r.registration or '' }}</td>
-      <td class="wrap">{{ r.destination or '' }}</td>
-      <td>{{ r.etaDayBox }} {{ r.etaRaw or '' }}</td>
-      <td>{{ outcome(r.verifyOutcome, r.verifyBasis or '') }}</td>
-      <td class="wrap">{{ r.missing|map(attribute='label')|join(' · ') }}</td>
-      <td><a class="btn btn-outline-primary btn-sm py-0" href="/logon/{{ r.id }}">Finish</a></td>
-    </tr>{% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+<div class="ro-list-head"><strong>{{ rows|length }} draft{{ '' if rows|length == 1 else 's' }} not logged on</strong><span>Saved, not watched. Nobody is counting these down.</span></div>
+<div class="ro-card-list">
+{% for r in rows %}
+  <article class="ro-record-card draft{% if r.id == current %} ro-current{% endif %}" data-draft="{{ r.id }}">
+    <div class="ro-card-top">
+      <span class="badge text-bg-warning">NOT WATCHED</span>
+      <a class="btn btn-outline-warning btn-sm ro-card-title" href="/logon/{{ r.id }}">{{ r.memberNumber or r.vesselName or ('Draft ' ~ reference(r)) }}</a>
+      {% if r.memberNumber and r.vesselName %}<span>{{ r.vesselName }}</span>{% endif %}
+      {{ outcome(r.verifyOutcome, r.verifyBasis or '') }}
+      <span class="text-secondary small">{{ reference(r) }} · {{ minutes(r.ageMinutes) }} old</span>
+      <a class="btn btn-outline-primary btn-sm ro-card-action" href="/logon/{{ r.id }}"><i class="bi bi-pencil-square me-1"></i>Finish</a>
+    </div>
+    <div class="ro-card-meta">
+      <div class="ro-card-field"><span class="k">Rego</span><span class="v">{{ r.registration or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Going to</span><span class="v">{{ r.destination or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Return</span><span class="v">{{ r.etaDayBox or '—' }} {{ r.etaRaw or '' }}</span></div>
+      <div class="ro-card-field"><span class="k">Still needed</span><span class="v">{{ r.missing|map(attribute='label')|join(' · ') }}</span></div>
+    </div>
+  </article>
+{% else %}<div class="ro-empty">No unfinished drafts.</div>{% endfor %}
 </div>
 {% endmacro %}
 
@@ -219,7 +234,7 @@
 {# SRCH-1 to SRCH-6: one input, every record type, partial input, one action to apply what it finds. #}
 {% macro find(current=None) %}
 <div class="ro-find">
-  <input class="form-control form-control-sm" style="width:15rem;font-size:.8rem" type="search" id="findBox" autocomplete="off"
+  <input class="form-control" type="search" id="findBox" autocomplete="off"
          placeholder="Find a boat, member, mobile or trip" aria-label="Find a boat, member, mobile or trip">
   <div class="ro-hits" id="findHits" hidden></div>
 </div>
@@ -233,17 +248,17 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var KIND = { vessel: 'boat', person: 'member', trip: 'trip' };
   function render(d) {
-    if (!d.hits.length) { pane.innerHTML = '<table><tr><td class="text-secondary">Nothing matches “' + esc(d.query) + '”.</td></tr></table>'; pane.hidden = false; return; }
-    pane.innerHTML = '<table>' + d.hits.map(function (h) {
+    if (!d.hits.length) { pane.innerHTML = '<div class="ro-empty">Nothing matches “' + esc(d.query) + '”.</div>'; pane.hidden = false; return; }
+    pane.innerHTML = d.hits.map(function (h) {
       var offers = (h.offers || []).length ? '<div class="text-secondary">fills ' + esc(h.offers.join(', ')) + '</div>' : '';
       var state = h.kind === 'trip' ? esc(h.state) : (h.trips + ' trip' + (h.trips === 1 ? '' : 's'));
-      return '<tr><td><span class="k">' + KIND[h.kind] + '</span></td>' +
-        '<td><strong>' + esc(h.label) + '</strong>' + (h.sublabel ? ' <span class="text-secondary">' + esc(h.sublabel) + '</span>' : '') +
-        (h.detail ? '<div class="text-secondary">' + esc(h.detail) + '</div>' : '') + offers + '</td>' +
-        '<td class="text-secondary">' + state + (h.atSea ? ' <span class="badge text-bg-info">at sea</span>' : '') + '</td>' +
-        '<td>' + (current ? '<button class="btn btn-outline-primary btn-sm py-0" data-apply="' + esc(h.key) + '">Use</button>'
-                          : '<a class="btn btn-outline-secondary btn-sm py-0" href="/logon/' + (h.lastTrip || '') + '">Open</a>') + '</td></tr>';
-    }).join('') + '</table>';
+      return '<div class="ro-search-card"><span class="k">' + KIND[h.kind] + '</span>' +
+        '<div class="body"><strong>' + esc(h.label) + '</strong>' + (h.sublabel ? ' <span class="text-secondary">' + esc(h.sublabel) + '</span>' : '') +
+        (h.detail ? '<div class="text-secondary">' + esc(h.detail) + '</div>' : '') + offers + '</div>' +
+        '<span class="text-secondary">' + state + (h.atSea ? ' <span class="badge text-bg-info">at sea</span>' : '') + '</span>' +
+        (current ? '<button class="btn btn-outline-primary btn-sm" data-apply="' + esc(h.key) + '">Use</button>'
+                 : '<a class="btn btn-outline-secondary btn-sm" href="/logon/' + (h.lastTrip || '') + '">Open</a>') + '</div>';
+    }).join('');
     pane.hidden = false;
   }
   box.addEventListener('input', function () {
@@ -254,7 +269,7 @@
       fetch('/api/logons/search?q=' + encodeURIComponent(q) + (current ? '&for=' + current : ''), { credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) throw new Error('Search failed (' + r.status + ')'); return r.json(); })
         .then(render)
-        .catch(function (e) { pane.innerHTML = '<table><tr><td class="text-danger">' + esc(e.message) + '</td></tr></table>'; pane.hidden = false; });
+        .catch(function (e) { pane.innerHTML = '<div class="ro-empty text-danger">' + esc(e.message) + '</div>'; pane.hidden = false; });
     }, 180);
   });
   document.addEventListener('click', function (ev) {
@@ -274,34 +289,56 @@
 </script>
 {% endmacro %}
 
-{# The queue is the paper radio log's row (spec A.1, DAT-6): its columns, its headings, its order. The
-   deadline condition comes first because it is what the watch is for; it is not a paper cell. #}
+{# The queue keeps the paper log's information, but presents one vessel per Quackit-style record card. #}
 {% macro queue(rows, now, current=None) %}
-<div class="ro-queue-head"><strong>{{ rows|length }} logged on and watched</strong>
-  <span>Accepted, deadlines counting down.</span></div>
-<table class="table table-sm ro-queue" id="queueTable">
-  <thead><tr><th>Status</th><th>Date</th><th>Time</th><th>Member No. OR Vessel Name</th><th>Vessel Rego. No.</th><th>Mobile Phone Number</th><th>Vessel Details</th><th>POB</th><th>Departure Point</th><th>Going to</th><th title="ETA/ETR">Return Day or Date</th><th title="ETA/ETR">Time</th><th>No.</th><th>Identity</th><th>Accepted</th><th></th></tr></thead>
-  <tbody>
-  {% for r in rows %}<tr class="{% if r.condition == 'overdue' %}table-danger{% elif r.condition == 'approaching' %}table-warning{% endif %}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
-    <td>{{ cond(r) }}</td>
-    <td>{{ cell(r.callDayBox) }}</td>
-    <td>{{ cell(r.callTimeRaw) }}</td>
-    <td><a href="/logon/{{ r.id }}" class="fw-semibold">{{ r.memberNumber or r.vesselName or ('log on ' ~ r.dayNumber) }}</a>{% if r.memberNumber and r.vesselName %} <span class="text-secondary">{{ r.vesselName }}</span>{% endif %}</td>
-    <td>{{ cell(r.registration) }}</td>
-    <td>{{ cell(r.mobile) }}</td>
-    <td class="wrap">{{ cell(r.vesselDetails) }}</td>
-    <td>{{ cell(r.pob) }}</td>
-    <td class="wrap">{{ cell(r.departurePoint) }}</td>
-    <td class="wrap">{{ cell(r.destination) }}</td>
-    <td>{% if r.etaDayBox %}<span title="{{ r.etaDayRaw }}">{{ r.etaDayBox }}</span>{% endif %}</td>
-    <td>{% if r.eta %}<span title="{{ r.etaBasis }}">{{ when(r.eta, now) }}</span>{% elif r.etaRaw %}<span class="text-danger" title="{{ r.etaBasis }}">{{ r.etaRaw }}</span>{% endif %}</td>
-    <td class="fw-semibold">{{ r.dayNumber if r.dayNumber is not none else ('#' ~ r.id) }}</td>
-    <td>{{ outcome(r.verifyOutcome, r.verifyBasis or '') }}</td>
-    <td class="text-secondary">{{ r.acceptedAt.strftime('%H:%M') if r.acceptedAt }} {{ r.acceptedBy or '' }}</td>
-    <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td>
-  </tr>{% else %}<tr><td colspan="16" class="text-secondary">Nothing at sea under this unit's watch.</td></tr>{% endfor %}
-  </tbody>
-</table>
+<div class="ro-list-head"><strong>{{ rows|length }} logged on</strong><span>Deadlines are counting down.</span></div>
+<div class="ro-card-list" id="queueCards">
+{% for r in rows %}
+  <article class="ro-record-card {{ r.condition }}{% if r.id == current %} ro-current{% endif %}" data-id="{{ r.id }}">
+    <div class="ro-card-top">
+      {{ cond(r) }}
+      <a class="btn btn-success btn-sm ro-card-title" href="/logon/{{ r.id }}">{{ r.memberNumber or r.vesselName or ('Log on ' ~ r.dayNumber) }}</a>
+      {% if r.memberNumber and r.vesselName %}<span>{{ r.vesselName }}</span>{% endif %}
+      {% if r.registration %}<span class="badge border text-secondary">{{ r.registration }}</span>{% endif %}
+      {{ outcome(r.verifyOutcome, r.verifyBasis or '') }}
+      <span class="text-secondary small">{{ r.dayNumber if r.dayNumber is not none else ('#' ~ r.id) }}</span>
+      <a class="btn btn-outline-secondary btn-sm ro-card-action" href="/logon/{{ r.id }}"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+    </div>
+    <div class="ro-card-meta">
+      <div class="ro-card-field"><span class="k">Called</span><span class="v">{{ cell(r.callDayBox) }} {{ cell(r.callTimeRaw) }}</span></div>
+      <div class="ro-card-field"><span class="k">Return</span><span class="v">{% if r.etaDayBox %}{{ r.etaDayBox }} {% endif %}{% if r.eta %}{{ when(r.eta, now) }}{% else %}{{ r.etaRaw or '—' }}{% endif %}</span></div>
+      <div class="ro-card-field"><span class="k">Route</span><span class="v">{{ r.departurePoint or '—' }} → {{ r.destination or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">POB</span><span class="v">{{ r.pob or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Mobile</span><span class="v">{{ r.mobile or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Vessel</span><span class="v">{{ r.vesselDetails or '—' }}</span></div>
+    </div>
+  </article>
+{% else %}<div class="ro-empty">Nothing at sea under this unit's watch.</div>{% endfor %}
+</div>
+{% endmacro %}
+
+{% macro closed_list(rows, now, reference) %}
+<div class="ro-list-head"><strong>{{ rows|length }} recently closed</strong><span>Logged off or discarded.</span></div>
+<div class="ro-card-list">
+{% for r in rows %}
+  <article class="ro-record-card closed" data-closed="{{ r.id }}">
+    <div class="ro-card-top">
+      {% if r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary">Discarded</span>
+      {% elif r.closeReason == 'notdeparted' %}<span class="badge text-bg-warning">Never departed</span>
+      {% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}
+      <a class="btn btn-outline-secondary btn-sm ro-card-title" href="/logon/{{ r.id }}">{{ r.memberNumber or r.vesselName or r.registration or reference(r) }}</a>
+      <span class="text-secondary small">{{ reference(r) }}</span>
+      <a class="btn btn-outline-secondary btn-sm ro-card-action" href="/logon/{{ r.id }}"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+    </div>
+    <div class="ro-card-meta">
+      <div class="ro-card-field"><span class="k">Closed</span><span class="v">{{ when(r.discardedAt or r.cancelledAt or r.loggedOffAt, now) }}</span></div>
+      <div class="ro-card-field"><span class="k">Return was</span><span class="v">{{ when(r.eta, now) or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Going to</span><span class="v">{{ r.destination or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Reason / evidence</span><span class="v">{{ r.discardReason or r.cancelReason or r.loggedOffNote or '—' }}</span></div>
+    </div>
+  </article>
+{% else %}<div class="ro-empty">No recently closed records.</div>{% endfor %}
+</div>
 {% endmacro %}
 
 {% macro refresh_script(current) %}
@@ -312,7 +349,13 @@ window.refreshQueue = function () {
   if (!pane) return;
   fetch('/logons/rows?partial=1{% if current %}&current={{ current }}{% endif %}', { credentials: 'same-origin' })
     .then(function (r) { if (!r.ok) throw new Error('Queue refresh failed (' + r.status + ')'); return r.text(); })
-    .then(function (html) { pane.innerHTML = html; })
+    .then(function (html) {
+      var fresh = new DOMParser().parseFromString(html, 'text/html');
+      ['roLiveAlerts', 'roLiveDrafts', 'roLiveWatch'].forEach(function (id) {
+        var current = document.getElementById(id), next = fresh.getElementById(id);
+        if (current && next) current.innerHTML = next.innerHTML;
+      });
+    })
     .catch(function (e) { var n = document.getElementById('queueNote'); if (n) { n.textContent = e.message; n.className = 'small text-danger'; } });
 };
 setInterval(window.refreshQueue, 30000);

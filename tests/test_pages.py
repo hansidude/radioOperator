@@ -113,11 +113,11 @@ class Pages(unittest.TestCase):
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
-        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-more-pane"')]
-        more = page[page.index('id="ro-more-pane"'):]
+        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-contact-pane"')]
         self.assertIn('data-ro-tab="entry"', page)
-        self.assertIn('data-ro-tab="more"', page)
-        self.assertIn('id="ro-more-pane" class="ro-more-pane d-none"', page)
+        for tab in ('contact', 'vessel', 'identity', 'watch', 'record'):
+            self.assertIn('data-ro-tab="%s"' % tab, page)
+            self.assertIn('id="ro-%s-pane" class="ro-workspace-pane d-none"' % tab, page)
         self.assertEqual(entry.count('class="capture-row row g-3"'), 5)
         rows = entry.split('class="capture-row row g-3"')[1:]
         for row, fields in zip(rows, (
@@ -129,8 +129,20 @@ class Pages(unittest.TestCase):
             for field in fields:
                 self.assertIn('id="f-%s"' % field, row.split('capture-row row g-3', 1)[0])
         self.assertNotIn('id="queuePane"', entry)
-        self.assertIn('id="queuePane"', more)
+        self.assertIn('id="queuePane"', page)
         self.assertIn('font-size:1.2rem', page)
+        self.assertNotIn('<table', page)
+
+    def test_queue_uses_tabs_and_cards_not_tables(self):
+        draft = self.new()
+        watching = self.accepted(rego='CD456Q', member='7788')
+        page = self.a.get('/logons').get_data(as_text=True)
+        for tab in ('watch', 'drafts', 'closed', 'find'):
+            self.assertIn('data-ro-tab="%s"' % tab, page)
+        self.assertIn('data-id="%d"' % watching, page)
+        self.assertIn('data-draft="%d"' % draft, page)
+        self.assertIn('class="ro-record-card', page)
+        self.assertNotIn('<table', page)
 
     def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
         i = self.new()
@@ -192,7 +204,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         self.assertIn('Draft 2', page)
         self.assertIn('draft 2 of', page)
-        self.assertIn('>1</a>', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('>Draft 1</a>', self.a.get('/logons').get_data(as_text=True))
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by

@@ -51,12 +51,14 @@ def main():
               'This is a draft, not a log on' in page.content())
         check('and nothing about it is watched', 'NOT WATCHED' in page.content())
         check('the main view is the five operator rows', page.locator('#ro-entry-pane .capture-row').count() == 5)
-        check('the watch queue starts on More', not page.locator('#queuePane').is_visible())
+        check('the watch queue starts on its own hidden tab', not page.locator('#queuePane').is_visible())
         size = float(page.locator('#f-callDay').evaluate("el => parseFloat(getComputedStyle(el).fontSize)"))
         check('the main entry text is large', size >= 18, '%spx' % size)
-        page.click('[data-ro-tab="more"]')
-        check('More shows the supporting detail and queue', page.locator('#queuePane').is_visible()
-              and page.locator('#captureMore').is_visible())
+        check('the radio page uses cards and no tables', page.locator('table').count() == 0)
+        page.click('[data-ro-tab="contact"]')
+        check('supporting details have a focused tab', page.locator('#captureContact').is_visible())
+        page.click('[data-ro-tab="watch"]')
+        check('Watch shows card collections', page.locator('#queuePane').is_visible())
         page.click('[data-ro-tab="entry"]')
 
         # type the way an operator does: every field, one after another, without waiting
@@ -75,13 +77,14 @@ def main():
         check('every value survived the reload', all(stored[f] for f, _ in FIELDS),
               [f for f, _ in FIELDS if not stored[f]])
         check('the drafts list shows this record, not the queue',
-              page.locator('tr[data-draft="%s"]' % record).count() == 1
-              and page.locator('tr[data-id="%s"]' % record).count() == 0)
+              page.locator('[data-draft="%s"]' % record).count() == 1
+              and page.locator('[data-id="%s"]' % record).count() == 0)
 
         # section 7 through the real page: a host may own the bare /api/search, so this must not 404
+        page.click('[data-ro-tab="identity"]')
         page.fill('#findBox', 'BROWSER')
-        page.wait_for_selector('#findHits table tr', timeout=8000)
-        rows = page.locator('#findHits tr').all_inner_texts()
+        page.wait_for_selector('#findHits .ro-search-card', timeout=8000)
+        rows = page.locator('#findHits .ro-search-card').all_inner_texts()
         check('the search box returns something', rows and 'Nothing matches' not in rows[0], rows[:2])
         check('and the verification panel is on the page', page.locator('.ro-verify').count() == 1)
 
@@ -90,14 +93,14 @@ def main():
               'Everything needed is here' in page.content())
         page.click('button:has-text("Accept the log on")')
         page.wait_for_load_state()
-        check('accepting puts it on the watch queue', page.locator('tr[data-id="%s"]' % record).count() == 1)
+        check('accepting puts it on the watch queue', page.locator('[data-id="%s"]' % record).count() == 1)
         check('and it reads as logged on', 'Logged on and watched' in page.content())
-        check('and it is no longer a draft', page.locator('tr[data-draft="%s"]' % record).count() == 0)
+        check('and it is no longer a draft', page.locator('[data-draft="%s"]' % record).count() == 0)
 
         page.fill('#logoffNote', 'browser check')
         page.click('button:has-text("Log off")')
         page.wait_for_load_state()
-        check('log off leaves the open queue', page.locator('tr[data-id="%s"]' % record).count() == 0)
+        check('log off leaves the open queue', page.locator('[data-id="%s"]' % record).count() == 0)
         check('and appears as logged off', 'browser check' in page.content())
         check('no javascript errors on the log on pages', not errors, errors)
         browser.close()

@@ -1,1 +1,4 @@
-{% import 'radio/_ui.html' as ui %}{{ ui.alert_list(alerts, health) }}{{ ui.draft_list(drafts, now, reference, current) }}{{ ui.queue(queue, now, current) }}
+{% import 'radio/_ui.html' as ui %}
+<div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
+<div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference, current) }}</div>
+<div id="roLiveWatch">{{ ui.queue(queue, now, current) }}</div>

@@ -1,34 +1,54 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>Log on{% endblock %}
+{% block page_title %}<i class="bi bi-broadcast me-1"></i>Radio log{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Log on">
-  <div class="entity-nav-links">
-    <span class="small text-secondary">{{ queue|length }} logged on</span>
-    {% set overdue = queue|selectattr('condition', 'equalto', 'overdue')|list|length %}{% if overdue %}<span class="badge text-bg-danger">{{ overdue }} overdue</span>{% endif %}
-    {% if drafts %}<span class="badge text-bg-warning" title="Saved, not watched, and nobody is counting them down">{{ drafts|length }} draft{{ '' if drafts|length == 1 else 's' }} not logged on</span>{% endif %}
-    <span id="queueNote" class="small text-secondary">approaching = {{ window }} min</span>
+<div class="entity-nav" role="navigation" aria-label="Radio log views">
+  <div class="entity-nav-links"><span id="queueNote" class="small text-secondary">approaching = {{ window }} min</span></div>
+  <div class="btn-group btn-group-sm ro-view-tabs" id="queueViewTabs" role="group" aria-label="Radio log views">
+    <button type="button" class="btn btn-outline-secondary active" data-ro-tab="watch" aria-controls="ro-watch-pane" aria-pressed="true"><i class="bi bi-broadcast me-1"></i>Watch <span class="badge text-bg-secondary">{{ queue|length }}</span></button>
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="drafts" aria-controls="ro-drafts-pane" aria-pressed="false"><i class="bi bi-pencil-square me-1"></i>Drafts <span class="badge text-bg-secondary">{{ drafts|length }}</span></button>
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="closed" aria-controls="ro-closed-pane" aria-pressed="false"><i class="bi bi-check2-circle me-1"></i>Closed</button>
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="find" aria-controls="ro-find-pane" aria-pressed="false"><i class="bi bi-search me-1"></i>Find</button>
   </div>
-  {{ ui.find() }}
   <form method="post" action="/logons/new"><button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New log on</button></form>
 </div>
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-<div id="queuePane" class="mt-2">{{ ui.alert_list(alerts, health) }}{{ ui.draft_list(drafts, now, reference) }}{{ ui.queue(queue, now) }}</div>
-{% if closed %}
-<details class="mt-3"><summary class="small text-secondary">Recently closed ({{ closed|length }})</summary>
-<table class="table table-sm ro-queue mt-1"><thead><tr><th>No.</th><th>Closed</th><th>How</th><th>Vessel</th><th>Return was</th><th>Going to</th><th>Reason / evidence</th><th></th></tr></thead><tbody>
-{% for r in closed %}<tr><td class="fw-semibold">{{ reference(r) }}</td>
-  <td>{{ ui.when(r.discardedAt or r.cancelledAt or r.loggedOffAt, now) }}</td>
-  <td>{% if r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary" title="Never a log on">Discarded</span>
-      {% elif r.closeReason == 'notdeparted' %}<span class="badge text-bg-warning">Never departed</span>
-      {% else %}<span class="badge text-bg-success">Logged off</span>{% endif %}</td>
-  <td>{{ r.memberNumber or r.vesselName or r.registration or '' }}</td><td>{{ ui.when(r.eta, now) }}</td><td class="wrap">{{ r.destination or '' }}</td>
-  <td class="wrap">{{ r.discardReason or r.cancelReason or r.loggedOffNote or '' }}</td>
-  <td><a class="btn btn-outline-secondary btn-sm py-0" href="/logon/{{ r.id }}">Open</a></td></tr>{% endfor %}
-</tbody></table></details>
-{% endif %}
+<div id="queuePane">
+  <section id="ro-watch-pane" class="ro-workspace-pane" data-ro-pane="watch">
+    <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
+    <div id="roLiveWatch">{{ ui.queue(queue, now) }}</div>
+  </section>
+  <section id="ro-drafts-pane" class="ro-workspace-pane d-none" data-ro-pane="drafts">
+    <div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference) }}</div>
+  </section>
+  <section id="ro-closed-pane" class="ro-workspace-pane d-none" data-ro-pane="closed">{{ ui.closed_list(closed, now, reference) }}</section>
+  <section id="ro-find-pane" class="ro-workspace-pane d-none" data-ro-pane="find">
+    <h2 class="ro-section-title">Find a previous vessel, member or trip</h2>
+    {{ ui.find() }}
+  </section>
+</div>
 {{ ui.refresh_script(None) }}
 {{ ui.find_script() }}
+<script>
+(function () {
+  var group = document.getElementById('queueViewTabs');
+  if (!group) return;
+  var buttons = Array.prototype.slice.call(group.querySelectorAll('[data-ro-tab]'));
+  function show(name, updateHash) {
+    if (!buttons.some(function (button) { return button.dataset.roTab === name; })) name = 'watch';
+    buttons.forEach(function (button) {
+      var active = button.dataset.roTab === name;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+      var pane = document.getElementById(button.getAttribute('aria-controls'));
+      if (pane) pane.classList.toggle('d-none', !active);
+    });
+    if (updateHash && window.history && window.history.replaceState) window.history.replaceState(null, '', '#' + name);
+  }
+  buttons.forEach(function (button) { button.addEventListener('click', function () { show(button.dataset.roTab, true); }); });
+  show(window.location.hash.slice(1) || 'watch', false);
+})();
+</script>
 {% endblock %}
