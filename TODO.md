@@ -180,10 +180,13 @@ That review is done. Resolved:
 - the unified toolbar is built and the separate draft date filter is gone;
 - the page tests were rewritten against the new markup (78 pass, Python 3.9 container).
 
-Still outstanding: **the content width**. At a 1920px viewport the log stops at 1548px, because
-quackit's `layout.html` container centres the page. Using the full width to a 1920px maximum means
-overriding the host's container from radio's own CSS, which crosses the host boundary this repo
-keeps -- a decision, not an oversight.
+Content width: **done**. `logons.html` overrides `body_wrap_class`, the block both base templates
+already expose, so the log opts out of quackit's 120ch reading-width cap (`layout.html:47`) without
+touching host CSS; `.ro-wide` then caps it at 1920px. Measured: 1920px wrapper at a 2560 viewport
+(centred), full width below that, no horizontal page scroll.
+
+The New Log On page (`logon.html`) still sits inside the 120ch cap -- the same one-line block
+override would widen it, but its layout has not been reviewed at full width.
 
 Browser checks done at 1920/900/390px: no horizontal page scroll at any width; rows are 35px in
 table mode and 236px labelled cards under 576px; empty cells drop out of the card (a sparse record

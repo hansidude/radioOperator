@@ -27,7 +27,11 @@
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
 .ro-toolbar select,.ro-toolbar .ro-toolbar-date{width:auto;min-width:7.5rem}
 .ro-toolbar .ro-toolbar-tick{display:flex;align-items:center;gap:.3rem;margin:0;min-height:0;padding-left:1.4rem}
-.ro-toolbar .ro-toolbar-search{flex:1 1 16rem;min-width:10rem}
+/* Grows to fill the row, but a search box the width of a 1920px screen is just a long empty bar. */
+.ro-toolbar .ro-toolbar-search{flex:1 1 16rem;min-width:10rem;max-width:30rem}
+/* The log's own width cap. Wide enough for all fourteen columns, still bounded so the rows do
+   not stretch to the width of a very large screen. */
+.ro-wide{max-width:1920px;margin-left:auto;margin-right:auto}
 .ro-paper-log{width:100%;overflow-x:auto;padding-bottom:.15rem}
 .ro-paper-grid{display:grid;grid-template-columns:4fr 8fr 5fr 11fr 8fr 10fr 11fr 5fr 10fr 10fr 8fr 5fr 7fr 2.8rem;min-width:56rem}
 .ro-paper-head{color:var(--bs-secondary-color);font-size:.62rem;font-weight:600;line-height:1.1;text-transform:uppercase}

@@ -1,6 +1,10 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>Radio log{% endblock %}
+{# The log is a 14-column paper form, not prose: the host's reading-width cap (quackit's
+   .mySpacing, 120ch) squeezes it to 1548px on a wide screen and starts clipping cells. Both
+   base templates expose this block, so opting out is the host's own hook, not a CSS override. #}
+{% block body_wrap_class %}container-fluid ro-wide{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Radio log">
   <span id="queueNote" class="small text-danger me-auto" role="alert" hidden></span>
