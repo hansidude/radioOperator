@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS `Alerts` (
   `raisedAt` DATETIME NOT NULL,                               -- the moment the checker noticed
   `notifiedAt` DATETIME DEFAULT NULL,                         -- last time it was put in front of someone
   `notifyCount` INT NOT NULL DEFAULT 0,
+  `deliveredAt` DATETIME DEFAULT NULL,                        -- last time a channel accepted it
+  `deliveryError` VARCHAR(255) DEFAULT NULL,                  -- why it did not: a silent pager is worse than none
   `acknowledgedAt` DATETIME DEFAULT NULL,                     -- attention, not resolution
   `acknowledgedBy` VARCHAR(255) DEFAULT NULL,
   `resolvedAt` DATETIME DEFAULT NULL,

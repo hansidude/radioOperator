@@ -14,9 +14,22 @@ long-trip reporting are later slices.
 lease, with no browser involved. It raises a draft that has gone unaccepted past the unit's interval
 and a log on whose return time has passed, records each as a row that survives a restart, keeps
 raising it until its cause is resolved, and reports whether it is alive so a dead checker does not
-look like a quiet night. What it does not do is deliver anything out of band: `Host.notify` is the
-seam for a unit's approved channel, and until one is approved an alert reaches a person only when
-they look at the site. On the spec's own terms that means ACC-5 is not yet met.
+look like a quiet night. **Where alerts go** is configuration, because the spec leaves the channel to the unit. Set any of
+these and an alert reaches someone who is not looking at the screen:
+
+```
+RADIO_ALERT_WEBHOOK=https://...     an HTTP POST of the alert as JSON: a phone-notification
+                                    service, a chat room, an SMS gateway, a siren on the bench
+RADIO_ALERT_SMTP_HOST / _PORT / _FROM / _TO / _STARTTLS / _SSL / _USER / _PASSWORD
+```
+
+With neither set, an alert reaches whoever has the site open and nobody else. The page says so
+rather than looking calm, a failed delivery is recorded against the alert and shown, and "Test the
+alert channel" on the log ons page sends a real one so the unit can prove it works before trusting
+it. While a page is open it also sounds an alarm and flashes the tab title, which is delivery to
+somebody in the room and to nobody else.
+
+Until a channel is configured and proved, ACC-5 is not met.
 
 **Identity comes from the unit's own trip history**, not a membership register: the unit's vessel and
 member records live in a system this app cannot reach, and §3.1 allows a conceptual model rather than

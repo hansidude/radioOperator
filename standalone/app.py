@@ -77,6 +77,15 @@ def create_app(db_url=None):
                       ('watch_stale_seconds', 'RADIO_WATCH_STALE_SECONDS')):
         if os.environ.get(env):
             setattr(host, name, int(os.environ[env]))
+    host.alert_delivery = {
+        'webhook': os.environ.get('RADIO_ALERT_WEBHOOK'),
+        'email': {'host': os.environ.get('RADIO_ALERT_SMTP_HOST'), 'port': os.environ.get('RADIO_ALERT_SMTP_PORT', '25'),
+                  'from': os.environ.get('RADIO_ALERT_FROM', 'logon@localhost'), 'to': os.environ.get('RADIO_ALERT_TO'),
+                  'starttls': os.environ.get('RADIO_ALERT_SMTP_STARTTLS') == '1',
+                  'ssl': os.environ.get('RADIO_ALERT_SMTP_SSL') == '1',
+                  'username': os.environ.get('RADIO_ALERT_SMTP_USER'),
+                  'password': os.environ.get('RADIO_ALERT_SMTP_PASSWORD')},
+    }
     mount(app, host, watch_every=int(os.environ.get('RADIO_WATCH_SECONDS', '30')))
     app.add_url_rule('/', 'home', lambda: redirect('/logons'))
     return app

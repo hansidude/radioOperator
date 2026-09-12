@@ -70,7 +70,7 @@ def open_alerts(cur, unit=None, logon_id=None):
     cur.execute(sql + ' ORDER BY dueAt', tuple(args))
     rows = cur.fetchall() or []
     for r in rows:
-        for k in ('dueAt', 'raisedAt', 'notifiedAt', 'acknowledgedAt', 'resolvedAt'):
+        for k in ('dueAt', 'raisedAt', 'notifiedAt', 'deliveredAt', 'acknowledgedAt', 'resolvedAt'):
             r[k] = L._dt(r[k])
     return rows
 
@@ -135,15 +135,25 @@ def sweep(cur, now, followup_minutes, repeat_minutes=None, notify=None):
 
 
 def _notify(notify, cur, alert_id, row, kind, now):
-    cur.execute('UPDATE Alerts SET notifiedAt = %s, notifyCount = notifyCount + 1 WHERE id = %s', (_s(now), alert_id))
-    message = '%s: %s %s' % (KINDS[kind], 'draft' if kind == 'draftfollowup' else 'log on', L.reference(row))
+    """Put it in front of somebody, and record whether that worked. Whether it worked is the part
+    that matters: a channel that has quietly stopped delivering is worse than none at all, so the
+    outcome is kept against the alert and shown rather than logged and forgotten."""
+    message = '%s: %s %s%s' % (KINDS[kind], 'draft' if kind == 'draftfollowup' else 'log on', L.reference(row),
+                               (' (%s)' % row['registration']) if row.get('registration') else '')
     log.warning(message)
+    delivered, error = None, 'No delivery channel is configured'
     if notify:
         try:
-            notify({'alertId': alert_id, 'kind': kind, 'unit': row['unit'], 'logOnId': row['id'],
-                    'reference': L.reference(row), 'message': message, 'at': now})
-        except Exception:                     # a broken delivery channel must not stop the watching
+            out = notify({'alertId': alert_id, 'kind': kind, 'unit': row['unit'], 'logOnId': row['id'],
+                          'reference': L.reference(row), 'vessel': row.get('registration') or row.get('vesselName'),
+                          'message': message, 'at': now})
+            sent, error = out if isinstance(out, tuple) else ([], None)
+            delivered = _s(now) if sent else None
+        except Exception as e:                # a broken delivery channel must not stop the watching
             log.exception('notify failed for alert %s', alert_id)
+            error = str(e)[:255]
+    cur.execute('UPDATE Alerts SET notifiedAt = %s, notifyCount = notifyCount + 1, deliveredAt = %s, '
+                'deliveryError = %s WHERE id = %s', (_s(now), delivered, error, alert_id))
 
 
 # ---------- the lease, so several web workers do not each run it ----------
@@ -167,6 +177,21 @@ def mark_run(cur, now, error=None):
                 (_s(now), (str(error)[:255] if error else None)))
 
 
+def delivery_health(cur, unit=None):
+    """Whether alerts are actually reaching anyone. Separate from whether the checker is alive:
+    a checker that runs perfectly and a pager that stopped working look the same on a quiet page."""
+    sql = ('SELECT COUNT(*) AS n FROM Alerts WHERE isActive = 1 AND resolvedAt IS NULL '
+           'AND notifyCount > 0 AND deliveryError IS NOT NULL')
+    args = ()
+    if unit is not None:
+        sql, args = sql + ' AND unit = %s', (unit,)
+    cur.execute(sql, args)
+    undelivered = (cur.fetchone() or {}).get('n') or 0
+    cur.execute(sql.replace('COUNT(*) AS n', 'deliveryError') + ' ORDER BY id DESC LIMIT 1', args)
+    row = cur.fetchone()
+    return {'undelivered': undelivered, 'lastError': (row or {}).get('deliveryError')}
+
+
 def health(cur, now, stale_seconds):
     """Whether anything is watching, in words. A dead checker and a quiet one look the same
     otherwise, so this is shown on the page rather than kept for an administrator."""
@@ -177,10 +202,18 @@ def health(cur, now, stale_seconds):
     last = L._dt(row['lastRunAt'])
     age = int((now - last).total_seconds())
     ok = age <= stale_seconds and not row['lastError']
-    return {'ok': ok, 'lastRunAt': last, 'ageSeconds': age, 'holder': row['holder'], 'lastError': row['lastError'],
-            'message': ('Checked %s ago' % (('%d s' % age) if age < 90 else ('%d min' % (age // 60))))
-                       if ok else ('Deadlines have not been checked for %d min. Nothing may be watching.' % (age // 60)
-                                   if not row['lastError'] else 'The deadline checker is failing: %s' % row['lastError'])}
+    delivery = delivery_health(cur)
+    out = {'ok': ok, 'lastRunAt': last, 'ageSeconds': age, 'holder': row['holder'], 'lastError': row['lastError'],
+           'undelivered': delivery['undelivered'], 'deliveryError': delivery['lastError'],
+           'message': ('Checked %s ago' % (('%d s' % age) if age < 90 else ('%d min' % (age // 60))))
+                      if ok else ('Deadlines have not been checked for %d min. Nothing may be watching.' % (age // 60)
+                                  if not row['lastError'] else 'The deadline checker is failing: %s' % row['lastError'])}
+    if delivery['undelivered']:
+        out['ok'] = False
+        out['message'] += '. %d alert%s reached nobody: %s' % (delivery['undelivered'],
+                                                               '' if delivery['undelivered'] == 1 else 's',
+                                                               delivery['lastError'] or 'delivery failed')
+    return out
 
 
 # ---------- the timer ----------

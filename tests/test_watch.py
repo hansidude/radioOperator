@@ -151,3 +151,66 @@ class Watching(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Delivery(unittest.TestCase):
+    """Getting it in front of someone who is not looking at the screen, and knowing when that failed."""
+
+    def test_nothing_configured_is_reported_rather_than_silent(self):
+        from server import notify as N
+        sent, error = N.deliver({}, {'message': 'a vessel is overdue'})
+        self.assertEqual(sent, [])
+        self.assertIn('No delivery channel', error)
+
+    def test_a_webhook_carries_the_alert(self):
+        import json
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        from server import notify as N
+        got = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                got.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+
+        server = HTTPServer(('127.0.0.1', 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        url = 'http://127.0.0.1:%d/alert' % server.server_address[1]
+        try:
+            sent, error = N.deliver({'webhook': url}, {'message': 'log on 12 is overdue', 'kind': 'overdue',
+                                                       'at': datetime(2026, 9, 12, 15, 0)})
+            self.assertEqual((sent, error), (['webhook'], None))
+            self.assertEqual(got[0]['message'], 'log on 12 is overdue')
+            self.assertEqual(got[0]['at'], '2026-09-12T15:00:00')
+        finally:
+            server.shutdown()
+
+    def test_a_channel_that_is_not_answering_is_recorded_not_swallowed(self):
+        from server import notify as N
+        sent, error = N.deliver({'webhook': 'http://127.0.0.1:9/nothing-listens-here'},
+                                {'message': 'a vessel is overdue'})
+        self.assertEqual(sent, [])
+        self.assertIn('webhook', error)
+
+    def test_a_failed_delivery_shows_as_a_health_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'r.sqlite'
+            create_schema(path)
+            conn = Connection(path)
+            cur = conn.cursor()
+            L.create(cur, 'alice', '', T0)
+            broken = lambda alert: ([], 'webhook: nobody is listening')
+            W.sweep(cur, T0 + timedelta(minutes=FOLLOWUP), FOLLOWUP, FOLLOWUP, broken)
+            alert = W.open_alerts(cur)[0]
+            self.assertIsNone(alert['deliveredAt'])
+            self.assertIn('nobody is listening', alert['deliveryError'])
+            W.take_lease(cur, T0, 90, 'w')
+            W.mark_run(cur, T0 + timedelta(minutes=FOLLOWUP))
+            health = W.health(cur, T0 + timedelta(minutes=FOLLOWUP), 180)
+            self.assertFalse(health['ok'])                       # the checker is fine; the pager is not
+            self.assertIn('reached nobody', health['message'])

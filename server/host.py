@@ -40,13 +40,20 @@ class Host:
         requires a real column type return one of theirs; the checker never claims to be a person."""
         return 'system'
 
-    def notify(self, alert):
-        """Put an alert in front of a person by whatever channel the unit has approved.
+    # Where alerts are sent. Empty means nowhere, and the page says so rather than looking calm.
+    # `{'webhook': 'https://...', 'email': {'host', 'port', 'from', 'to', 'starttls', 'username',
+    # 'password'}}`; see notify.py. The spec refuses to choose a channel (Appendix D q17), so this
+    # is configuration a unit fills in, and an unfilled one is a stated gap rather than a silence.
+    alert_delivery = {}
 
-        The default does nothing, which means an alert reaches someone only when they look at the
-        site. That is not ACC-5, and a deployment that leaves this unimplemented has not met it.
-        A host wires this to the approved channel; the spec refuses to choose one (Appendix D q17)."""
-        return None
+    def notify(self, alert):
+        """Put an alert in front of a person by whatever channel the unit has configured.
+
+        Returns (channels that accepted it, error or None) so the checker can record whether it
+        actually reached anyone. With nothing configured it reaches whoever is looking at the site
+        and nobody else, which does not meet ACC-5 and is reported as such."""
+        from . import notify as N
+        return N.deliver(self.alert_delivery, alert)
 
     # `background_connect` is deliberately not defined here. A host that cannot give a connection
     # outside a request cannot have anything watching while no browser is open, and that is said
