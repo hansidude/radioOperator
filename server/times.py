@@ -29,7 +29,8 @@ FMT = '%a %d %b %H:%M'
 
 
 def _no(raw, why):
-    return {'when': None, 'basis': 'Not understood: %s. Kept as typed: "%s".' % (why, raw), 'warning': 'Not understood: ' + why}
+    return {'when': None, 'basis': 'Not understood: %s. Kept as typed: "%s".' % (why, raw),
+            'warning': 'Not understood: ' + why, 'invalid': True}
 
 
 _WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
@@ -44,7 +45,7 @@ def fmt_day(day, this_year=None):
     return out if this_year is None or day.year == this_year else out + '/%02d' % (day.year % 100)
 
 
-def parse_day(raw, reference):
+def parse_day(raw, reference, warn_before=True):
     """The paper log's 'Return Day or Date' cell on its own:
     {'day': date or None, 'label': how it was given, 'basis', 'warning'}.
 
@@ -53,11 +54,11 @@ def parse_day(raw, reference):
     box shows once a day is resolved, so whatever is displayed can always be typed back in."""
     text = (raw or '').strip()
     if not text:
-        return {'day': None, 'label': '', 'basis': '', 'warning': None}
+        return {'day': None, 'label': '', 'basis': '', 'warning': None, 'invalid': False}
 
     def no(why):
         return {'day': None, 'label': '', 'basis': 'Not understood: %s. Kept as typed: "%s".' % (why, text),
-                'warning': 'Not understood: ' + why}
+                'warning': 'Not understood: ' + why, 'invalid': True}
 
     s = re.sub(r'\s+', ' ', text.lower()).strip('.,')
     day, basis = None, ''
@@ -87,13 +88,13 @@ def parse_day(raw, reference):
         except ValueError:
             return no('not a calendar date')
         basis = 'date given'
-    warning = 'Before today. Check the date.' if day < reference.date() else None
+    warning = 'Before today. Check the date.' if warn_before and day < reference.date() else None
     return {'day': day, 'label': basis,
             'basis': '%s (%s)' % (day.strftime('%a %d %b'), basis) + (' \u2014 ' + warning if warning else ''),
-            'warning': warning}
+            'warning': warning, 'invalid': False}
 
 
-def parse(raw, reference, reference_label='entry time', day=None, day_label=None):
+def parse(raw, reference, reference_label='entry time', day=None, day_label=None, warn_past=True):
     """{'when': datetime or None, 'basis': how it was read, 'warning': what to check or None}.
 
     `reference` is the instant relative and time-only forms are read against (REC-6: the call
@@ -102,7 +103,7 @@ def parse(raw, reference, reference_label='entry time', day=None, day_label=None
     written inside the time."""
     text = (raw or '').strip()
     if not text:
-        return {'when': None, 'basis': '', 'warning': None}
+        return {'when': None, 'basis': '', 'warning': None, 'invalid': False}
     s = re.sub(r'\s+', ' ', text.lower())
 
     # ---- relative: so many hours and minutes after the reference ----
@@ -120,7 +121,8 @@ def parse(raw, reference, reference_label='entry time', day=None, day_label=None
             h, rem = divmod(int(delta.total_seconds()), 3600)
             basis = '%s after the %s %s = %s' % (('%d h %d min' % (h, rem // 60)) if rem else ('%d h' % h), reference_label, reference.strftime(FMT), when.strftime(FMT))
             warning = 'A relative time ignores the return day cell (%s).' % day_label if day is not None else None
-            return {'when': when, 'basis': basis + (' — ' + warning if warning else ''), 'warning': warning}
+            return {'when': when, 'basis': basis + (' — ' + warning if warning else ''),
+                    'warning': warning, 'invalid': False}
     if s.startswith('+'):
         return _no(text, 'say +2h, +30m or +1:30')
 
@@ -183,14 +185,14 @@ def parse(raw, reference, reference_label='entry time', day=None, day_label=None
     if day is None:
         return {'when': None,
                 'basis': 'Read as %02d:%02d, but no day yet. Fill the day cell. Kept as typed: "%s".' % (hour, minute, text),
-                'warning': 'No day: fill the day cell before this is a deadline.'}
+                'warning': None, 'invalid': False}
     when = datetime.combine(day, datetime.min.time()).replace(hour=hour, minute=minute)
     basis = '%s (%s)' % (when.strftime(FMT), day_label)
     warning = None
-    if when < reference:
+    if warn_past and when < reference:
         warning = 'Already past the %s (%s).' % (reference_label, reference.strftime('%a %d %b %H:%M'))
     elif ambiguous:
         warning = 'Read as 24-hour %02d:%02d. Say %d:%02dpm if you mean the afternoon.' % (hour, minute, hour, minute)
     if warning:
         basis += ' — ' + warning
-    return {'when': when, 'basis': basis, 'warning': warning}
+    return {'when': when, 'basis': basis, 'warning': warning, 'invalid': False}

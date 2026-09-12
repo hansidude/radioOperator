@@ -14,9 +14,10 @@ from playwright.sync_api import sync_playwright
 
 URL = os.environ.get('RADIO_URL', 'http://localhost:8091').rstrip('/')
 USER, PASS = os.environ.get('RADIO_USER'), os.environ.get('RADIO_PASS')
-FIELDS = [('callDay', 'today'), ('callTime', '1345'), ('memberNumber', '4471'), ('vesselName', 'BROWSER CHECK'),
-          ('registration', 'AB123Q'), ('mobile', '0412 345 678'), ('pob', '2'), ('departurePoint', 'Marina'),
-          ('destination', 'Facing Island'), ('etaDay', 'tomorrow'), ('eta', '0700')]
+FIELDS = [('callDay', '2026-09-12'), ('callTime', '13:45'), ('memberNumber', '4471'), ('vesselName', 'BROWSER CHECK'),
+          ('registration', 'AB123Q'), ('mobile', '0412 345 678'), ('length', '6'), ('hullColour', 'white'),
+          ('make', 'Quintrex'), ('model', '610'), ('pob', '2'), ('departurePoint', 'Marina'),
+          ('destination', 'Facing Island'), ('etaDay', '2026-09-13'), ('eta', '07:00')]
 fails = []
 
 
@@ -55,6 +56,16 @@ def main():
         check('the watch queue starts on its own hidden tab', not page.locator('#queuePane').is_visible())
         size = float(page.locator('#f-callDay').evaluate("el => parseFloat(getComputedStyle(el).fontSize)"))
         check('the main entry text is large', size >= 18, '%spx' % size)
+        check('date and time pickers are available',
+              page.locator('[data-picker-target="callDay"][type="date"]').count() == 1
+              and page.locator('[data-picker-target="callTime"][type="time"]').count() == 1)
+        page.locator('[data-picker-target="callDay"]').evaluate(
+            "(el) => { el.value = '2026-09-12'; el.dispatchEvent(new Event('change', {bubbles: true})); }")
+        page.locator('[data-picker-target="callTime"]').evaluate(
+            "(el) => { el.value = '13:45'; el.dispatchEvent(new Event('change', {bubbles: true})); }")
+        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
+        check('picker selections enter and save the date and time',
+              '/' in page.input_value('#f-callDay') and page.input_value('#f-callTime') == '13:45')
         check('the radio page uses cards and no tables', page.locator('table').count() == 0)
         page.click('[data-ro-tab="contact"]')
         check('supporting details have a focused tab', page.locator('#captureContact').is_visible())
@@ -69,9 +80,19 @@ def main():
         page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
         status = page.text_content('#saveStatus').strip()
         check('every field saved with no race', status.startswith('Saved'), status)
-        check('the day box shows a date', page.input_value('#f-etaDay') == 'Sun 13/9' or '/' in page.input_value('#f-etaDay'),
+        check('the day box shows a date', '/' in page.input_value('#f-etaDay'),
               page.input_value('#f-etaDay'))
-        check('the ETA reads as an instant', ':' in page.text_content('#b-eta'), page.text_content('#b-eta').strip())
+        check('valid dates and times are not marked invalid', page.locator('#ro-entry-pane .is-invalid').count() == 0)
+        page.fill('#f-eta', '25:70')
+        page.dispatch_event('#f-eta', 'change')
+        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
+        check('a malformed time is marked only on its field',
+              page.locator('#f-eta.is-invalid').count() == 1
+              and page.locator('#ro-entry-pane .ro-basis, #ro-entry-pane .ro-warn').count() == 0)
+        page.fill('#f-eta', '07:00')
+        page.dispatch_event('#f-eta', 'change')
+        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
+        check('correcting the time removes the invalid state', page.locator('#f-eta.is-invalid').count() == 0)
 
         page.reload()
         stored = {f: page.input_value('#f-' + f) for f, _ in FIELDS}

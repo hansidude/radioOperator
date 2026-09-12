@@ -4,4 +4,4 @@
 <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
 <div id="roLiveDrafts">{{ ui.draft_list(drafts, now, reference, current, heading=False) }}</div>
 <div id="roLiveWatch">{{ ui.queue(queue, now, current, heading=False) }}</div>
-<div id="roLiveOverdue">{{ ui.queue(overdue, now, current, heading=False) }}</div>
+<div id="roLiveOverdue">{{ ui.queue(overdue, now, current, heading=False, empty='0 overdue') }}</div>

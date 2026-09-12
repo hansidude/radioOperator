@@ -33,6 +33,7 @@
 .ro-card-field .k{color:var(--bs-secondary-color);font-size:.68rem;text-transform:uppercase}
 .ro-card-field .v{font-size:.82rem;overflow-wrap:anywhere}
 .ro-empty{color:var(--bs-secondary-color);padding:.35rem 0}
+.ro-zero{font-size:1.05rem;color:var(--bs-secondary-color);padding:.35rem 0}
 .ro-status-counts{display:grid;grid-template-columns:repeat(3,minmax(9rem,1fr));gap:.45rem;margin:.65rem 0 .8rem}
 .ro-status-count{display:flex;align-items:center;gap:.65rem;min-height:3.8rem;border:1px solid var(--bs-border-color);border-left:4px solid var(--bs-success);border-radius:.25rem;padding:.4rem .7rem;background:var(--bs-body-bg)}
 .ro-status-count.overdue{border-left-color:var(--bs-danger)}
@@ -68,14 +69,14 @@
 .ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
 .ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
 .ro-workspace-pane{width:100%;padding:.25rem 0 1rem}
-.ro-entry-shell{max-width:72rem;margin:0 auto}
 .ro-primary-form .capture-row{padding:.65rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-primary-form .capture-row:first-child{padding-top:.25rem}
 .ro-primary-form label,.ro-primary-form .group-label{display:block;font-size:1rem;font-weight:600;color:var(--bs-body-color);margin:0 0 .35rem}
 .ro-primary-form .form-control,.ro-primary-form .form-select{min-height:3.15rem;font-size:1.2rem;line-height:1.35;padding:.65rem .75rem}
 .ro-primary-form textarea.form-control{min-height:6rem}
 .ro-primary-form .mandatory .form-control{background:var(--bs-tertiary-bg)}
-.ro-primary-form .ro-basis,.ro-primary-form .ro-warn{font-size:.85rem;margin-top:.25rem}
+.ro-primary-form .ro-picker-button{min-width:3.4rem;font-size:1.15rem}
+.ro-native-picker{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .ro-primary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:1rem 0}
 .ro-primary-actions .btn{font-size:1rem;padding:.55rem .9rem}
 .ro-primary-actions .form-control,.ro-primary-actions .form-select{font-size:1rem;min-height:2.75rem}
@@ -95,9 +96,6 @@
   .ro-card-field{white-space:normal}
   .ro-card-top .ro-card-action{margin-left:0}
 }
-.ro-basis{font-size:.72rem;color:var(--bs-secondary-color);min-height:1em}
-.ro-warn{font-size:.72rem;color:var(--bs-warning)}
-.ro-warn:empty,.ro-basis:empty{display:none}
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
 {% endmacro %}
@@ -191,11 +189,17 @@
       <div class="ro-card-field"><span class="k">Still needed</span><span class="v">{{ r.missing|map(attribute='label')|join(' · ') }}</span></div>
     </div>
   </article>
+{% else %}{% if not heading %}<div class="ro-zero">0 drafts</div>{% endif %}
 {% endfor %}
 </div>
 {% endmacro %}
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
+
+{% macro vessel_summary(r) %}
+{% set parts = [((r.length ~ 'm') if r.length else ''), r.hullColour or '', r.make or '', r.model or '', r.vesselDetails or ''] %}
+{% set text = parts|select|join(' · ') %}{{ text or '—' }}
+{% endmacro %}
 
 {% set VERIFY = {'verified': ['text-bg-success', 'Verified'], 'conflict': ['text-bg-danger', 'CONFLICT'],
                  'partial': ['text-bg-warning', 'Partial'], 'unverified': ['border text-secondary', 'Unverified']} %}
@@ -284,12 +288,12 @@
 {% set overdue = rows|selectattr('condition', 'equalto', 'overdue')|list %}
 <div class="ro-status-counts" id="roStatusCounts" aria-label="Radio log totals">
   <div class="ro-status-count logged-on"><span class="number" data-ro-count="loggedon">{{ rows|length }}</span><span class="label">Logged on</span></div>
-  <div class="ro-status-count overdue"><span class="number" data-ro-count="overdue">{{ overdue|length }}</span><span class="label">Overdue</span></div>
+  <div class="ro-status-count{% if overdue %} overdue{% endif %}"><span class="number" data-ro-count="overdue">{{ overdue|length }}</span><span class="label">Overdue</span></div>
   <div class="ro-status-count drafts"><span class="number" data-ro-count="drafts">{{ drafts|length }}</span><span class="label">Drafts</span></div>
 </div>
 {% endmacro %}
 
-{% macro queue(rows, now, current=None, heading=True) %}
+{% macro queue(rows, now, current=None, heading=True, empty='0 logged on') %}
 {% if heading %}
 <div class="ro-list-head"><strong>{{ rows|length }} logged on</strong><span>Deadlines are counting down.</span></div>
 {% endif %}
@@ -311,9 +315,10 @@
       <div class="ro-card-field"><span class="k">Route</span><span class="v">{{ r.departurePoint or '—' }} → {{ r.destination or '—' }}</span></div>
       <div class="ro-card-field"><span class="k">POB</span><span class="v">{{ r.pob or '—' }}</span></div>
       <div class="ro-card-field"><span class="k">Mobile</span><span class="v">{{ r.mobile or '—' }}</span></div>
-      <div class="ro-card-field"><span class="k">Vessel</span><span class="v">{{ r.vesselDetails or '—' }}</span></div>
+      <div class="ro-card-field"><span class="k">Vessel</span><span class="v">{{ vessel_summary(r) }}</span></div>
     </div>
   </article>
+{% else %}{% if not heading %}<div class="ro-zero">{{ empty }}</div>{% endif %}
 {% endfor %}
 </div>
 {% endmacro %}

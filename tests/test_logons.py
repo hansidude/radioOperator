@@ -159,7 +159,7 @@ class LogOns(unittest.TestCase):
     def test_a_time_with_no_day_is_not_a_deadline(self):                # CAP-4, ACC-1
         i = L.create(self.cur, 'alice', '', T0)
         out = L.set_field(self.cur, i, 'eta', '1500', 'alice', T0)
-        self.assertIsNone(out['when']); self.assertIn('No day', out['warning'])
+        self.assertIsNone(out['when']); self.assertIsNone(out['warning']); self.assertFalse(out['invalid'])
         row = L.get(self.cur, i)
         self.assertEqual(row['etaRaw'], '1500')                         # kept as heard
         self.assertIsNone(row['eta']); self.assertIsNone(row['etaDate'])
@@ -182,12 +182,12 @@ class LogOns(unittest.TestCase):
         self.assertEqual(L.condition(row, T0 + timedelta(hours=1, minutes=40), 30)[0], 'approaching')
         self.assertEqual(L.condition(row, T0 + timedelta(hours=2), 30), ('overdue', 0))
         out = L.set_field(self.cur, i, 'eta', '25:70', 'alice', T0)
-        self.assertIsNone(out['when']); self.assertIn('Not understood', out['warning'])
+        self.assertIsNone(out['when']); self.assertIn('Not understood', out['warning']); self.assertTrue(out['invalid'])
         row = L.get(self.cur, i)
         self.assertEqual(row['etaRaw'], '25:70'); self.assertIsNone(row['eta'])
         self.assertIn('eta', [m['field'] for m in L.missing(row)])
         out = L.set_field(self.cur, i, 'pob', 'about four', 'alice', T0)
-        self.assertIn('kept as heard', out['warning'])
+        self.assertIn('kept as heard', out['warning']); self.assertTrue(out['invalid'])
         self.assertEqual(L.get(self.cur, i)['pob'], 'about four')
 
     def test_return_day_and_time_are_separate_cells_read_together(self):     # DAT-6, REC-6, AC-48
@@ -199,11 +199,20 @@ class LogOns(unittest.TestCase):
         out = L.set_field(self.cur, i, 'etaDay', 'mon', 'alice', T0)          # T0 is a Saturday
         self.assertEqual(out['when'], datetime(2026, 9, 14, 6, 0))
         out = L.set_field(self.cur, i, 'eta', '', 'alice', T0)                 # a day without a time is not a deadline
-        self.assertIsNone(out['when']); self.assertIn('not a deadline', out['warning'])
+        self.assertIsNone(out['when']); self.assertIsNone(out['warning']); self.assertFalse(out['invalid'])
         self.assertIn('eta', [m['field'] for m in L.missing(L.get(self.cur, i))])
         out = L.set_field(self.cur, i, 'etaDay', 'someday', 'alice', T0)
         self.assertIn('Not understood', out['warning'])
         L.set_field(self.cur, i, 'callDay', '11/9', 'alice', T0); out = L.set_field(self.cur, i, 'callTime', '2300', 'alice', T0)
+        self.assertEqual(out['when'], datetime(2026, 9, 11, 23, 0))
+
+    def test_late_call_entry_is_recorded_without_rebuking_the_operator(self):  # REC-5, REC-6, AC-8
+        i = L.create(self.cur, 'alice', '', T0)
+        day = L.set_field(self.cur, i, 'callDay', '11/9', 'alice', T0)
+        out = L.set_field(self.cur, i, 'callTime', '2300', 'alice', T0)
+        self.assertIsNone(day['warning'])
+        self.assertIsNone(out['warning'])
+        self.assertFalse(day['invalid']); self.assertFalse(out['invalid'])
         self.assertEqual(out['when'], datetime(2026, 9, 11, 23, 0))
 
     def test_a_resolved_day_is_a_date_from_then_on(self):                # the point of storing the date

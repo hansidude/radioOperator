@@ -91,13 +91,16 @@ class Pages(unittest.TestCase):
         self.assertIn('id="queuePane"', page)
         self.assertIn('data-draft="%d"' % j, page)             # the other draft is visible while this one is captured
         self.assertIn('data-field="eta"', page)
+        self.assertIn('type="date" class="ro-native-picker" data-picker-target="callDay"', page)
+        self.assertIn('type="time" class="ro-native-picker" data-picker-target="callTime"', page)
         self.assertIn('Still to ask', page)
         self.assertIn('This is a draft, not a log on', page)
         r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '3pm', 'version': 0})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.json['version'], 1)
         self.assertIsNone(r.json['when'])                          # a time with no day is not a deadline
-        self.assertIn('No day', r.json['warning'])
+        self.assertFalse(r.json['invalid'])
+        self.assertIsNone(r.json['warning'])
         r = self.a.post('/api/logon/%d' % i, json={'field': 'etaDay', 'value': 'today', 'version': 1})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertTrue(r.json['when'].endswith('T15:00:00'))
@@ -123,7 +126,7 @@ class Pages(unittest.TestCase):
         for row, fields in zip(rows, (
                 ('callDay', 'callTime'),
                 ('memberNumber', 'vesselName', 'registration', 'mobile'),
-                ('vesselDetails',),
+                ('length', 'hullColour', 'make', 'model'),
                 ('pob', 'departurePoint', 'destination'),
                 ('etaDay', 'eta'))):
             for field in fields:
@@ -132,19 +135,43 @@ class Pages(unittest.TestCase):
         self.assertIn('id="queuePane"', page)
         self.assertIn('font-size:1.2rem', page)
         self.assertNotIn('<table', page)
+        self.assertNotIn('placeholder=', entry)
+        self.assertNotIn('class="ro-basis"', entry)
+        self.assertNotIn('class="ro-warn"', entry)
+        self.assertNotIn('max-width:72rem', page)
+
+    def test_only_malformed_values_are_marked_invalid(self):
+        i = self.new()
+        self.assertFalse(self.field(i, 'callDay', '2026-09-11')['invalid'])
+        self.assertFalse(self.field(i, 'callTime', '09:00')['invalid'])
+        self.assertFalse(self.field(i, 'etaDay', '2026-09-13')['invalid'])
+        self.assertFalse(self.field(i, 'eta', '15:00')['invalid'])
+        self.assertTrue(self.field(i, 'eta', '25:70')['invalid'])
+        self.assertTrue(self.field(i, 'etaDay', '2026-02-31')['invalid'])
 
     def test_queue_uses_tabs_and_cards_not_tables(self):
         draft = self.new()
         watching = self.accepted(rego='CD456Q', member='7788')
         page = self.a.get('/logons').get_data(as_text=True)
-        for tab in ('loggedon', 'overdue', 'drafts', 'closed', 'find'):
+        for tab in ('overview', 'loggedon', 'overdue', 'drafts', 'closed', 'find'):
             self.assertIn('data-ro-tab="%s"' % tab, page)
+        self.assertIn('id="ro-overview-pane" class="ro-workspace-pane"', page)
+        self.assertIn('id="ro-loggedon-pane" class="ro-workspace-pane d-none"', page)
         self.assertIn('data-id="%d"' % watching, page)
         self.assertIn('data-draft="%d"' % draft, page)
         self.assertIn('class="ro-record-card', page)
         self.assertIn('class="ro-status-counts"', page)
         self.assertIn('data-ro-count="loggedon">1</span><span class="label">Logged on</span>', page)
         self.assertNotIn('<table', page)
+
+    def test_empty_tabs_confirm_zero_without_false_alarm_colour(self):
+        page = self.a.get('/logons').get_data(as_text=True)
+        self.assertIn('>0 logged on</div>', page)
+        self.assertIn('>0 overdue</div>', page)
+        self.assertIn('>0 drafts</div>', page)
+        self.assertIn('data-ro-tab="overdue"', page)
+        self.assertNotIn('btn-outline-danger', page)
+        self.assertNotIn('class="ro-status-count overdue"', page)
 
     def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
         i = self.new()
@@ -171,7 +198,9 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('Logged on and watched', page)
         self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
-        self.assertIn('OVERDUE', self.a.get('/logons').get_data(as_text=True))
+        listing = self.a.get('/logons').get_data(as_text=True)
+        self.assertIn('OVERDUE', listing)
+        self.assertIn('class="ro-status-count overdue"', listing)
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
         self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 400)
 

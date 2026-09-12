@@ -25,7 +25,8 @@ class Times(unittest.TestCase):
     def test_a_time_with_no_day_is_not_a_deadline(self):     # CAP-4: blank never means today
         got = self.when('1500', day=None)
         self.assertIsNone(got['when'])
-        self.assertIn('No day', got['warning'])
+        self.assertFalse(got['invalid'])
+        self.assertIsNone(got['warning'])
         self.assertIn('1500', got['basis'])                  # kept as typed
         self.assertIsNone(self.when('0900', day=None)['when'])
 
@@ -48,10 +49,12 @@ class Times(unittest.TestCase):
         for raw in ('25:70', '3', 'soonish', '13pm', '+0h', '31/2 1500'):
             got = self.when(raw)
             self.assertIsNone(got['when'], raw)
+            self.assertTrue(got['invalid'], raw)
             self.assertIn('Not understood', got['basis'])
             self.assertIn(raw, got['basis'])          # kept as typed
         self.assertEqual(self.when('')['when'], None)
         self.assertEqual(self.when('')['basis'], '')
+        self.assertFalse(self.when('')['invalid'])
 
     def test_a_past_instant_is_flagged_not_moved(self):
         got = self.when('0900')
@@ -78,6 +81,8 @@ class Times(unittest.TestCase):
         self.assertEqual(d('2026-09-20'), date(2026, 9, 20))
         self.assertIsNone(d('someday'))
         self.assertIsNone(d('31/2'))
+        self.assertFalse(times.parse_day('2026-09-12', REF)['invalid'])
+        self.assertTrue(times.parse_day('31/2', REF)['invalid'])
         self.assertIn('Before today', times.parse_day('1/9', REF)['warning'])
 
     def test_a_resolved_day_shows_as_a_date_and_types_back_in(self):

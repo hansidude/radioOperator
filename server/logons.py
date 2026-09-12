@@ -65,7 +65,7 @@ EXTRA = (
 )
 LABELS = {
     'callDay': 'Date', 'callTime': 'Time', 'memberNumber': 'Member No.', 'vesselName': 'Vessel Name',
-    'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Vessel Details',
+    'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Other vessel details',
     'pob': 'POB', 'departurePoint': 'Departure Point', 'destination': 'Going to',
     'etaDay': 'Return Day or Date', 'eta': 'Time',
     'channel': 'Channel', 'departureDay': 'Departure day', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
@@ -330,24 +330,26 @@ def interpret(row, field, resolve_day=False):
     written = (row.get(day_raw_col) or '').strip()
     settled = row.get(day_date_col) or (row[when_col].date() if row.get(when_col) else None)
     if resolve_day:
-        day = times.parse_day(written, ref)
+        day = times.parse_day(written, ref, warn_before=field != 'callTime')
     elif settled:
-        day = {'day': settled, 'label': 'day cell', 'basis': times.fmt_day(settled, ref.year) + ' (day cell)', 'warning': None}
+        day = {'day': settled, 'label': 'day cell', 'basis': times.fmt_day(settled, ref.year) + ' (day cell)',
+               'warning': None, 'invalid': False}
     elif written:
-        day = times.parse_day(written, ref)          # written but never resolved: read it now, once
+        day = times.parse_day(written, ref, warn_before=field != 'callTime')  # written but never resolved: read it now, once
     else:
-        day = {'day': None, 'label': '', 'basis': '', 'warning': None}
+        day = {'day': None, 'label': '', 'basis': '', 'warning': None, 'invalid': False}
     if not (row.get(raw_col) or '').strip():
         if day['day'] or day['warning']:
-            return dict(day, when=None, basis=day['basis'] + ' — no time yet',
-                        warning=day['warning'] or 'A day without a time is not a deadline.')
-        return {'when': None, 'day': None, 'basis': '', 'warning': None}
-    got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['label'])
+            return dict(day, when=None, basis=day['basis'] + ' — no time yet')
+        return {'when': None, 'day': None, 'basis': '', 'warning': None, 'invalid': False}
+    got = times.parse(row.get(raw_col), ref, label, day=day['day'], day_label=day['label'],
+                      warn_past=field != 'callTime')
     # a date written inside the time cell ('13/9 0630') fills the day cell too
     got['day'] = day['day'] or (got['when'].date() if got['when'] else None)
     if day['warning'] and not got['warning']:
         got['warning'] = day['warning']
         got['basis'] += ' — ' + day['warning']
+    got['invalid'] = got['invalid'] or day['invalid']
     return got
 
 
@@ -381,7 +383,8 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
         raise Refused('No such field: %s' % field)
     row = _open_row(cur, logon_id, version)
     value = value.strip() if isinstance(value, str) else ('' if value is None else str(value))
-    out = {'field': field, 'value': value or None, 'when': None, 'basis': None, 'warning': None}
+    out = {'field': field, 'value': value or None, 'when': None, 'basis': None,
+           'warning': None, 'invalid': False}
     if field in TIME_FIELDS or field in DAY_FIELDS:
         tf = DAY_FIELDS.get(field, field)
         day_raw_col, day_date_col, raw_col, when_col, basis_col = TIME_FIELDS[tf]
@@ -391,7 +394,7 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
         got = interpret(after, tf, resolve_day=field in DAY_FIELDS)
         sets = {column(field): value or None, day_date_col: _sd(got['day']),
                 when_col: _s(got['when']), basis_col: got['basis'] or None}
-        out.update(when=got['when'], basis=got['basis'], warning=got['warning'])
+        out.update(when=got['when'], basis=got['basis'], warning=got['warning'], invalid=got['invalid'])
         if field in DAY_FIELDS:      # the box stops showing the word and shows the date it meant
             out['display'] = times.fmt_day(got['day'], row['createdAt'].year) if got['day'] else value
         # CAP-5: an ETA before the departure is information, shown beside the field, never a refusal.
@@ -406,6 +409,7 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
         sets = {field: value or None}
         if field in NUMBER_FIELDS and value and not re.match(r'^\d+(\.\d+)?$', value):
             out['warning'] = 'Not a %s; kept as heard.' % NUMBER_FIELDS[field]
+            out['invalid'] = True
         if field in IDENT_FIELDS:
             _record_identifier(cur, logon_id, field, value, row[field], user, now)
             sets.update(_verify_sets(cur, row, sets))
