@@ -103,10 +103,16 @@
     var b = ev.target.closest('[data-focus]');
     if (b) { var el = document.getElementById('f-' + b.dataset.focus); if (el) { el.focus(); el.select && el.select(); } }
   });
+  // One save at a time. Two in flight race on the version, so a fast operator moving through the
+  // fields had a field rejected as stale by their own previous keystroke and silently not stored.
+  var pending = Promise.resolve();
   function save(el) {
+    pending = pending.then(function () { return send(el); });
+  }
+  function send(el) {
     var field = el.dataset.field;
     setStatus('Saving…', 'text-secondary');
-    fetch('/api/logon/' + id, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    return fetch('/api/logon/' + id, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({ field: field, value: el.value, version: version }) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { return { ok: false, status: r.status, d: {} }; }); })
       .then(function (x) {
