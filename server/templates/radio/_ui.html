@@ -127,13 +127,15 @@
   .ro-paper-log{overflow-x:visible}
   .ro-paper-head{display:none}
   .ro-paper-grid{min-width:0}
-  .ro-record-card.ro-paper-row{grid-template-columns:1fr auto;gap:.05rem .5rem;padding:.45rem .55rem;border-left-width:4px;min-height:0}
+  /* One column of labelled lines, with the open button lifted out of the flow so it does not
+     stretch the first row and leave a gap under the number. */
+  .ro-record-card.ro-paper-row{position:relative;grid-template-columns:1fr;gap:.05rem;padding:.45rem 3rem .45rem .55rem;border-left-width:4px;min-height:0}
   .ro-paper-row>*{grid-column:1;border-right:0;padding:.05rem 0;white-space:normal;overflow:visible;text-overflow:clip}
   .ro-paper-row>.ro-blank{display:none}
   .ro-paper-row>*::before{content:attr(data-l) ": ";color:var(--bs-secondary-color);font-size:.66rem;font-weight:600;text-transform:uppercase;margin-right:.3rem}
   .ro-paper-num{justify-content:flex-start}
   .ro-paper-link{font-size:.95rem}
-  .ro-paper-action{grid-column:2;grid-row:1;justify-content:flex-end}
+  .ro-paper-action{position:absolute;top:.4rem;right:.45rem;padding:0}
   .ro-paper-action::before{content:none}
 }
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}

@@ -7,8 +7,8 @@ This is the authoritative handoff for the next radio log-on implementation pass.
 Status: **done** (2026-09-12). One `records()` query in `server/logons.py`, one `record_list`
 macro in `server/templates/radio/_ui.html`, one status/date/sort/search toolbar in
 `server/templates/radio/logons.html`. The per-status tabs, `queue`/`closed_list`/`status_counts`
-macros and the separate draft date filter are gone. Verified on the port 80 Docker stack; the
-1920px and 390px visual checks below are still outstanding.
+macros and the separate draft date filter are gone. Verified on the port 80 Docker stack,
+including the 1920px, 900px and 390px browser checks (Playwright, `.venv-render`).
 
 Replace the separate Drafts, Logged on, Overdue, and Closed list tabs with one
 filterable collection. These records have the same data shape; status is a record
@@ -180,8 +180,15 @@ That review is done. Resolved:
 - the unified toolbar is built and the separate draft date filter is gone;
 - the page tests were rewritten against the new markup (78 pass, Python 3.9 container).
 
-Still outstanding: the content width is not pinned to `1920px`, and the 1920px/390px visual
-checks have not been run.
+Still outstanding: **the content width**. At a 1920px viewport the log stops at 1548px, because
+quackit's `layout.html` container centres the page. Using the full width to a 1920px maximum means
+overriding the host's container from radio's own CSS, which crosses the host boundary this repo
+keeps -- a decision, not an oversight.
+
+Browser checks done at 1920/900/390px: no horizontal page scroll at any width; rows are 35px in
+table mode and 236px labelled cards under 576px; empty cells drop out of the card (a sparse record
+shows 9 of 14). Between 576px and ~900px the table scrolls inside its own box, which is the
+existing `.ro-paper-log{overflow-x:auto}` behaviour, not the page scrolling.
 
 Existing records: the decision is to delete them all and start fresh, because the current rows
 predate the draft minimum and do not satisfy it. Done on the port 80 stack. **Not yet done on the
