@@ -34,6 +34,12 @@ class Host:
         """The watch owner (§3.3) for records this user creates and sees: an opaque tag. One unit by default."""
         return ''
 
+    def system_actor(self):
+        """Who a host should record for something the app did on its own (REC-2: automated events
+        identify the system actor rather than inventing an operator). Hosts whose audit trail
+        requires a real column type return one of theirs; the checker never claims to be a person."""
+        return 'system'
+
     def notify(self, alert):
         """Put an alert in front of a person by whatever channel the unit has approved.
 

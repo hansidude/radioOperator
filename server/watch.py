@@ -204,6 +204,10 @@ class Checker(threading.Thread):
         conn = self.host.background_connect()
         try:
             cur = conn.cursor()
+            # A host's history triggers record who did it, and nothing here is a person. The
+            # checker names itself as the system actor rather than leaving that blank, which on
+            # quackit's generated triggers would reject every write it makes (REC-2).
+            cur.execute('SET @user_id = %s', (self.host.system_actor(),))
             error = None
             try:
                 if not take_lease(cur, now, self.every * 3):
