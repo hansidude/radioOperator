@@ -111,6 +111,27 @@ class Pages(unittest.TestCase):
         self.assertIn('2 drafts not logged on', listing)
         self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
 
+    def test_capture_page_leads_with_the_five_operator_rows(self):
+        page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
+        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-more-pane"')]
+        more = page[page.index('id="ro-more-pane"'):]
+        self.assertIn('data-ro-tab="entry"', page)
+        self.assertIn('data-ro-tab="more"', page)
+        self.assertIn('id="ro-more-pane" class="ro-more-pane d-none"', page)
+        self.assertEqual(entry.count('class="capture-row row g-3"'), 5)
+        rows = entry.split('class="capture-row row g-3"')[1:]
+        for row, fields in zip(rows, (
+                ('callDay', 'callTime'),
+                ('memberNumber', 'vesselName', 'registration', 'mobile'),
+                ('vesselDetails',),
+                ('pob', 'departurePoint', 'destination'),
+                ('etaDay', 'eta'))):
+            for field in fields:
+                self.assertIn('id="f-%s"' % field, row.split('capture-row row g-3', 1)[0])
+        self.assertNotIn('id="queuePane"', entry)
+        self.assertIn('id="queuePane"', more)
+        self.assertIn('font-size:1.2rem', page)
+
     def test_a_draft_is_not_watched_and_says_what_it_needs(self):        # AC-27, AC-50, ACC-1, ACC-2
         i = self.new()
         for name, value in (('etaDay', 'today'), ('eta', '0001'), ('pob', '3'), ('destination', 'Facing Island')):
