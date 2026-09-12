@@ -79,7 +79,10 @@
   </form>
   {% if open %}<form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: the vessel is back or the trip has ended?')"><input type="hidden" name="back" value="/logons"></form>{% endif %}
   <div class="ro-sys mb-2">
-    {% if logon.reopenedAt %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b %H:%M') }}: {{ logon.reopenReason }}. The earlier closure is kept above.</div>{% endif %}
+    {% if logon.reopenedAt and open %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b %H:%M') }}: {{ logon.reopenReason }}.
+      Before that it was {% if logon.cancelledAt %}cancelled {{ logon.cancelledAt.strftime('%H:%M') }}{% if logon.cancelReason %}: {{ logon.cancelReason }}{% endif %}
+      {% else %}logged off {{ logon.loggedOffAt.strftime('%H:%M') if logon.loggedOffAt }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}{% endif %}. That closure is kept, not erased.</div>
+    {% elif logon.reopenedAt %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b %H:%M') }}: {{ logon.reopenReason }}, then closed again.</div>{% endif %}
     <strong>This system</strong> · record #{{ logon.id }} · entered {{ logon.createdAt.strftime('%a %d %b %H:%M') }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}{% if logon.loggedOffAt %} · logged off {{ logon.loggedOffAt.strftime('%H:%M') }} by {{ logon.updatedBy }}{% endif %}
     <div>Paper columns 13 to 15 — Trip ID No., Entered in Noggin, Logged off in Noggin — record transcription into Noggin and are marked on the paper. This system is not Noggin and cannot know them.</div>
   </div>
