@@ -29,7 +29,7 @@
 {% set needed = name in checked.red %}
 {% set hint = name in checked.orange %}
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
-  {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
+  {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="3" data-auto-grow data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
   {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% elif hint %} ro-hint{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %} {% if name == 'memberNumber' %}list="roMembers"{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
 </div>
@@ -48,6 +48,8 @@
       <div class="capture-row row g-3">{{ field('length', 'col-6 col-lg-3') }}{{ field('hullColour', 'col-6 col-lg-3') }}{{ field('make', 'col-6 col-lg-3') }}{{ field('model', 'col-6 col-lg-3') }}</div>
       <div class="capture-row row g-3">{{ field('pob', 'col-12 col-md-2') }}{{ field('departurePoint', 'col-12 col-md-5') }}{{ field('destination', 'col-12 col-md-5') }}</div>
       <div class="capture-row row g-3">{{ field('etaDay', 'col-12 col-md-7') }}{{ field('eta', 'col-12 col-md-5') }}</div>
+      {# Not a paper column (DAT-6): what was heard that has no box, including a Member No. that is not a member (CAP-24). #}
+      <div class="ro-notes-row row g-3">{{ field('notes', 'col-12') }}</div>
     </form>
     {# The Member No. box offers the unit's members; a number that is not one is emptied (logons._links). #}
     <datalist id="roMembers">{% for m in member_options %}<option value="{{ m.memberNumber }}">{{ m.name }}{% if m.vesselNames %} · {{ m.vesselNames }}{% endif %}</option>{% endfor %}</datalist>
@@ -140,13 +142,15 @@
         if (seq !== checkSeq) return;
         if (!x.ok) throw new Error(x.d.error || 'HTTP ' + x.status);
         mark(x.d.red, x.d.orange);
-        if (x.d.notMember) {             // not a member: the box is left blank, and this is a public user log on
-          var member = document.getElementById('f-memberNumber');
+        if (x.d.notMember) {             // CAP-24: not a member, so the box is left blank and what was heard goes in Notes
+          var member = document.getElementById('f-memberNumber'), notes = document.getElementById('f-notes');
           if (member.value.trim() === x.d.notMember) {
             member.value = '';
+            if (notes.value.indexOf(x.d.notMemberNote) === -1) notes.value = notes.value.trim() ? notes.value.replace(/\s+$/, '') + '\n' + x.d.notMemberNote : x.d.notMemberNote;
+            notes.dispatchEvent(new Event('input', { bubbles: true }));
             changed(member);
             checked = null;
-            setStatus(x.d.notMember + ' is not a member: Member No. left blank (public user)', 'text-warning');
+            setStatus(x.d.notMember + ' is not a member: Member No. left blank, kept in Notes (public user)', 'text-warning');
           }
         }
       })

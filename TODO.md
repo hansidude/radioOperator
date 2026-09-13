@@ -39,7 +39,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - The page shows the record's status large, with the log's symbol and word (📝 Draft, 👀 Logged on,
   🚨 Overdue, ✅ Logged off, 🏠 Never departed, 🗑️ Discarded). Tabs: Log on and History only.
 - Five paper rows on the Log on tab: Date | Time; Member No. | Vessel Name | Rego | Mobile;
-  Length | Hull colour | Make | Model; POB | Departure | Going to; Return day | Time.
+  Length | Hull colour | Make | Model; POB | Departure | Going to; Return day | Time. Then Notes (three lines,
+  grows), back on the form since 2026-09-14.
 - Explicit save only: nothing is written until Save, one save is one update and one history event,
   a stale version is refused visibly (409), leaving with unsaved changes warns.
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every
@@ -73,9 +74,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   and email. A vessel needs a name or a rego.
 - Phones follow the log on's mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
   writes nothing, keeps what was typed and turns its boxes red; each form comes back to its own tab.
-- **A log on is a member's or a public user's** (owner, 2026-09-14). The Member No. box offers the unit's
-  members; a number that is not a member is emptied as focus leaves the box ("… is not a member: Member No.
-  left blank (public user)") and refused by the server if it is saved anyway. No member = public user log on.
+- **A log on is a member's or a public user's** (owner, 2026-09-14; spec CAP-24). The Member No. box offers the
+  unit's members; a number that is not a member is emptied as focus leaves the box and written into **Notes**
+  as `Member No. heard: m00128 (no such member)`. A save does the same if it gets there first; nothing is
+  refused. No member = public user log on.
   The rego ties the log on to a vessel record when it names exactly one (the member's own vessels, else the
   public vessels). The log shows 👤 Member No. or 🌐 Public in the Member No. column; the log on page shows
   the member or public vessel it is tied to, linked. A number saved before members existed stays until changed.
@@ -114,9 +116,6 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
       2. Leave it
 - [ ] **CAP-19 spec conflict.** `vessel-logon-spec.md` CAP-19 requires immediate durable creation; the
       owner chose explicit Save. Update CAP-19 and audit the ACC/WAT requirements that lean on it.
-- [ ] **CAP-23 spec conflict (members).** The owner decided a Member No. that is not a member is left blank
-      (2026-09-14). CAP-23 keeps every value as heard, and §3.2 says selection needs no standing record.
-      Update the spec, or keep the heard number somewhere other than the Member No. box.
 - [ ] **Trip ID collisions.** `tripRef` is issued state-wide in the real system; this branch allocates its
       own, so two branches will collide. Needs a branch prefix or a range split (`VARCHAR(16)` has room).
 - [ ] **Alert delivery (ACC-5).** Alerts reach only whoever has a page open. Set and prove
@@ -148,7 +147,7 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 
 - [ ] **Set aside on 2026-09-13, to be redone properly:** the log on page's Contact, Vessel, Identity and Record
       tabs (owner: *"all these fields are shit"*). Out of sight until then: channel, departure, radio
-      channel, contact, AIS, vessel type/details/notes (values kept, not editable); Find and apply an
+      channel, contact, AIS, vessel type/details (values kept, not editable); Find and apply an
       earlier trip; the identity check's evidence, including IDV-1's "applied, so it does not corroborate"
       (still computed, shown nowhere); Still to ask; the Heard list; reopening a closed record (route kept,
       no button); the log off reason (always "returned"). `_ui.html` find, find_script and verification

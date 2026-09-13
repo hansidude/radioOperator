@@ -324,6 +324,7 @@ def main(engine='chromium'):
             page.locator('#f-memberNumber').fill('m99999')                                 # not a member: left blank
             page.locator('#f-memberNumber').press('Tab')
             expect(page.locator('#f-memberNumber')).to_have_value('')
+            expect(page.locator('#f-notes')).to_have_value('Member No. heard: m99999 (no such member)')   # kept in Notes (CAP-24)
             expect(page.locator('#saveStatus')).to_contain_text('m99999 is not a member')
             page.locator('#f-memberNumber').fill(member_no)                                # Member No. heard, Vessel Name empty
             page.locator('#f-memberNumber').press('Tab')

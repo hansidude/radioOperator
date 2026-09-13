@@ -48,7 +48,9 @@ v1.1 it is the save that completes the mandatory set, with no separate accept ac
 an accepted log on can only be logged off; one vessel has one open log on. The cost of gating
 the watch is stated in §1.2: an unfinished call nobody is counting down, whose only mitigation
 is the draft follow-up in ACC-5 and WAT-9. New §3.5 sets out the ideal call and the twenty
-situations that are not ideal. New REC-9 numbers records from one each day.
+situations that are not ideal. New REC-9 numbers records from one each day. Since v1.1 a log on's Member No. is a
+member record, a number heard that names no member is kept in the notes and the log on is a public
+user's (CAP-24), and the vessel is told it is on the log only once the computer log has it (ACC-9).
 
 ## Updating the documents
 

@@ -112,17 +112,6 @@ class InvalidDraft(Refused):
                          'A draft needs a valid date, time, and one of member number, vessel rego or mobile')
 
 
-class NotAMember(InvalidDraft):
-    """A Member No. that names no member. It is not stored: the box is left blank and the log on is a
-    public user's (owner, 2026-09-14). This departs from CAP-23, which keeps every value as heard; the
-    conflict is listed in TODO.md for the spec."""
-
-    def __init__(self, number):
-        self.fields = ['memberNumber']
-        self.number = number
-        Refused.__init__(self, '%s is not a member. Member No. is left blank: this is a public user log on.' % number)
-
-
 class Stale(Exception):
     """The row changed since the caller last saw it (CAP-22). Hosts turn it into 409."""
 
@@ -498,11 +487,25 @@ def blank(now, unit='', call_day=None):
     return row
 
 
+def heard_note(number):
+    """The line a Member No. that names no member leaves in Notes (CAP-24)."""
+    return 'Member No. heard: %s (no such member)' % number
+
+
+def _with_heard(notes, number):
+    """Notes with the heard number's line added once."""
+    line = heard_note(number)
+    if line in (notes or ''):
+        return notes
+    return (notes.rstrip() + '\n' + line) if (notes or '').strip() else line
+
+
 def _links(cur, row, clean):
     """The member and vessel records a save ties this log on to: (columns to set, a Member No. that names
-    no member). Owner, 2026-09-14: the Member No. has to be a real member. A new or changed number that
-    is not is never stored; with no member the log on is a public user's, and its rego may name one of
-    the public vessels. A number saved before members existed stays as it was until it is changed."""
+    no member). CAP-24: the Member No. is a real member record or it is blank. A new or changed number that
+    is not a member is never stored there; the caller keeps it in Notes, and with no member the log on is a
+    public user's, whose rego may name one of the public vessels. A number saved before members existed
+    stays as it was until it is changed."""
     from . import members        # members.py imports this module; a top-level import would be circular
     sets, not_member = {}, None
     if 'memberNumber' in clean:
@@ -550,6 +553,8 @@ def _prepare_fields(cur, row, values):
         if field in NUMBER_FIELDS and value and not NUMBER.match(value):
             invalid.append(field)
     links, not_member = _links(cur, row, clean)
+    if not_member:
+        links['notes'] = _with_heard(after.get('notes'), not_member)
     sets.update(links)
     after.update(links)
 
@@ -586,7 +591,7 @@ def check_fields(cur, row, values):
     """The boxes the form's current values turn red or orange, writing nothing: the draft minimum, what cannot be
     read, and on a draft what still stops acceptance (ACC-1). The page asks this as focus leaves a box,
     so there is one rule, here, and not a second copy in the browser. `notMember` is a Member No. that
-    names no member: the form empties that box, since a save would refuse it."""
+    names no member: the form empties that box and adds `notMemberNote` to Notes, as a save would (CAP-24)."""
     sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
     red = set(required) | set(invalid)
     if row['watchStatus'] == 'draft':
@@ -597,7 +602,8 @@ def check_fields(cur, row, values):
     pair = ('memberNumber', 'vesselName')
     heard = [field for field in pair if after.get(field)]
     orange = [field for field in pair if len(heard) == 1 and field not in heard and field not in red]
-    return {'red': sorted(red), 'orange': orange, 'notMember': not_member}
+    return {'red': sorted(red), 'orange': orange, 'notMember': not_member,
+            'notMemberNote': heard_note(not_member) if not_member else None}
 
 
 def form_values(row):
@@ -609,8 +615,6 @@ def save_fields(cur, logon_id, values, user, now, version=None):
     """Save one whole operator form as one LogOns update and therefore one host history event."""
     row = _open_row(cur, logon_id, version)
     sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
-    if not_member:
-        raise NotAMember(not_member)
     if required:
         raise InvalidDraft(required, logged_on=row['watchStatus'] == 'loggedOn')
     for field in IDENT_FIELDS:
@@ -626,15 +630,13 @@ def save_fields(cur, logon_id, values, user, now, version=None):
     sets.update(acceptance(cur, after, user, now))       # a complete draft is logged on by this save (ACC-3)
     saved_version = _bump(cur, row, sets, user, now)
     return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after),
-            'accepted': sets.get('watchStatus') == 'loggedOn'}
+            'accepted': sets.get('watchStatus') == 'loggedOn', 'notMember': not_member}
 
 
 def create_saved(cur, values, user, unit, now):
     """Create the first durable draft only after the explicit form save passes its minimum."""
     row = blank(now, unit)
     sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
-    if not_member:
-        raise NotAMember(not_member)
     if required:
         raise InvalidDraft(required)
     day = after['callDate']
@@ -669,7 +671,7 @@ def create_saved(cur, values, user, unit, now):
         if after.get(field):
             _record_identifier(cur, logon_id, field, after[field], None, user, now)
     return {'id': logon_id, 'version': 0, 'invalid': invalid, 'displays': displays,
-            'accepted': sets.get('watchStatus') == 'loggedOn'}
+            'accepted': sets.get('watchStatus') == 'loggedOn', 'notMember': not_member}
 
 
 def _open_row(cur, logon_id, version):
@@ -792,8 +794,10 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
             out['invalid'] = True
         links, not_member = _links(cur, row, {field: value})
         if not_member:
-            raise NotAMember(not_member)
+            links['notes'] = _with_heard(row.get('notes'), not_member)
+            out['notMember'] = not_member
         sets.update(links)
+        out['value'] = sets[field] or None
         if field in IDENT_FIELDS:
             _record_identifier(cur, logon_id, field, sets[field], row[field], user, now)
             sets.update(_verify_sets(cur, row, sets))

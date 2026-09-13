@@ -1,7 +1,7 @@
 # Vessel Log On — Functional Specification
 
 **Version:** 1.1 (draft)<br>
-**Revised:** 13 September 2026 (AEST)<br>
+**Revised:** 14 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
 **Audience:** Anyone implementing or evaluating a system that performs this function
@@ -155,8 +155,8 @@ justification. **May** — optional.
 | **Log off** | The act of closing a log on because the vessel has returned or otherwise ended its trip. |
 | **Operator** | A person, usually a volunteer, receiving log ons at a unit. |
 | **Unit** | A marine rescue base holding the watch for a geographic area. |
-| **Member** | A person with a standing record held by the organisation. |
-| **Public user** | A person without a standing record, logging on as a non-member. |
+| **Member** | A person with a standing record held by the organisation, and a member number issued to that record. A log on is a member's only when its Member No. is selected from those records (CAP-24). |
+| **Public user** | A person logging on without a member record: any log on with no member selected. For a public user the vessel is the standing record (a public vessel, carrying its owner's contact details). |
 | **Identifier** | A captured identifying value, whether or not it resolves: member number, vessel registration, mobile number, vessel name, person name. |
 | **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
 | **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
@@ -191,8 +191,8 @@ justification. **May** — optional.
 | Entity | Description | Key attributes |
 |---|---|---|
 | **LogOn** | One trip record, with independent capture and watch states. | capture status, watch status, watch owner, channel, operator, call time, departure point/time, destination, POB, verification outcome, created/updated timestamps |
-| **Vessel** | A boat known to the system. | registration, name, length, hull colour, type, make, model, AIS identifier |
-| **Member / PublicUser** | A person, with membership a standing-record attribute rather than a prerequisite to capture. | identifiers, name, contact numbers, associated vessels |
+| **Vessel** | A boat known to the system: a member's vessel, or a public vessel standing for a public user. | registration, name, length, hull colour, type, make, model, AIS identifier; for a public vessel, owner name, phone and email |
+| **Member / PublicUser** | A member is a standing record; a public user is a log on without one. Membership is not a prerequisite to capture. | member number, name, address, phone, email; emergency contacts, vessels, trailers and cars |
 | **OnboardContact** | A reachable person aboard or ashore; location/role explicitly recorded. | name, aboard/ashore, relationship, number, source and confirmation time |
 | **Identifier** | An independently captured value and its resolution history. | type, raw value, normalized value, source, captured time, candidates, match basis, selected record, outcome |
 | **Obligation** | One expected event or internal follow-up. | kind, due date/time, raw time expression, interpretation basis/timezone, status, satisfaction/amendment evidence |
@@ -208,9 +208,10 @@ Automated events record a system actor and responsible unit, rather than inventi
 
 ### 3.2 Relationships
 
-- A LogOn may reference one selected Vessel and one primary Member or PublicUser;
-  either may remain unknown even after capture is marked complete. Additional people
-  are contacts. Vessel/person selection does not require creating a standing record.
+- A LogOn references at most one Member, and only by selecting an existing member record
+  (CAP-24); with none it is a public user's log on. It may reference one Vessel record, and
+  either may remain unknown even after capture is complete. Additional people are contacts.
+  Logging on does not require creating a standing record, but a reference is always to a real one.
 - A LogOn retains zero or more captured Identifiers, contacts, obligations, and
   escalation steps. It retains every transfer attempt and ownership change.
 - Vessels and people have many-to-many associations. A phone number or name need not
@@ -379,7 +380,8 @@ before claiming compliance. Immediate durable capture is justified operationally
 when the greatest number of vessels are at sea.
 
 **OC-9.** The unit's paper radio log (Figure 5, transcribed in A.1) is the primary operational
-record and the first thing filled out for every call. A paper row exists from the first pen
+record and the first thing filled out for every call. A paper row is not a log on: a vessel is
+logged on only when the system has it logged on (ACC-9). A paper row exists from the first pen
 stroke with whatever cells are known, is completed across the call in whatever order the
 caller supplies, and is the reference a system record is checked against. Any system that
 performs this function shall fit the paper log, not the other way round: its columns, their
@@ -522,7 +524,16 @@ captured with a warning rather than silently discarded, rounded or converted int
 credible-looking operational value. Only a usable, explicitly interpreted deadline can
 drive vessel overdue detection; unresolved time input invokes WAT-9. When amending an
 existing deadline, saving unresolved input is distinct from replacing the effective
-monitored deadline (WAT-10).
+monitored deadline (WAT-10). A reference to a standing record is not a captured value; CAP-24
+governs what happens to one that does not resolve.
+
+**CAP-24.** The Member No. of a log on **shall** only ever hold an existing member record, chosen
+from the unit's members. A member number heard that names no member **shall not** be stored as
+the Member No.: the box is left blank, the number heard is kept in the log on's notes, and the
+log on is a public user's. It is not refused and nothing else captured is lost (ACC-8).
+*Rationale: database integrity. A Member No. that points at nobody looks like a member's log on
+and is not one; the next operator reads it as verified membership. What the caller said is still
+evidence, so it is kept where it cannot be mistaken for a record: in the notes.*
 
 ---
 
@@ -531,7 +542,7 @@ monitored deadline (WAT-10).
 ### 5.3 Acceptance — the gate between a draft and a watch
 
 **ACC-1.** A log on **shall not** be accepted until its mandatory set is complete. The mandatory
-set is: **at least two of** member number, vessel name, vessel registration and mobile number;
+set is: **at least two of** member number (a member record, CAP-24), vessel name, vessel registration and mobile number;
 **and** persons on board, departure point, where the vessel is going, and a usable return
 day and time. Two identifiers rather than all four, because agreement between two independently
 supplied values is the unit's accuracy check (A.8, IDV-1). A usable return time, because without
@@ -551,7 +562,7 @@ requirement is unsafe (§1.2).*
 **ACC-3.** Saving a draft whose mandatory set is complete and valid **shall** accept it, in that
 same save, recording the saving operator and the time. There **shall not** be a separate accept
 action. The save **shall** be the point at which the unit undertakes the watch, and the operator's
-acknowledgment to the vessel corresponds to it. A save that leaves the set incomplete keeps a
+acknowledgment to the vessel corresponds to it (ACC-9). A save that leaves the set incomplete keeps a
 draft; a save refused acceptance under ACC-6 keeps a draft with everything captured.
 *Rationale: the operator fills in the required details because the vessel is logging on; once they
 are there, the unit has accepted it. A second confirmation adds a step and a way to leave a
@@ -592,6 +603,13 @@ never took place.*
 **ACC-8.** Where the mandatory set is incomplete, the system **shall** say which values are
 missing and **shall not** refuse, discard or alter anything already captured (CAP-1, CAP-2).
 Acceptance is the only thing withheld.
+
+**ACC-9.** The operator **shall** end the call by telling the vessel it is on the log only when the
+system shows it logged on: the save has accepted it. A paper row, a draft, or details still being
+typed are not a log on, and a vessel **shall not** be told it is logged on on the strength of them.
+*Rationale: the only log on that exists is the one on the computer log. Telling a vessel it is
+logged on before then is telling it something untrue, and it is exactly the failure §1.2 names:
+a vessel at sea believing it is under a watch that nobody is keeping.*
 
 ---
 
@@ -635,7 +653,8 @@ candidates (IDV-7), and may retain volunteered corrections without blocking capt
 standing record, and associate it with the vessel for reuse.
 
 **DAT-5.** Every captured identifier **shall** be stored as captured, independently of
-whatever record it resolves to.
+whatever record it resolves to. A member number that resolves to no member is kept in the
+notes rather than as the Member No. (CAP-24).
 *Rationale: the value the operator heard is evidence; overwriting it with the resolved
 value destroys the ability to detect a mis-resolution later.*
 
@@ -948,6 +967,8 @@ within a section is not always contiguous.
 | **AC-54** | Discard a draft begun in error; then attempt to discard an accepted log on. | The draft is discarded with actor, time and reason, remains searchable, and counts as evidence of no vessel or person; the accepted log on refuses and must be logged off (ACC-7). |
 | **AC-55** | View the queue on a screen other than the one that created a draft, with several drafts open. | Every draft is counted and visible, each with the values it is missing and its age, plainly separate from the watched log ons (WAT-1, ACC-5). |
 | **AC-56** | Create records across a day boundary and read the numbers. | Numbering counts from one for each day, is unique within the unit and day, is never reused or renumbered, and is what every page, report and export quotes (REC-9). |
+| **AC-57** | Capture a member number that is a member, then one that names no member, then save. | The first ties the log on to that member record; the second leaves Member No. blank, is kept word for word in the notes, the save is not refused, and the log on reads as a public user's everywhere it is shown (CAP-24). |
+| **AC-58** | Read the capture view before and after the save that completes the mandatory set. | Before: a draft, with nothing an operator could read back to the vessel as logged on; after: logged on, the moment the operator may say so (ACC-9, ACC-2). |
 
 <a id="section-102-verification-and-search"></a>
 
@@ -1297,6 +1318,15 @@ revisions add identifiers; they do not renumber.
 
 ### Version 1.1 — changes from 1.0
 
+- **A Member No. is a member record** (CAP-24, 14 September 2026). The unit keeps member records
+  (member number issued by the system, contact details, emergency contacts, vessels, trailers, cars)
+  and public vessels, the standing record for a public user. A log on's Member No. is selected from the
+  members; a number heard that names no member is left out of Member No. and kept in the notes, and the
+  log on is a public user's. This narrows CAP-23 and DAT-5 for that one value. The glossary, §3.1, §3.2,
+  ACC-1 and AC-57 follow.
+- **The vessel is told it is on the log only when the computer log has it** (ACC-9). A paper row or a
+  draft is not a log on (OC-9). AC-58 follows. This bears on Appendix D question 15: a call written on
+  paper and entered later is not a log on until it is entered.
 - **Saving a complete draft logs it on** (§5.3 ACC-3). Version 1.0 required a separate, explicit accept
   action after the mandatory set was complete. The unit's position: the required details are filled
   because the vessel is logging on, so the save that completes them is the acceptance. The save is

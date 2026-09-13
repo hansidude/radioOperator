@@ -127,8 +127,11 @@ class Members(unittest.TestCase):
         self.assertEqual(self.b.get('/member/%d' % i).status_code, 403)
         self.assertEqual(self.b.post('/member/%d/cars' % i, data={'registration': 'X'}).status_code, 403)
         self.assertNotIn('Jane Smith', self.b.get('/members').get_data(as_text=True))
-        self.assertEqual(self.b.post('/logons/new', json={'fields': {'callDay': date.today().isoformat(), 'callTime': '0900',
-                                                                    'memberNumber': 'm00001'}}).status_code, 400)
+        other = self.b.post('/logons/new', json={'fields': {'callDay': date.today().isoformat(), 'callTime': '0900',
+                                                            'memberNumber': 'm00001', 'mobile': '0400000002'}})
+        self.assertEqual(other.status_code, 200, other.data)
+        self.assertEqual(other.json['notMember'], 'm00001')                           # another unit's member is not one here
+        self.assertIsNone(L.get(self.db(), other.json['id'])['memberId'])
 
     # ---- public vessels ----
 
@@ -178,29 +181,35 @@ class Members(unittest.TestCase):
         self.assertIn('aria-label="Member"', cell)
         self.assertIn('m00001', cell)
 
-    def test_a_member_number_that_is_not_a_member_is_left_blank_and_it_is_a_public_log_on(self):
+    def test_a_member_number_that_is_not_a_member_is_kept_in_notes_and_it_is_a_public_log_on(self):   # CAP-24
         self.member()
+        self.assertEqual(self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex',
+                                                           'ownerPhone': '0411222333'}).status_code, 302)
         check = self.a.post('/logons/new', json={'check': True, 'fields': {'callDay': date.today().isoformat(), 'callTime': '0915',
                                                                            'memberNumber': 'm09999', 'registration': 'PUB01'}})
         self.assertEqual(check.status_code, 200)
-        self.assertEqual(check.json['notMember'], 'm09999')                           # the form empties the box
-        refused = self.logon(memberNumber='m09999', registration='PUB01')
-        self.assertEqual(refused.status_code, 400)                                   # never stored as typed
-        self.assertEqual(refused.json['fields'], ['memberNumber'])
-        self.assertIn('not a member', refused.json['error'])
-        self.assertIn('0 records', self.a.get('/logons').get_data(as_text=True))
-
-        self.assertEqual(self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex',
-                                                           'ownerPhone': '0411222333'}).status_code, 302)
-        saved = self.logon(memberNumber='', registration='pub01')
-        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertEqual((check.json['notMember'], check.json['notMemberNote']),
+                         ('m09999', 'Member No. heard: m09999 (no such member)'))    # the form empties the box and adds this
+        saved = self.logon(memberNumber='m09999', registration='pub01', notes='Two aboard, one child')
+        self.assertEqual(saved.status_code, 200, saved.data)                          # nothing refused (ACC-8)
+        self.assertEqual(saved.json['notMember'], 'm09999')
         row = L.get(self.db(), saved.json['id'])
+        self.assertIsNone(row['memberNumber'])                                        # never stored as a Member No.
         self.assertIsNone(row['memberId'])
+        self.assertEqual(row['notes'], 'Two aboard, one child\nMember No. heard: m09999 (no such member)')
         self.assertIsNotNone(row['vesselId'])                                        # tied to the public vessel
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
         self.assertIn('href="/vessel/%d" data-who="public"' % row['vesselId'], page)
         self.assertIn('Public · Blue Duck', page)
-        self.assertEqual(self.a.post('/api/logon/%d' % row['id'], json={'field': 'memberNumber', 'value': 'm09999'}).status_code, 400)
+        self.assertIn('<label for="f-notes">Notes</label>', page)
+        self.assertIn('Member No. heard: m09999 (no such member)</textarea>', page)
+        again = self.a.post('/api/logon/%d' % row['id'], json={'fields': {'memberNumber': 'm09999',
+                                                                          'notes': row['notes']}, 'version': row['version']})
+        self.assertEqual(again.status_code, 200, again.data)
+        self.assertEqual(L.get(self.db(), row['id'])['notes'].count('m09999'), 1)       # said twice, noted once
+        one = self.a.post('/api/logon/%d' % row['id'], json={'field': 'memberNumber', 'value': 'm08888'})
+        self.assertEqual((one.status_code, one.json['notMember'], one.json['value']), (200, 'm08888', None))
+        self.assertIn('Member No. heard: m08888', L.get(self.db(), row['id'])['notes'])
         log = self.a.get('/logons').get_data(as_text=True)
         cell = log[log.index('data-record="%d"' % row['id']):]
         cell = cell[cell.index('data-column="member"'):cell.index('data-column="vesselName"')]
