@@ -47,6 +47,7 @@
     <div class="ro-who-row" id="roWho">
       <label>Member or public user</label>
       <span class="ro-who-now" id="roWhoNow">{% if not creating %}{{ ui.who_badge(member, vessel) }}{% endif %}</span>
+      {% if open %}<button type="button" class="btn btn-outline-danger" id="roClearWho" title="Remove the member or public vessel from this log on"{% if not (member or vessel) %} hidden{% endif %}><i class="bi bi-x-lg me-1"></i>Remove</button>{% endif %}
       {% if open %}<button type="button" class="btn btn-outline-primary" id="roPickMember">{{ ui.WHO.member.symbol }} Member</button>
       <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>{% endif %}
     </div>
@@ -311,11 +312,30 @@
     whoNow.textContent = (member ? WHO_MEMBER + ' ' + member.primary : WHO_PUBLIC + ' Public') +
                          (vessel ? ' · ' + vessel.primary : '') + ' (not saved)';
     whoNow.dataset.who = member ? 'member' : 'public';
+    if (clearWho) clearWho.hidden = !(member || vessel);
     showWho(member ? '/member/' + member.id + '/panel' : vessel ? '/vessel/' + vessel.id + '/panel' : null,
             member ? WHO_MEMBER + ' Member' : WHO_PUBLIC + ' Public vessel');
     checked = null;
     check();
   }
+  // Remove: undo the pick. Everything it filled goes (Member No., the vessel boxes, the vessel link) and so does
+  // the tab; Mobile stays, it is the caller's number. Saving then stores no member and no vessel.
+  var clearWho = document.getElementById('roClearWho');
+  if (clearWho) clearWho.addEventListener('click', function () {
+    filling = true;
+    put('memberNumber', '', true);
+    VESSEL_BOXES.forEach(function (name) { put(name, '', true); });
+    vesselId.value = '';
+    changed(vesselId);
+    filling = false;
+    Object.keys(panels).forEach(function (k) { if (panels[k]) panels[k].hidden = true; });
+    whoNow.textContent = '';
+    delete whoNow.dataset.who;
+    clearWho.hidden = true;
+    showWho(null, '');
+    checked = null;
+    check();
+  });
   // The Member / Public vessel tab: the picked record's own page content, loaded in place (Quackit's htmx).
   var whoTab = document.getElementById('roWhoTab'), whoPanel = document.getElementById('roWhoPanel'), whoUrl = null;
   function showWho(url, label) {

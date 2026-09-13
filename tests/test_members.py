@@ -321,12 +321,14 @@ class Members(unittest.TestCase):
     def test_a_picked_member_or_public_vessel_gets_its_own_tab_on_the_log_on_page(self):
         new = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('id="roWhoTab" hidden', new)                                  # nothing picked: no tab
+        self.assertRegex(new, r'id="roClearWho"[^>]* hidden>')                        # and nothing to remove
         self.assertIn('<div id="roWhoPanel" data-navbar-local></div>', new)
         m = self.member()
         self.vessel(m)
         r = self.logon(memberNumber='m00001', registration='AB123Q')
         page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
         self.assertIn('id="roWhoTab"><span data-ro-who-label>👤 Member</span>', page)
+        self.assertRegex(page, r'id="roClearWho"[^>]*><i class="bi bi-x-lg me-1"></i>Remove</button>')   # shown: something to remove
         self.assertIn('hx-get="/member/%d/panel" hx-trigger="load" hx-swap="innerHTML"' % m, page)
         panel = self.a.get('/member/%d/panel' % m).get_data(as_text=True)
         self.assertNotIn('<html', panel)                                            # content only, for swapping in
@@ -348,6 +350,21 @@ class Members(unittest.TestCase):
         self.assertIn('data-entity-tab="history"', vpanel)
         own = M.children(self.db(), 'vessels', m)[0]
         self.assertEqual(self.a.get('/vessel/%d/panel' % own['id']).status_code, 404)   # a member's vessel is on the member
+
+    def test_removing_the_pick_and_saving_leaves_no_member_and_no_vessel(self):
+        m = self.member()
+        self.vessel(m)
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        r = self.logon(memberNumber='m00001', vesselName='Sea Dog', registration='AB123Q', vesselId=str(vessel['id']))
+        row = L.get(self.db(), r.json['id'])
+        self.assertEqual((row['memberId'], row['vesselId']), (m, vessel['id']))
+        removed = {'memberNumber': '', 'vesselName': '', 'registration': '', 'vesselId': '', 'mobile': '0400000001'}
+        saved = self.a.post('/api/logon/%d' % row['id'], json={'fields': removed, 'version': row['version']})
+        self.assertEqual(saved.status_code, 200, saved.data)
+        row = L.get(self.db(), row['id'])
+        self.assertEqual((row['memberNumber'], row['memberId'], row['vesselId'], row['registration']), (None, None, None, None))
+        page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
+        self.assertIn('id="roWhoTab" hidden', page)
 
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history

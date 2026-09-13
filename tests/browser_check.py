@@ -252,6 +252,14 @@ def main(engine='chromium'):
             who_tab.click()
             expect(panel.locator('#public-ownerName')).to_have_value('Verify Public ' + token)
             page.locator('[data-ro-tab="entry"]').click()
+            page.locator('#roClearWho').click()                                                   # remove the pick, easily
+            for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'vesselId'):
+                expect(page.locator('#f-' + name)).to_have_value('')
+            expect(page.locator('#f-mobile')).to_have_value('0412 345 678')                       # the caller's number stays
+            expect(who_tab).to_be_hidden()
+            expect(page.locator('#roClearWho')).to_be_hidden()
+            expect(page.locator('#roWhoNow')).to_have_text('')
+            expect(page.locator('#f-registration')).to_have_class(re.compile('is-invalid'))      # re-checked: an ID is needed again
             page.locator('#roPickPublic').click()                                                 # a public user seen for the first time
             page.locator('#spInput').fill('NEWPUB-' + token)
             page.locator('#spFilter [data-create]').click()

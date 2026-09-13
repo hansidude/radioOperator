@@ -94,7 +94,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   picker finds the member, then one of their vessels (or No vessel, or New vessel for this member). Public user:
   a public vessel, or New public vessel. Picks fill Member No., the vessel boxes and an empty mobile, and link the
   record by `vesselId`; new vessels are saved from the page and picked at once. Typing over Member No., Vessel
-  Name or Rego drops the pick, and the rego decides again.
+  Name or Rego drops the pick, and the rego decides again. **✕ Remove** beside the choice undoes it: Member No., the
+  vessel boxes and the vessel link are emptied and the tab goes; Mobile stays.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
   8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's
