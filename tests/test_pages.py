@@ -12,6 +12,7 @@ from server import logons as L
 from server.host import Host
 from server.routes import mount
 from server.sqlite import Connection, create_schema
+from fixtures import known_members
 
 
 def test_app(path):
@@ -51,6 +52,7 @@ class Pages(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.app = test_app(Path(self.tmp.name) / 'test.db')
+        known_members(Connection(Path(self.tmp.name) / 'test.db'), 'unitA')
         self.app.testing = True
         self.a = self.app.test_client()
         self.a.get('/test-login/alice/unitA')

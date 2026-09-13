@@ -1,0 +1,37 @@
+{% extends base_template %}
+{% import 'radio/_ui.html' as ui %}
+{% import 'myMacro_record_view.html' as records_ui %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+{% from 'myMacro_filters.html' import search_controls %}
+{% block page_title %}<i class="bi bi-people me-1"></i>Members{% endblock %}
+{% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
+{% block navbar_buttons %}
+<div class="entity-nav" role="navigation" aria-label="Members">
+  <div class="entity-nav-links">{{ entity_nav.parent_link('/logons', brand, 'broadcast') }}</div>
+  <a class="btn btn-primary btn-sm" href="/members/new"><i class="bi bi-plus-lg me-1"></i>New member</a>
+  {{ entity_nav.page_link('/vessels', 'Public vessels', 'life-preserver') }}
+</div>
+{% endblock %}
+{% block body %}
+{{ ui.styles() }}
+{# The search is the server's, as on the log: typing swaps in the matching rows (DRY-CATALOG, htmx). #}
+<form id="roMemberFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Members filters" method="get" action="/members"
+      hx-get="/members" hx-target="#roMemberRows" hx-select="#roMemberRows" hx-swap="outerHTML"
+      hx-trigger="input from:#roMemberSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
+  {{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}
+</form>
+{% set display = namespace(rows=[]) %}
+{% for m in members %}
+  {% set number %}<span class="dc-record-index">{{ records_ui.symbol(ui.WHO.member.symbol, ui.WHO.member.label, value=m.memberNumber) }}</span>{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ m.id }}" title="Open member {{ m.memberNumber }}" aria-label="Open member {{ m.memberNumber }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set display.rows = display.rows + [{'id': m.id, 'cells': {'number': number, 'name': m.name, 'phone': m.phone or '', 'email': m.email or '',
+                                                                'vessels': m.vesselNames, 'action': action}}] %}
+{% endfor %}
+<div id="roMemberRows">{{ records_ui.record_grid(display.rows, [
+  {'key': 'number', 'label': 'Member No.', 'symbol': ui.FIELD_SYMBOLS.memberNumber, 'width': 'minmax(6rem,.7fr)', 'kind': 'index'},
+  {'key': 'name', 'label': 'Name', 'width': 'minmax(0,1.3fr)'},
+  {'key': 'phone', 'label': 'Phone', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
+  {'key': 'email', 'label': 'Email', 'width': 'minmax(0,1.3fr)'},
+  {'key': 'vessels', 'label': 'Vessels', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.5fr)'},
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioMembers', '0 members') }}</div>
+{% endblock %}

@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import identity as ID
 from server import logons as L
 from server.sqlite import Connection, create_schema
+from fixtures import known_members
 
 T0 = datetime(2026, 9, 12, 14, 32)
 
@@ -19,6 +20,7 @@ class Identity(unittest.TestCase):
         path = Path(self.tmp.name) / 'radio.sqlite'
         create_schema(path)
         self.conn = Connection(path)
+        known_members(self.conn)
         self.cur = self.conn.cursor()
         self.clock = T0
 

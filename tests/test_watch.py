@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import logons as L
 from server import watch as W
 from server.sqlite import Connection, create_schema
+from fixtures import known_members
 
 logging.getLogger('radio.watch').setLevel(logging.CRITICAL)   # the warnings are the product, not test noise
 
@@ -28,6 +29,7 @@ class Watching(unittest.TestCase):
         path = Path(self.tmp.name) / 'radio.sqlite'
         create_schema(path)
         self.conn = Connection(path)
+        known_members(self.conn)
         self.cur = self.conn.cursor()
         self.told = []
 

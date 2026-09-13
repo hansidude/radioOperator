@@ -1,6 +1,7 @@
 -- Vessel log on (vessel-logon-spec.md). The host applies this file: in quackit, Admin -> Database
 -- management generates these tables plus their history tables and triggers; standalone runs the
--- same CREATEs on SQLite or MariaDB without triggers. No foreign keys out of these two tables.
+-- same CREATEs on SQLite or MariaDB without triggers. No foreign keys out of LogOns: memberId and vesselId are
+-- links to current records, and the trip keeps the values it was given (§3.2).
 
 -- One row per trip (§3.1 LogOn). Every fact is a column; an unsupplied fact stays NULL (CAP-2, CAP-4).
 -- `unit` is the watch owner: an opaque tag from the host ('' when there is one unit).
@@ -45,6 +46,10 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `departureTime` DATETIME DEFAULT NULL,
   `departureBasis` VARCHAR(255) DEFAULT NULL,
   `memberNumber` VARCHAR(64) DEFAULT NULL,                    -- class B: the current value; every value heard is also an Identifiers row (DAT-5)
+  -- The member and vessel records this trip is tied to. A new or changed Member No. must be a real
+  -- member; with no member the log on is a public user's (owner, 2026-09-14).
+  `memberId` INT DEFAULT NULL,                                -- Members.id; NULL = a public user log on
+  `vesselId` INT DEFAULT NULL,                                -- Vessels.id, when the rego names exactly one known vessel
   `registration` VARCHAR(64) DEFAULT NULL,
   `mobile` VARCHAR(32) DEFAULT NULL,
   `vesselName` VARCHAR(255) DEFAULT NULL,
@@ -145,3 +150,102 @@ CREATE TABLE IF NOT EXISTS `WatchHealth` (
   `lastError` VARCHAR(255) DEFAULT NULL,
   `runs` INT NOT NULL DEFAULT 0
 );
+
+-- The unit's standing records (spec §3.1 Member / PublicUser and Vessel). A member holds any number of
+-- emergency contacts, vessels, trailers and cars. A vessel with no member is a public vessel: for a
+-- public user the vessel is the record, so its owner's contact details are on it.
+-- Member numbers are issued here: 'm00001', one running sequence. Same caveat as the trip reference:
+-- quackit's generator drops the uniqueness, so members.save_member() allocates under a lock.
+CREATE TABLE IF NOT EXISTS `Members` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `unit` VARCHAR(64) NOT NULL DEFAULT '',
+  `memberNumber` VARCHAR(16) NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `address` VARCHAR(255) DEFAULT NULL,
+  `phone` VARCHAR(32) DEFAULT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `createdAt` DATETIME DEFAULT NOW(),
+  `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `updatedAt` DATETIME DEFAULT NOW(),
+  `isActive` BOOL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS `uniq_members_number` ON `Members`(`memberNumber`);
+
+CREATE TABLE IF NOT EXISTS `EmergencyContacts` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `memberId` INT NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `relationship` VARCHAR(64) DEFAULT NULL,
+  `phone` VARCHAR(32) DEFAULT NULL,
+  `email` VARCHAR(255) DEFAULT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `createdAt` DATETIME DEFAULT NOW(),
+  `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `updatedAt` DATETIME DEFAULT NOW(),
+  `isActive` BOOL DEFAULT 1,
+  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_contacts_member` ON `EmergencyContacts`(`memberId`, `isActive`);
+
+-- A member's vessel (memberId) or a public vessel (memberId NULL, owner details filled in).
+CREATE TABLE IF NOT EXISTS `Vessels` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `unit` VARCHAR(64) NOT NULL DEFAULT '',
+  `memberId` INT DEFAULT NULL,
+  `vesselName` VARCHAR(255) DEFAULT NULL,                    -- the same column names as LogOns, so one set of labels
+  `registration` VARCHAR(64) DEFAULT NULL,
+  `length` VARCHAR(16) DEFAULT NULL,                          -- metres
+  `hullColour` VARCHAR(64) DEFAULT NULL,
+  `vesselType` VARCHAR(64) DEFAULT NULL,
+  `make` VARCHAR(64) DEFAULT NULL,
+  `model` VARCHAR(64) DEFAULT NULL,
+  `ais` VARCHAR(32) DEFAULT NULL,
+  `ownerName` VARCHAR(255) DEFAULT NULL,                      -- public vessel: the public user
+  `ownerPhone` VARCHAR(32) DEFAULT NULL,
+  `ownerEmail` VARCHAR(255) DEFAULT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `createdAt` DATETIME DEFAULT NOW(),
+  `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `updatedAt` DATETIME DEFAULT NOW(),
+  `isActive` BOOL DEFAULT 1,
+  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_vessels_member` ON `Vessels`(`unit`, `memberId`, `isActive`);
+
+CREATE TABLE IF NOT EXISTS `Trailers` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `memberId` INT NOT NULL,
+  `registration` VARCHAR(64) NOT NULL,
+  `make` VARCHAR(64) DEFAULT NULL,
+  `model` VARCHAR(64) DEFAULT NULL,
+  `colour` VARCHAR(64) DEFAULT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `createdAt` DATETIME DEFAULT NOW(),
+  `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `updatedAt` DATETIME DEFAULT NOW(),
+  `isActive` BOOL DEFAULT 1,
+  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_trailers_member` ON `Trailers`(`memberId`, `isActive`);
+
+CREATE TABLE IF NOT EXISTS `Cars` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `memberId` INT NOT NULL,
+  `registration` VARCHAR(64) NOT NULL,
+  `make` VARCHAR(64) DEFAULT NULL,
+  `model` VARCHAR(64) DEFAULT NULL,
+  `colour` VARCHAR(64) DEFAULT NULL,
+  `version` INT NOT NULL DEFAULT 0,
+  `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `createdAt` DATETIME DEFAULT NOW(),
+  `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
+  `updatedAt` DATETIME DEFAULT NOW(),
+  `isActive` BOOL DEFAULT 1,
+  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_cars_member` ON `Cars`(`memberId`, `isActive`);

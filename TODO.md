@@ -62,6 +62,27 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   other time boxes are typed.
 - The "already logged on as T-…" clash line, with its link, is the one text line under the form.
 
+### Members and public vessels (`/members`, `/member/<id>`, `/vessels`, `/vessel/<id>`)
+
+- Reached from the RadioLogs navbar (Members, Public vessels). Lists through Quackit's `record_grid`, server
+  search swapped in by htmx like the log.
+- A member: Member No. issued automatically as `m00001`, name (required), address, phone, email. Tabs (Quackit's
+  shared `entity_nav.tabs`): Details, Emergency contacts, Vessels, Trailers, Cars, History. Any number of
+  each; Remove makes a row inactive, never deletes it.
+- A public vessel is the record for a public user: the boat plus its owner's name and phone (both required)
+  and email. A vessel needs a name or a rego.
+- Phones follow the log on's mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
+  writes nothing, keeps what was typed and turns its boxes red; each form comes back to its own tab.
+- **A log on is a member's or a public user's** (owner, 2026-09-14). The Member No. box offers the unit's
+  members; a number that is not a member is emptied as focus leaves the box ("… is not a member: Member No.
+  left blank (public user)") and refused by the server if it is saved anyway. No member = public user log on.
+  The rego ties the log on to a vessel record when it names exactly one (the member's own vessels, else the
+  public vessels). The log shows 👤 Member No. or 🌐 Public in the Member No. column; the log on page shows
+  the member or public vessel it is tied to, linked. A number saved before members existed stays until changed.
+- Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
+  `LogOns.vesselId`. Migrated on port 80 through Database management on 2026-09-14. **8080 still needs the
+  same migration before this is rolled out there.**
+
 ### Behind it
 
 - One record table, `LogOns`, with one status column (`watchStatus`: draft, loggedOn, loggedOff,
@@ -93,6 +114,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
       2. Leave it
 - [ ] **CAP-19 spec conflict.** `vessel-logon-spec.md` CAP-19 requires immediate durable creation; the
       owner chose explicit Save. Update CAP-19 and audit the ACC/WAT requirements that lean on it.
+- [ ] **CAP-23 spec conflict (members).** The owner decided a Member No. that is not a member is left blank
+      (2026-09-14). CAP-23 keeps every value as heard, and §3.2 says selection needs no standing record.
+      Update the spec, or keep the heard number somewhere other than the Member No. box.
 - [ ] **Trip ID collisions.** `tripRef` is issued state-wide in the real system; this branch allocates its
       own, so two branches will collide. Needs a branch prefix or a range split (`VARCHAR(16)` has room).
 - [ ] **Alert delivery (ACC-5).** Alerts reach only whoever has a page open. Set and prove
@@ -108,7 +132,19 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
       when space is short and which columns show by default.
 - [ ] Define "smart" widths before building (content-sized up to a cap, blank columns shrink).
 
+### Members follow-ups (not built)
+
+- [ ] Identity check and one-box search (`identity.py`) still read trip history only, not the member and vessel records.
+- [ ] Choosing a member does not fill their vessel onto the log on; the rego/name are still typed.
+- [ ] Members and public vessels cannot be removed (only a member's contacts, vessels, trailers and cars can).
+      The browser check therefore leaves one `Verify Member …` and one `PUBLIC-…` record on port 80 per run.
+- [ ] History tab covers the member's own details; changes to contacts, vessels, trailers and cars are in their
+      history tables but not shown.
+
 ### Clean-up
+
+- [ ] The log on page has its own tab script (`logon.html`, `data-ro-tab`); member and vessel pages use Quackit's
+      `entity_nav.tabs`. Move the log on page onto the shared tabs.
 
 - [ ] **Set aside on 2026-09-13, to be redone properly:** the log on page's Contact, Vessel, Identity and Record
       tabs (owner: *"all these fields are shit"*). Out of sight until then: channel, departure, radio

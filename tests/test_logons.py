@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import logons as L
 from server.sqlite import Connection, create_schema
+from fixtures import known_members
 
 T0 = datetime(2026, 9, 12, 14, 32)
 
@@ -18,6 +19,7 @@ class LogOns(unittest.TestCase):
         path = Path(self.tmp.name) / 'radio.sqlite'
         create_schema(path)
         self.conn = Connection(path)
+        known_members(self.conn)
         self.cur = self.conn.cursor()
 
     def eta(self, i, day, time, who='alice', at=T0):
@@ -131,7 +133,7 @@ class LogOns(unittest.TestCase):
             L.set_field(self.cur, i, 'destination', '', 'alice', T0)                      # the single-field path too
         row = L.get(self.cur, i)
         self.assertEqual((row['watchStatus'], row['pob'], row['destination']), ('loggedOn', '3', 'Facing Island'))
-        self.assertIn('pob', L.check_fields(row, {'pob': ''})['red'])                    # red on leaving the box
+        self.assertIn('pob', L.check_fields(self.cur, row, {'pob': ''})['red'])                    # red on leaving the box
         L.save_fields(self.cur, i, {'pob': '4', 'vesselName': 'Sea Dog'}, 'alice', T0)     # changing, not emptying, is fine
         self.assertEqual(L.get(self.cur, i)['pob'], '4')
 
@@ -142,8 +144,8 @@ class LogOns(unittest.TestCase):
         for heard in ('041234567', '04123456789', '+61412345678', '0412-345-678', 'O412345678'):
             self.assertEqual(L.written_mobile(heard), (heard, True), heard)             # kept as heard, and wrong
         base = {'callDay': '12/9', 'callTime': '1400', 'registration': 'AB1'}
-        self.assertIn('mobile', L.check_fields(L.blank(T0), dict(base, mobile='041234567'))['red'])
-        self.assertNotIn('mobile', L.check_fields(L.blank(T0), dict(base, mobile='0412345678'))['red'])
+        self.assertIn('mobile', L.check_fields(self.cur, L.blank(T0), dict(base, mobile='041234567'))['red'])
+        self.assertNotIn('mobile', L.check_fields(self.cur, L.blank(T0), dict(base, mobile='0412345678'))['red'])
         i = L.create(self.cur, 'alice', '', T0)
         L.save_fields(self.cur, i, dict(base, mobile='0412345678'), 'alice', T0)
         row = L.get(self.cur, i)
@@ -157,7 +159,7 @@ class LogOns(unittest.TestCase):
 
     def test_member_or_vessel_name_heard_turns_the_other_orange(self):   # the paper's "Member No. or Vessel Name"
         base = {'callDay': '12/9', 'callTime': '1400'}
-        check = lambda **kw: L.check_fields(L.blank(T0), dict(base, **kw))
+        check = lambda **kw: L.check_fields(self.cur, L.blank(T0), dict(base, **kw))
         self.assertEqual(check(memberNumber='4471', registration='AB1')['orange'], ['vesselName'])
         self.assertEqual(check(vesselName='Sea Dog', registration='AB1')['orange'], ['memberNumber'])
         self.assertEqual(check(memberNumber='4471', vesselName='Sea Dog')['orange'], [])

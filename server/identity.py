@@ -1,9 +1,10 @@
 """
 Who is this? Section 7 of the spec: cross-verification, tolerant matching, one search.
 
-There is no membership register to check against. The unit's vessel and member records live in a
-system this app has no access to, so identity is derived from the unit's own trip history, which
-§3.1 allows ("a conceptual model; it does not prescribe separate database tables for each row").
+Identity is derived from the unit's own trip history, which §3.1 allows ("a conceptual model; it does
+not prescribe separate database tables for each row"). Since 2026-09-14 there are member and vessel
+records (members.py), and a log on's Member No. has to be one of them, but the check below still reads
+history only; putting those records behind it is open work (TODO.md).
 
   a vessel      every past trip carrying the same registration, else the same vessel name
   a person      every past trip carrying the same member number, else the same mobile

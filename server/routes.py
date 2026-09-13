@@ -14,6 +14,7 @@ from flask import Blueprint, abort, current_app, jsonify, make_response, redirec
 
 from . import identity as ID
 from . import logons as L
+from . import members as M
 from . import times as T
 from . import watch as W
 from .db import cursor
@@ -104,6 +105,14 @@ def _filters():
             'search': (request.args.get('q') or '').strip()}
 
 
+def _record_links(cur, h, row):
+    """What the log on page shows about who this is: the member or public vessel the record is tied to,
+    and the members the Member No. box offers."""
+    return {'member': M.get(cur, 'member', row['memberId']) if row.get('memberId') else None,
+            'vessel': M.get(cur, 'vessels', row['vesselId']) if row.get('vesselId') else None,
+            'member_options': M.members(cur, h.unit())}
+
+
 def _alerts(cur, h):
     """What the checker has raised, and whether the checker is alive. Both are shown, because an
     empty alert list from a dead checker looks exactly like an empty one from a quiet night."""
@@ -167,7 +176,7 @@ def logons_new():
         body = request.get_json(silent=True) or {}
         try:
             if body.get('check'):          # which boxes are red, nothing written
-                out = L.check_fields(L.blank(now, h.unit()), body.get('fields'))
+                out = L.check_fields(cur, L.blank(now, h.unit()), body.get('fields'))
                 cur.close()
                 return jsonify(out)
             out = L.create_saved(cur, body.get('fields'), h.user(), h.unit(), now)
@@ -185,11 +194,13 @@ def logons_new():
 
     row = L.blank(now, h.unit(), now.date())
     verified = ID.verify(cur, row, [])
+    checked = L.check_fields(cur, row, L.form_values(row))
+    links = _record_links(cur, h, row)
     cur.close()
     cond, minutes = L.condition(row, now, h.approaching_minutes)
     return _page('logon.html', creating=True, logon=row, queue=[], drafts=[], alerts=[], health=None,
                  identifiers=[], gaps=L.gaps(row), condition=cond, minutes=minutes, verified=verified,
-                 missing=L.missing(row), checked=L.check_fields(row, L.form_values(row)), clash=None, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
+                 missing=L.missing(row), checked=checked, clash=None, **links, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
                  labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS, column=L.column,
                  box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, close_reasons=L.CLOSE_REASONS,
                  reference=L.reference, window=h.approaching_minutes)
@@ -206,12 +217,15 @@ def logon_page(logon_id):
     alerts, health = _alerts(cur, h)
     clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] != 'loggedOn' else None
     history = h.history(cur, 'LogOns', logon_id)
+    closed = row['watchStatus'] in ('loggedOff', 'discarded', 'cancelled')
+    checked = {'red': [], 'orange': []} if closed else L.check_fields(cur, row, L.form_values(row))
+    links = _record_links(cur, h, row)
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,
                  identifiers=idents, gaps=L.gaps(row),
                  condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
-                 checked=L.check_fields(row, L.form_values(row)) if row['watchStatus'] not in ('loggedOff', 'discarded', 'cancelled') else {'red': [], 'orange': []},
+                 checked=checked, **links,
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
                  day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
                  close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes,
@@ -273,7 +287,7 @@ def api_set_field(logon_id):
     now = _now()
     try:
         if body.get('check'):              # which boxes are red, nothing written
-            out = L.check_fields(row, body.get('fields'))
+            out = L.check_fields(cur, row, body.get('fields'))
             cur.close()
             return jsonify(out)
         if 'fields' in body:
@@ -377,6 +391,9 @@ def api_queue():
                 r[k] = r[k].isoformat()
     return jsonify({'now': _now().isoformat(), 'approachingMinutes': h.approaching_minutes,
                     'loggedOn': rows, 'drafts': unaccepted})
+
+
+from . import member_pages  # noqa: E402,F401  registers the member and public vessel pages on bp
 
 
 @bp.errorhandler(NotLoggedIn)

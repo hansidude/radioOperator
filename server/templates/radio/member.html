@@ -1,0 +1,41 @@
+{% extends base_template %}
+{% import 'radio/_ui.html' as ui %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+{% block body_wrap_class %}container-fluid{% endblock %}
+{% block page_title %}<i class="bi bi-person-vcard me-1"></i>{% if creating %}New member{% else %}Member {{ member.memberNumber }}{% endif %}{% endblock %}
+{% block navbar_buttons %}
+<div class="entity-nav" role="navigation" aria-label="Member">
+  <div class="entity-nav-links">{{ entity_nav.parent_link('/members', 'Members', 'people') }}</div>
+  {% if not creating %}{{ entity_nav.tabs('memberTabs', 'Member tabs', tabs, prefix='ro-member-', hash_tabs=True) }}{% endif %}
+</div>
+{% endblock %}
+{% block body %}
+{{ ui.styles() }}
+{% if creating %}
+<section id="ro-member-details" class="ro-workspace-pane">
+  {{ ui.record_form('member', '/members/new', kinds.member.fields, labels, member, failed, submit='Save') }}
+</section>
+{% else %}
+<section id="ro-member-details" class="ro-workspace-pane">
+  <p class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</p>
+  {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version) }}
+</section>
+{% for kind in ('contacts', 'vessels', 'trailers', 'cars') %}
+<section id="ro-member-{{ kind }}" class="ro-workspace-pane d-none">
+  {% for c in children[kind] %}
+  {{ ui.record_form('%s-%d' % (kind, c.id), '/member/%d/%s/%d#%s' % (member.id, kind, c.id, kind), kinds[kind].fields, labels, c, failed,
+                    version=c.version, remove='/member/%d/%s/%d/remove#%s' % (member.id, kind, c.id, kind)) }}
+  {% endfor %}
+  <p class="ro-section-title mt-3">Add {{ kinds[kind].one }}</p>
+  {{ ui.record_form(kind ~ '-new', '/member/%d/%s#%s' % (member.id, kind, kind), kinds[kind].fields, labels, {}, failed, submit='Add ' ~ kinds[kind].one) }}
+</section>
+{% endfor %}
+<section id="ro-member-history" class="ro-workspace-pane d-none">
+  <div class="container-fluid mySpacing px-0">
+  {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
+  {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges with context %}
+  {{ dcFn_ShowHistoryChanges(history, dcKey_i='member-history', dcTitle_i='Member history', dcFieldLabelsDictionary_i=labels, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

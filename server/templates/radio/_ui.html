@@ -86,6 +86,10 @@
   .ro-card-top .ro-card-action{margin-left:0}
 
 }
+.ro-record-form{padding:.5rem 0 1rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-record-form label{display:block;font-size:1rem;font-weight:600;margin:0 0 .35rem}
+.ro-record-form .form-control{font-size:1.1rem;min-height:2.9rem}
+.ro-who{text-decoration:none}
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
 {% endmacro %}
@@ -225,7 +229,7 @@
   {% set display.rows = display.rows + [{
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''), 'missing': gaps.keys,
     'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
-              'member': r.memberNumber or '', 'vesselName': r.vesselName or '', 'rego': r.registration or '',
+              'member': member_cell(r, 'member' in gaps.keys), 'vesselName': r.vesselName or '', 'rego': r.registration or '',
               'mobile': r.mobileBox or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
               'departure': r.departurePoint or '', 'destination': r.destination or '',
               'returnDay': r.etaDayBox or '', 'returnTime': r.etaBox or '',
@@ -325,3 +329,58 @@
 {% endmacro %}
 
 {# The queue keeps the paper log's information, but presents one vessel per Quackit-style record card. #}
+
+{# ---------- members and public vessels ---------- #}
+{# Whose log on this is (owner, 2026-09-14): a member's when its Member No. is a member record, otherwise a
+   public user's. One vocabulary for the log, the log on page and the members pages. #}
+{% set WHO = {'member': {'symbol': '👤', 'label': 'Member'}, 'public': {'symbol': '🌐', 'label': 'Public user'}} %}
+
+{# The log's Member No. cell. A draft still short of an ID keeps its orange ? rather than saying Public.
+   A number typed before members existed is shown after Public, as it was typed. #}
+{% macro member_cell(r, needed=False) -%}
+{%- if r.memberId -%}{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=r.memberNumber) }}
+{%- elif not needed -%}{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value=('Public ' ~ r.memberNumber) if r.memberNumber else 'Public', detail='not a member record') }}
+{%- endif -%}
+{%- endmacro %}
+
+{# A log on's own page: the member or public vessel it is tied to, linked to that record. #}
+{% macro who_badge(member, vessel) -%}
+{%- if member -%}<a class="ro-who" href="/member/{{ member.id }}" data-who="member">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=member.memberNumber ~ ' ' ~ member.name) }}</a>
+{%- elif vessel -%}<a class="ro-who" href="/vessel/{{ vessel.id }}" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public · ' ~ (vessel.vesselName or vessel.registration)) }}</a>
+{%- else -%}<span class="ro-who" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public') }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{# One labelled box on a member or vessel form: label on top, nothing written inside it, red when the save
+   was refused for it. `failed` is the refused save when it came from this form. #}
+{% macro record_field(form, name, label, value, failed, cols='col-12 col-md-6') -%}
+{%- set mine = failed.get('form') == form -%}
+{%- set shown = failed['values'].get(name, '') if mine else (value if value is not none else '') -%}
+{%- set red = mine and name in failed.red -%}
+<div class="{{ cols }}"><label for="{{ form }}-{{ name }}">{{ label }}</label>
+  {%- if name == 'address' %}<textarea id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" rows="3" data-auto-grow{% if red %} aria-invalid="true"{% endif %}>{{ shown }}</textarea>
+  {%- else %}<input id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" value="{{ shown }}"{% if name in ('email', 'ownerEmail') %} type="email"{% elif name in ('phone', 'ownerPhone') %} type="tel"{% endif %}{% if red %} aria-invalid="true"{% endif %}>{% endif %}
+</div>
+{%- endmacro %}
+
+{# A whole member / vessel form: its boxes, then Save first in the bottom row (yellow: it changes data, as on
+   the log on), then Remove when there is one. Nested forms are not allowed, so Remove posts its own form. #}
+{% macro record_form(form, action, fields, labels, values, failed, version=None, submit='Save', remove=None) %}
+<form id="{{ form }}" method="post" action="{{ action }}" class="ro-record-form" autocomplete="off">
+  {% if version is not none %}<input type="hidden" name="version" value="{{ version }}">{% endif %}
+  <div class="row g-3">{% for name in fields %}{{ record_field(form, name, labels[name], values[name], failed) }}{% endfor %}</div>
+  {% if failed.get('form') == form and not failed.red %}<div class="text-danger mt-2" role="alert">{{ failed.error }}</div>{% endif %}
+  <div class="ro-primary-actions">
+    <button class="btn btn-warning"><i class="bi bi-floppy me-1"></i>{{ submit }}</button>
+    {% if remove %}<button form="{{ form }}-remove" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>{% endif %}
+  </div>
+</form>
+{% if remove %}<form id="{{ form }}-remove" method="post" action="{{ remove }}" onsubmit="return confirm('Remove this?')"><input type="hidden" name="version" value="{{ version }}"></form>{% endif %}
+{% endmacro %}
+
+{# Quackit's navbar links from the log to the standing records, and back. #}
+{% macro records_links() %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+{{ entity_nav.page_link('/members', 'Members', 'people') }}
+{{ entity_nav.page_link('/vessels', 'Public vessels', 'life-preserver') }}
+{% endmacro %}

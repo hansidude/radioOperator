@@ -90,6 +90,7 @@ TIME_FIELDS = {'eta': ('etaDayRaw', 'etaDate', 'etaRaw', 'eta', 'etaBasis'),
 DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime', 'departureDay': 'departureTime'}
 DATES = ('etaDate', 'callDate', 'departureDate', 'dayDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
+NUMBER = re.compile(r'^\d+(\.\d+)?$')
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
 DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'acceptedAt', 'loggedOffAt',
@@ -109,6 +110,17 @@ class InvalidDraft(Refused):
         self.fields = fields
         super().__init__('A log on keeps everything required: %s' % ', '.join(LABELS.get(f, f) for f in fields) if logged_on else
                          'A draft needs a valid date, time, and one of member number, vessel rego or mobile')
+
+
+class NotAMember(InvalidDraft):
+    """A Member No. that names no member. It is not stored: the box is left blank and the log on is a
+    public user's (owner, 2026-09-14). This departs from CAP-23, which keeps every value as heard; the
+    conflict is listed in TODO.md for the spec."""
+
+    def __init__(self, number):
+        self.fields = ['memberNumber']
+        self.number = number
+        Refused.__init__(self, '%s is not a member. Member No. is left blank: this is a public user log on.' % number)
 
 
 class Stale(Exception):
@@ -406,24 +418,31 @@ def _next_trip_ref(cur):
     """The next trip reference: the paper log's 'Trip ID No.', one running sequence across every
     unit and every day, and the record's key.
 
+    The state-wide system issues these across all units; this branch allocates its own, so two
+    branches will eventually meet in the middle -- that is a reconciliation to do with a branch
+    prefix, not something to paper over here."""
+    return next_ref(cur, 'LogOns', 'tripRef', TRIP_PREFIX, TRIP_DIGITS, 'trip reference')
+
+
+def next_ref(cur, table, col, prefix, digits, name):
+    """The next prefix-plus-digits reference in `table`.`col`: trip references, member numbers.
+
     Zero-padded to a fixed width so the text order is the number order, which is what lets MAX()
-    find the highest without the database having to know the format. Locked and retried like the day
-    number above. The state-wide system issues these across all units; this branch allocates its own,
-    so two branches will eventually meet in the middle -- that is a reconciliation to do with a
-    branch prefix, not something to paper over here."""
-    cur.execute('SELECT MAX(tripRef) AS m FROM LogOns FOR UPDATE')
+    find the highest without the database having to know the format. Read under a lock and retried
+    by the caller on a unique clash, like the day number above."""
+    cur.execute('SELECT MAX(%s) AS m FROM %s FOR UPDATE' % (col, table))
     highest = (cur.fetchone() or {}).get('m')
     if highest is None:
         nxt = 1
     else:
-        if not highest.startswith(TRIP_PREFIX) or not highest[len(TRIP_PREFIX):].isdigit():
-            raise Refused('The highest trip reference in the database is %r, which is not %s plus digits. '
-                          'Refusing to guess the next one.' % (highest, TRIP_PREFIX))
-        nxt = int(highest[len(TRIP_PREFIX):]) + 1
-    if nxt >= 10 ** TRIP_DIGITS:
-        raise Refused('Trip references have run past %s%s. The width has to grow before another can be issued.'
-                      % (TRIP_PREFIX, '9' * TRIP_DIGITS))
-    return '%s%0*d' % (TRIP_PREFIX, TRIP_DIGITS, nxt)
+        if not highest.startswith(prefix) or not highest[len(prefix):].isdigit():
+            raise Refused('The highest %s in the database is %r, which is not %s plus digits. '
+                          'Refusing to guess the next one.' % (name, highest, prefix))
+        nxt = int(highest[len(prefix):]) + 1
+    if nxt >= 10 ** digits:
+        raise Refused('%s has run past %s%s. The width has to grow before another can be issued.'
+                      % (name[0].upper() + name[1:], prefix, '9' * digits))
+    return '%s%0*d' % (prefix, digits, nxt)
 
 
 def create(cur, user, unit, now):
@@ -473,13 +492,38 @@ def blank(now, unit='', call_day=None):
     for columns in TIME_FIELDS.values():
         for column_name in columns:
             row[column_name] = None
-    row.update(id=None, unit=unit, watchStatus='draft', dayNumber=None, dayDate=call_day,
+    row.update(id=None, unit=unit, memberId=None, vesselId=None, watchStatus='draft', dayNumber=None, dayDate=call_day,
                callDayRaw=_sd(call_day), callDate=call_day, version=0, createdAt=now, updatedAt=now,
                createdBy='', updatedBy='', verifyOutcome='unverified', verifyBasis='')
     return row
 
 
-def _prepare_fields(row, values):
+def _links(cur, row, clean):
+    """The member and vessel records a save ties this log on to: (columns to set, a Member No. that names
+    no member). Owner, 2026-09-14: the Member No. has to be a real member. A new or changed number that
+    is not is never stored; with no member the log on is a public user's, and its rego may name one of
+    the public vessels. A number saved before members existed stays as it was until it is changed."""
+    from . import members        # members.py imports this module; a top-level import would be circular
+    sets, not_member = {}, None
+    if 'memberNumber' in clean:
+        number = clean['memberNumber']
+        if not number:
+            sets.update(memberNumber=None, memberId=None)
+        elif normalize('memberNumber', number) != normalize('memberNumber', row.get('memberNumber') or ''):
+            found = members.by_number(cur, row['unit'], number)
+            if found:
+                sets.update(memberNumber=found['memberNumber'], memberId=found['id'])
+            else:
+                not_member = number
+                sets.update(memberNumber=row.get('memberNumber'), memberId=row.get('memberId'))
+    if 'registration' in clean or 'memberId' in sets:
+        member_id = sets['memberId'] if 'memberId' in sets else row.get('memberId')
+        rego = clean['registration'] if 'registration' in clean else row.get('registration')
+        sets['vesselId'] = members.vessel_for(cur, row['unit'], rego, member_id)
+    return sets, not_member
+
+
+def _prepare_fields(cur, row, values):
     """Validate and interpret one explicit form save without writing anything. `required` lists the
     draft minimum still absent; the caller decides whether that refuses a save or only turns boxes red."""
     if not isinstance(values, dict):
@@ -503,8 +547,11 @@ def _prepare_fields(row, values):
         col = column(field)
         sets[col] = value or None
         after[col] = value or None
-        if field in NUMBER_FIELDS and value and not re.match(r'^\d+(\.\d+)?$', value):
+        if field in NUMBER_FIELDS and value and not NUMBER.match(value):
             invalid.append(field)
+    links, not_member = _links(cur, row, clean)
+    sets.update(links)
+    after.update(links)
 
     day_for = {target: source for source, target in DAY_FIELDS.items()}
     for time_field in ('callTime', 'departureTime', 'eta'):
@@ -532,14 +579,15 @@ def _prepare_fields(row, values):
         # A log on stays complete (ACC-1, WAT-10): no save may take away, or make unreadable, what
         # the watch depends on. The boxes it would empty are named, and nothing is written.
         required.extend(box for m in missing(after) for box in m['boxes'])
-    return sets, after, sorted(set(invalid)), displays, required
+    return sets, after, sorted(set(invalid)), displays, required, not_member
 
 
-def check_fields(row, values):
+def check_fields(cur, row, values):
     """The boxes the form's current values turn red or orange, writing nothing: the draft minimum, what cannot be
     read, and on a draft what still stops acceptance (ACC-1). The page asks this as focus leaves a box,
-    so there is one rule, here, and not a second copy in the browser."""
-    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    so there is one rule, here, and not a second copy in the browser. `notMember` is a Member No. that
+    names no member: the form empties that box, since a save would refuse it."""
+    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
     red = set(required) | set(invalid)
     if row['watchStatus'] == 'draft':
         for m in missing(after):
@@ -549,7 +597,7 @@ def check_fields(row, values):
     pair = ('memberNumber', 'vesselName')
     heard = [field for field in pair if after.get(field)]
     orange = [field for field in pair if len(heard) == 1 and field not in heard and field not in red]
-    return {'red': sorted(red), 'orange': orange}
+    return {'red': sorted(red), 'orange': orange, 'notMember': not_member}
 
 
 def form_values(row):
@@ -560,7 +608,9 @@ def form_values(row):
 def save_fields(cur, logon_id, values, user, now, version=None):
     """Save one whole operator form as one LogOns update and therefore one host history event."""
     row = _open_row(cur, logon_id, version)
-    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
+    if not_member:
+        raise NotAMember(not_member)
     if required:
         raise InvalidDraft(required, logged_on=row['watchStatus'] == 'loggedOn')
     for field in IDENT_FIELDS:
@@ -582,7 +632,9 @@ def save_fields(cur, logon_id, values, user, now, version=None):
 def create_saved(cur, values, user, unit, now):
     """Create the first durable draft only after the explicit form save passes its minimum."""
     row = blank(now, unit)
-    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
+    if not_member:
+        raise NotAMember(not_member)
     if required:
         raise InvalidDraft(required)
     day = after['callDate']
@@ -735,11 +787,15 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
             value, out['invalid'] = written_mobile(value)
             out['value'] = value or None
         sets = {field: value or None}
-        if field in NUMBER_FIELDS and value and not re.match(r'^\d+(\.\d+)?$', value):
+        if field in NUMBER_FIELDS and value and not NUMBER.match(value):
             out['warning'] = 'Not a %s; kept as heard.' % NUMBER_FIELDS[field]
             out['invalid'] = True
+        links, not_member = _links(cur, row, {field: value})
+        if not_member:
+            raise NotAMember(not_member)
+        sets.update(links)
         if field in IDENT_FIELDS:
-            _record_identifier(cur, logon_id, field, value, row[field], user, now)
+            _record_identifier(cur, logon_id, field, sets[field], row[field], user, now)
             sets.update(_verify_sets(cur, row, sets))
     if row['watchStatus'] == 'loggedOn':            # the same rule for a single field (ACC-1, WAT-10)
         short = [box for m in missing(dict(row, **sets)) for box in m['boxes']]
@@ -864,10 +920,18 @@ def apply_profile(cur, logon_id, key, user, now, version=None):
     sets, filled = {}, []
     for field, value in fields.items():
         if field in FIELDS and not row.get(field):
+            if field == 'memberNumber':
+                links, not_member = _links(cur, row, {field: value})
+                if not_member:
+                    continue                             # an earlier trip's number that is not a member is not applied
+                sets.update(links)
+                value = links['memberNumber']
             sets[field] = value
             filled.append(LABELS.get(field, field))
             if field in IDENT_FIELDS:
                 _record_identifier(cur, logon_id, field, value, row[field], user, now, source='profile')
+    if 'registration' in sets and 'vesselId' not in sets:
+        sets.update(_links(cur, dict(row, **sets), {'registration': sets['registration']})[0])
     if not sets:
         raise Refused('Everything it knows is already on this record')
     sets.update(_verify_sets(cur, row, sets))
