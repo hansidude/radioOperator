@@ -390,8 +390,10 @@ def main(engine='chromium'):
             expect(page.locator('.ro-status-now')).to_contain_text('👀')                          # the same symbol and word as the log
             expect(page.locator('.ro-status-now')).to_contain_text('Logged on')
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
-            tops = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().top))')
-            assert max(tops) - min(tops) < 12, 'Save, note and Log off are not on one line: %s' % tops
+            bottoms = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
+            assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
+            expect(page.locator('label[for="logoffNote"]')).to_have_text('Note')
+            expect(page.locator('#ro-entry-pane [placeholder]')).to_have_count(0)
             expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
             expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
             watching = True

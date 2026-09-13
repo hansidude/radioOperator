@@ -207,7 +207,8 @@ class Pages(unittest.TestCase):
         self.assertNotIn('id="queuePane"', page)
         self.assertIn('font-size:1.2rem', page)
         self.assertNotIn('<table', page)
-        self.assertNotIn('placeholder=', entry[:entry.index('</form>')])   # the paper fields carry no hints; action rows may
+        self.assertNotIn('placeholder=', page)                              # nothing written inside a box; labels go on top
+        self.assertIn('<label for="discardReason">Reason</label>', entry)
         self.assertNotIn('class="ro-basis"', entry)
         self.assertNotIn('class="ro-warn"', entry)
         self.assertNotIn('max-width:72rem', page)
@@ -389,6 +390,8 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertNotIn('Logged on and watched', page)                   # no words and no reason dropdown
         self.assertNotIn('name="reason" form="logoffForm"', page)
+        self.assertNotIn('placeholder=', page)
+        self.assertIn('<label for="logoffNote">Note</label>', page)
         self.assertIn('data-status="overdue"', page)                      # overdue from the moment of acceptance
         self.assertIn('>Overdue</span>', page)
         listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)

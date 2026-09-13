@@ -56,7 +56,7 @@
 .ro-workspace-pane{width:100%;padding:.25rem 0 1rem}
 .ro-primary-form .capture-row{padding:.65rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-primary-form .capture-row:first-child{padding-top:.25rem}
-.ro-primary-form label{display:block;font-size:1rem;font-weight:600;color:var(--bs-body-color);margin:0 0 .35rem}
+.ro-primary-form label,.ro-primary-actions label{display:block;font-size:1rem;font-weight:600;color:var(--bs-body-color);margin:0 0 .35rem}
 .ro-primary-form .form-control,.ro-primary-form .form-select{min-height:3.15rem;font-size:1.2rem;line-height:1.35;padding:.65rem .75rem}
 .ro-primary-form textarea.form-control{min-height:6rem}
 .ro-primary-form .mandatory .form-control{background-color:var(--bs-tertiary-bg)}
@@ -65,7 +65,7 @@
 .form-control.ro-hint:focus{border-color:var(--bs-orange);box-shadow:0 0 0 .25rem rgba(253,126,20,.25)}
 .ro-primary-form .ro-picker-button{min-width:3.4rem;font-size:1.15rem}
 .ro-native-picker{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.ro-primary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:1rem 0}
+.ro-primary-actions{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.65rem;padding:1rem 0}
 .ro-primary-actions .btn{font-size:1rem;padding:.55rem .9rem}
 .ro-primary-actions .form-control,.ro-primary-actions .form-select{font-size:1rem;min-height:2.75rem}
 .ro-section-title{font-size:1.05rem;font-weight:600;margin:0 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--bs-border-color)}
@@ -268,7 +268,7 @@
 {% macro find(current=None) %}
 <div class="ro-find">
   <input class="form-control" type="search" id="findBox" autocomplete="off"
-         placeholder="Find a boat, member, mobile or trip" aria-label="Find a boat, member, mobile or trip">
+         aria-label="Find a boat, member, mobile or trip">
   <div class="ro-hits" id="findHits" hidden></div>
 </div>
 {% endmacro %}
