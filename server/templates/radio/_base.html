@@ -14,6 +14,7 @@
   {% endfor %}
   <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js') }}"></script>
   {{ record_scripts('radio_shared.static') }}
+  <script src="{{ url_for('radio_shared.static', filename='js/auto_grow.js', v='1') }}"></script>
   <script src="{{ url_for('radio_shared.static', filename='vendor/htmx-1.9.10/htmx.min.js') }}"></script>
   <script src="{{ url_for('radio_shared.static', filename='js/htmx_errors.js') }}"></script>
   <style>

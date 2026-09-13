@@ -230,7 +230,7 @@ def main(engine='chromium'):
             expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
             bottom = page.locator('#ro-entry-pane .ro-primary-actions')
             expect(bottom.locator('[data-save-record]')).to_be_visible()                 # Save, Accept, Discard in one row
-            expect(bottom.locator('input[name="reason"]')).to_be_visible()
+            expect(page.locator('#ro-entry-pane textarea[name="reason"]')).to_be_visible()           # Reason above the buttons
             expect(bottom.get_by_role('button', name='Discard draft')).to_be_visible()
             expect(page.locator('.ro-status-now')).to_contain_text('📝')                       # its status, as on the log
             expect(page.locator('.ro-status-now')).to_contain_text('Draft')
@@ -393,6 +393,13 @@ def main(engine='chromium'):
             bottoms = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
             expect(page.locator('label[for="logoffNote"]')).to_have_text('Note')
+            note_height = lambda: page.locator('#logoffNote').evaluate('el => el.getBoundingClientRect().height')
+            three = note_height()
+            assert three >= 3 * 20, 'The Note box is not three lines tall: %spx' % three
+            page.locator('#logoffNote').fill('one\ntwo\nthree\nfour\nfive\nsix')
+            expect(page.locator('#logoffNote')).not_to_have_css('height', '%spx' % three)             # it grows with the text
+            assert note_height() > three + 30, 'The Note box did not grow: %s -> %s' % (three, note_height())
+            page.locator('#logoffNote').fill('')
             expect(page.locator('#ro-entry-pane [placeholder]')).to_have_count(0)
             expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
             expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
