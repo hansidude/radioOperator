@@ -101,6 +101,26 @@ class LogOns(unittest.TestCase):
         with self.assertRaises(L.Refused):
             L.accept(self.cur, i, 'alice', T0)                          # already accepted
 
+    def test_a_mobile_is_ten_digits_written_0412_345_678(self):
+        self.assertEqual(L.written_mobile('0412345678'), ('0412 345 678', False))
+        self.assertEqual(L.written_mobile(' 04 1234 5678 '), ('0412 345 678', False))  # spaces typed anywhere
+        self.assertEqual(L.written_mobile(''), ('', False))
+        for heard in ('041234567', '04123456789', '+61412345678', '0412-345-678', 'O412345678'):
+            self.assertEqual(L.written_mobile(heard), (heard, True), heard)             # kept as heard, and wrong
+        base = {'callDay': '12/9', 'callTime': '1400', 'registration': 'AB1'}
+        self.assertIn('mobile', L.check_fields(L.blank(T0), dict(base, mobile='041234567'))['red'])
+        self.assertNotIn('mobile', L.check_fields(L.blank(T0), dict(base, mobile='0412345678'))['red'])
+        i = L.create(self.cur, 'alice', '', T0)
+        L.save_fields(self.cur, i, dict(base, mobile='0412345678'), 'alice', T0)
+        row = L.get(self.cur, i)
+        self.assertEqual(row['mobile'], '0412 345 678')                                  # saved in the written form
+        self.assertEqual([r['id'] for r in L.records(self.cur, '', T0, 30, search='0412345678')], [i])
+        row['mobile'] = '0412345678'                                                     # saved before the format
+        self.assertEqual(L.box(row, 'mobile'), '0412 345 678')
+        out = L.set_field(self.cur, i, 'mobile', '12345', 'alice', T0)
+        self.assertTrue(out['invalid'])
+        self.assertEqual(L.get(self.cur, i)['mobile'], '12345')
+
     def test_member_or_vessel_name_heard_turns_the_other_orange(self):   # the paper's "Member No. or Vessel Name"
         base = {'callDay': '12/9', 'callTime': '1400'}
         check = lambda **kw: L.check_fields(L.blank(T0), dict(base, **kw))

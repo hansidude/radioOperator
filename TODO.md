@@ -41,6 +41,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every
   editable pane. A draft's bottom row: Save · Accept the log on · reason · Discard draft.
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
+- Mobile: exactly 10 digits, saved and shown as `0412 345 678` (spaces while typing are fine); anything else
+  is kept as typed and red. Search finds it with or without spaces.
 - Orange boxes: with Member No. or Vessel Name heard, the other empty one turns orange (worth asking for,
   blocks nothing). Red wins. Same server check as red.
 - Red boxes only, no messages. The server decides (`logons.check_fields`): the draft minimum, values

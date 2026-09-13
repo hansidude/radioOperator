@@ -211,7 +211,7 @@
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''),
     'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
               'member': r.memberNumber or '', 'vesselName': r.vesselName or '', 'rego': r.registration or '',
-              'mobile': r.mobile or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
+              'mobile': r.mobileBox or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
               'departure': r.departurePoint or '', 'destination': r.destination or '',
               'returnDay': r.etaDayBox or '', 'returnTime': r.etaBox or '',
               'trip': r.tripRef or '', 'action': action}

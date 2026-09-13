@@ -166,6 +166,18 @@ def resolved_day(row, field):
     return row.get(day_date_col) or (row[when_col].date() if row.get(when_col) else None)
 
 
+def written_mobile(value):
+    """(what to store, whether it is wrong) for a mobile number. Exactly 10 digits, spaces anywhere
+    ignored, is written 0412 345 678. Anything else (9 or 11 digits, +61, letters) is kept as heard and
+    is wrong, so its box is red (CAP-23: never invent, never drop what was heard)."""
+    digits = re.sub(r'\s+', '', value or '')
+    if not digits:
+        return '', False
+    if not re.fullmatch(r'\d{10}', digits):
+        return value, True
+    return '%s %s %s' % (digits[:4], digits[4:7], digits[7:]), False
+
+
 def box(row, field):
     """What the input shows. A day cell shows the date it settled on ('Sun 13/9') and a time cell the
     time ('1400'), so the words the operator typed are never what anyone reads back; unresolved, it
@@ -174,6 +186,8 @@ def box(row, field):
         day = resolved_day(row, field)
         if day:
             return times.fmt_day(day)
+    if field == 'mobile':
+        return written_mobile(row.get('mobile'))[0]     # a number saved before the format reads 0412 345 678 too
     if field in TIME_FIELDS and row.get(field):
         return times.fmt_time(row[field])       # a time it settled on reads back as 4-digit 24-hour: '929' shows 0929
     if field in TIME_FIELDS and present(row, field):
@@ -258,7 +272,7 @@ def _decorate(rows, now, approaching_minutes):
         r['missing'] = missing(r)
         r['ageMinutes'] = int((now - r['createdAt']).total_seconds() // 60)
         r['callDayBox'], r['etaDayBox'] = box(r, 'callDay'), box(r, 'etaDay')
-        r['callTimeBox'], r['etaBox'] = box(r, 'callTime'), box(r, 'eta')
+        r['callTimeBox'], r['etaBox'], r['mobileBox'] = box(r, 'callTime'), box(r, 'eta'), box(r, 'mobile')
     return rows
 
 
@@ -303,8 +317,10 @@ def records(cur, unit, now, approaching_minutes, status=None, day=None, search=N
         rows = [r for r in rows if r['condition'] == 'overdue']
     if search:
         needle = str(search).strip().lower()
+        spaceless = re.sub(r'\s+', '', needle)          # 0412345678 finds 0412 345 678
         rows = [r for r in rows
-                if any(needle in str(r[field]).lower() for field in SEARCH_FIELDS if r.get(field) is not None)]
+                if any(needle in str(r[field]).lower() or (field == 'mobile' and spaceless in re.sub(r'\s+', '', str(r[field])))
+                       for field in SEARCH_FIELDS if r.get(field) is not None)]
     rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=sort != 'oldest')
     return due_first(rows) if sort == 'due' else rows
 
@@ -442,6 +458,10 @@ def _prepare_fields(row, values):
             raise Refused('%s: too long to store' % LABELS[field])
         if field == 'channel' and value and value not in CHANNELS:
             raise Refused('Channel must be one of: ' + ', '.join(CHANNELS))
+        if field == 'mobile':
+            value, wrong = written_mobile(value)
+            if wrong:
+                invalid.append(field)
         clean[field] = value
         col = column(field)
         sets[col] = value or None
@@ -666,6 +686,9 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
             raise Refused('Channel must be one of: ' + ', '.join(CHANNELS))
         if len(value) > (65535 if field == 'notes' else 255):
             raise Refused('%s: too long to store' % LABELS[field])
+        if field == 'mobile':
+            value, out['invalid'] = written_mobile(value)
+            out['value'] = value or None
         sets = {field: value or None}
         if field in NUMBER_FIELDS and value and not re.match(r'^\d+(\.\d+)?$', value):
             out['warning'] = 'Not a %s; kept as heard.' % NUMBER_FIELDS[field]

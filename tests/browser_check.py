@@ -121,7 +121,8 @@ def main(engine='chromium'):
             assert len(writes) == before + 1, 'First Save was not one batched write'
             for name, value in fields.items():
                 if name not in ('callDay', 'etaDay'):   # settled times read back 4-digit: 13:45 shows 1345
-                    expect(page.locator('#f-' + name)).to_have_value(value.replace(':', '') if name in ('callTime', 'eta') else value)
+                    shown = {'callTime': value.replace(':', ''), 'eta': value.replace(':', ''), 'mobile': '0412 345 678'}.get(name, value)
+                    expect(page.locator('#f-' + name)).to_have_value(shown)   # times 4-digit, mobile written 0412 345 678
             expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(0)
             actions = page.locator('#ro-entry-pane .ro-primary-actions')
             expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save left of Accept
@@ -256,6 +257,12 @@ def main(engine='chromium'):
             expect(page.locator('#f-vesselName')).to_have_class(re.compile(r'\bro-hint\b'))    # orange, not red
             expect(page.locator('#f-vesselName')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-vesselName')).to_have_css('border-top-color', 'rgb(253, 126, 20)')
+            page.locator('#f-mobile').fill('041234567')                                    # 9 digits: red on leaving
+            page.locator('#f-mobile').press('Tab')
+            expect(page.locator('#f-mobile')).to_have_class(re.compile('is-invalid'))
+            page.locator('#f-mobile').fill('0412 345 678')
+            page.locator('#f-mobile').press('Tab')
+            expect(page.locator('#f-mobile')).not_to_have_class(re.compile('is-invalid'))
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
             expect(page.locator('#appNavbarControls #roFilters')).to_have_count(1)            # the filters ride in the navbar
