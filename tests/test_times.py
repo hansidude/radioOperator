@@ -88,10 +88,10 @@ class Times(unittest.TestCase):
     def test_a_resolved_day_shows_as_a_date_and_types_back_in(self):
         for raw in ('today', 'tomorrow', 'monday', '14/9', '2026-09-20'):
             first = times.parse_day(raw, REF)['day']
-            shown = times.fmt_day(first, REF.year)
+            shown = times.fmt_day(first)
             self.assertEqual(times.parse_day(shown, REF)['day'], first, shown)   # round trip
-        self.assertEqual(times.fmt_day(date(2026, 9, 13), 2026), 'Sun 13/9')
-        self.assertEqual(times.fmt_day(date(2027, 1, 4), 2026), 'Mon 4/1/27')
+        self.assertEqual(times.fmt_day(date(2026, 9, 13)), 'Sun 13/9/26')     # the year is always shown
+        self.assertEqual(times.fmt_day(date(2027, 1, 4)), 'Mon 4/1/27')
         self.assertEqual(times.fmt_day(None), '')
 
 

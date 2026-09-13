@@ -173,9 +173,13 @@ def box(row, field):
     if field in DAY_FIELDS:
         day = resolved_day(row, field)
         if day:
-            return times.fmt_day(day, (row.get('createdAt') or datetime.now()).year)
+            return times.fmt_day(day)
     if field in TIME_FIELDS and row.get(field):
-        return row[field].strftime('%H%M')      # a time it settled on reads back as 4-digit 24-hour: '929' shows 0929
+        return times.fmt_time(row[field])       # a time it settled on reads back as 4-digit 24-hour: '929' shows 0929
+    if field in TIME_FIELDS and present(row, field):
+        clock = interpret(row, field).get('clock')
+        if clock:                               # understood but no day yet: '3pm' still reads 1500
+            return clock
     return row.get(column(field)) or ''
 
 
@@ -254,6 +258,7 @@ def _decorate(rows, now, approaching_minutes):
         r['missing'] = missing(r)
         r['ageMinutes'] = int((now - r['createdAt']).total_seconds() // 60)
         r['callDayBox'], r['etaDayBox'] = box(r, 'callDay'), box(r, 'etaDay')
+        r['callTimeBox'], r['etaBox'] = box(r, 'callTime'), box(r, 'eta')
     return rows
 
 
@@ -443,7 +448,7 @@ def _prepare_fields(row, values):
         parsed = {day_date_col: _sd(got['day']), when_col: _s(got['when']), basis_col: got['basis'] or None}
         sets.update(parsed)
         after.update({day_date_col: got['day'], when_col: got['when'], basis_col: got['basis'] or None})
-        displays[day_field] = times.fmt_day(got['day'], row['createdAt'].year) if got['day'] else clean.get(day_field, '')
+        displays[day_field] = times.fmt_day(got['day']) if got['day'] else clean.get(day_field, '')
         if got['invalid']:
             invalid.extend(f for f in (day_field, time_field) if f in clean)
 
@@ -571,7 +576,7 @@ def interpret(row, field, resolve_day=False):
     if resolve_day:
         day = times.parse_day(written, ref, warn_before=field != 'callTime')
     elif settled:
-        day = {'day': settled, 'label': 'day cell', 'basis': times.fmt_day(settled, ref.year) + ' (day cell)',
+        day = {'day': settled, 'label': 'day cell', 'basis': times.fmt_day(settled) + ' (day cell)',
                'warning': None, 'invalid': False}
     elif written:
         day = times.parse_day(written, ref, warn_before=field != 'callTime')  # written but never resolved: read it now, once
@@ -635,11 +640,11 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
                 when_col: _s(got['when']), basis_col: got['basis'] or None}
         out.update(when=got['when'], basis=got['basis'], warning=got['warning'], invalid=got['invalid'])
         if field in DAY_FIELDS:      # the box stops showing the word and shows the date it meant
-            out['display'] = times.fmt_day(got['day'], row['createdAt'].year) if got['day'] else value
+            out['display'] = times.fmt_day(got['day']) if got['day'] else value
         # CAP-5: an ETA before the departure is information, shown beside the field, never a refusal.
         after[when_col] = got['when']
         if after['eta'] and after['departureTime'] and after['eta'] < after['departureTime'] and not out['warning']:
-            out['warning'] = 'ETA %s is before the departure time %s.' % (after['eta'].strftime('%H:%M'), after['departureTime'].strftime('%H:%M'))
+            out['warning'] = 'ETA %s is before the departure time %s.' % (times.fmt_time(after['eta']), times.fmt_time(after['departureTime']))
     else:
         if field == 'channel' and value and value not in CHANNELS:
             raise Refused('Channel must be one of: ' + ', '.join(CHANNELS))

@@ -141,6 +141,9 @@ def main(engine='chromium'):
             expect(row.get_by_role('img', name='Member number', exact=True)).to_be_visible()
             expect(row.get_by_role('img', name='Vessel name', exact=True)).to_be_visible()
             expect(row.locator('[data-column="identity"]')).to_contain_text(vessel)
+            expect(row.locator('[data-column="day"]')).to_contain_text('/%02d' % (date.today().year % 100))
+            expect(row.locator('[data-column="time"]')).to_contain_text('1345')            # typed 13:45, always 4-digit
+            expect(row.locator('[data-column="returnTime"]')).to_contain_text('1700')
             expect(row.locator('[data-column="identity"]')).to_contain_text(token)
             # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
             expect(page.get_by_role('button', name='Apply', exact=True)).to_have_count(0)
@@ -213,6 +216,7 @@ def main(engine='chromium'):
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-registration')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-callTime')).to_have_value('1400')
+            expect(page.locator('#f-callDay')).to_have_value(re.compile(r'^\w{3} \d{1,2}/\d{1,2}/\d{2}$'))   # always with the year
             page.screenshot(path=str(ARTIFACTS / ('radio-draft-%s.png' % engine)))
             page.locator('#f-pob').fill('abc')          # red as soon as focus leaves, from the server's check
             expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))

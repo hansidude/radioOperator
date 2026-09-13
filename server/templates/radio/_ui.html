@@ -85,7 +85,7 @@
 </style>
 {% endmacro %}
 
-{% macro when(dt, now) %}{% if dt %}{% if dt.date() != now.date() %}{{ dt.strftime('%d %b ') }}{% endif %}{{ dt.strftime('%H:%M') }}{% endif %}{% endmacro %}
+{% macro when(dt, now) %}{% if dt %}{% if dt.date() != now.date() %}{{ dt.strftime('%d %b ') }}{% endif %}{{ dt|hhmm }}{% endif %}{% endmacro %}
 
 {% macro minutes(m) %}{% if m|abs < 60 %}{{ m|abs }} min{% elif m|abs < 1440 %}{{ (m|abs // 60) }} h {{ (m|abs % 60) }} min{% else %}{{ (m|abs // 1440) }} d {{ ((m|abs % 1440) // 60) }} h{% endif %}{% endmacro %}
 
@@ -108,8 +108,8 @@
     <span class="who">OVERDUE</span>
     <a href="/logon/{{ a.logOnId }}" class="fw-semibold">log on {{ a.reference }}</a>
     <span>{{ a.vessel }}</span>
-    <span class="text-secondary">due {{ a.dueAt.strftime('%H:%M') }}, {{ minutes(a.overdueMinutes) }} ago{% if a.notifyCount > 1 %} · raised {{ a.notifyCount }} times{% endif %}</span>
-    {% if a.acknowledgedAt %}<span class="text-secondary">seen {{ a.acknowledgedAt.strftime('%H:%M') }} by {{ a.acknowledgedBy }}</span>
+    <span class="text-secondary">due {{ a.dueAt|hhmm }}, {{ minutes(a.overdueMinutes) }} ago{% if a.notifyCount > 1 %} · raised {{ a.notifyCount }} times{% endif %}</span>
+    {% if a.acknowledgedAt %}<span class="text-secondary">seen {{ a.acknowledgedAt|hhmm }} by {{ a.acknowledgedBy }}</span>
     {% else %}<form method="post" action="/logon/{{ a.logOnId }}/alert/{{ a.id }}/ack"><input type="hidden" name="back" value="{{ back }}"><button class="btn btn-outline-light btn-sm py-0" title="Records that you have seen it. It does not resolve anything.">Seen</button></form>{% endif %}
   </div>
   {% endfor %}
@@ -213,11 +213,11 @@
   {% set action %}<a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open record {{ reference(r) }}" aria-label="Open record {{ reference(r) }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
   {% set display.rows = display.rows + [{
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''),
-    'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeRaw or '',
+    'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
               'identity': identity_badges(r, reference), 'rego': r.registration or '',
               'mobile': r.mobile or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
               'departure': r.departurePoint or '', 'destination': r.destination or '',
-              'returnDay': r.etaDayBox or '', 'returnTime': r.etaRaw or '',
+              'returnDay': r.etaDayBox or '', 'returnTime': r.etaBox or '',
               'trip': r.tripRef or '', 'action': action}
   }] %}
 {% endfor %}

@@ -25,7 +25,13 @@ _T_DIGITS = re.compile(r'^(\d{3,4})\s*(am|pm)?$')
 _T_H = re.compile(r'^(\d{1,2})\s*(am|pm)$')
 _T_BARE = re.compile(r'^\d{1,2}$')
 
-FMT = '%a %d %b %H:%M'
+TIME = '%H%M'                  # a time of day is always 4-digit 24-hour: 0929, 1400
+FMT = '%a %d %b ' + TIME
+
+
+def fmt_time(when):
+    """A time of day as every radio page shows it. Also the `hhmm` template filter."""
+    return when.strftime(TIME)
 
 
 def _no(raw, why):
@@ -36,13 +42,12 @@ def _no(raw, why):
 _WEEKDAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
 
 
-def fmt_day(day, this_year=None):
-    """A resolved day as the day box and the queue show it: 'Sun 13/9', with the year when it differs.
+def fmt_day(day):
+    """A resolved day as the day box and the queue show it: 'Sun 13/9/26', always with the year.
     This is what replaces the word the operator typed, so nothing relative is ever stored or re-read."""
     if day is None:
         return ''
-    out = '%s %d/%d' % (day.strftime('%a'), day.day, day.month)
-    return out if this_year is None or day.year == this_year else out + '/%02d' % (day.year % 100)
+    return '%s %d/%d/%02d' % (day.strftime('%a'), day.day, day.month, day.year % 100)
 
 
 def parse_day(raw, reference, warn_before=True):
@@ -184,15 +189,15 @@ def parse(raw, reference, reference_label='entry time', day=None, day_label=None
     # CAP-4: no day, no instant. Blank never means today.
     if day is None:
         return {'when': None,
-                'basis': 'Read as %02d:%02d, but no day yet. Fill the day cell. Kept as typed: "%s".' % (hour, minute, text),
-                'warning': None, 'invalid': False}
+                'basis': 'Read as %02d%02d, but no day yet. Fill the day cell. Kept as typed: "%s".' % (hour, minute, text),
+                'warning': None, 'invalid': False, 'clock': '%02d%02d' % (hour, minute)}
     when = datetime.combine(day, datetime.min.time()).replace(hour=hour, minute=minute)
     basis = '%s (%s)' % (when.strftime(FMT), day_label)
     warning = None
     if warn_past and when < reference:
-        warning = 'Already past the %s (%s).' % (reference_label, reference.strftime('%a %d %b %H:%M'))
+        warning = 'Already past the %s (%s).' % (reference_label, reference.strftime(FMT))
     elif ambiguous:
-        warning = 'Read as 24-hour %02d:%02d. Say %d:%02dpm if you mean the afternoon.' % (hour, minute, hour, minute)
+        warning = 'Read as 24-hour %02d%02d. Say %d:%02dpm if you mean the afternoon.' % (hour, minute, hour, minute)
     if warning:
         basis += ' — ' + warning
     return {'when': when, 'basis': basis, 'warning': warning, 'invalid': False}

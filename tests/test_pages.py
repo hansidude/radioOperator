@@ -107,7 +107,7 @@ class Pages(unittest.TestCase):
         self.assertEqual(saved.status_code, 200, saved.data)
         row = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('data-record="%d"' % saved.json['id'], row)
-        self.assertIn('08:15', row)
+        self.assertIn('0815', row)                                    # listed 4-digit, whatever was typed
 
     def test_capture_page_shows_the_queue_and_saves_field_by_field(self):    # AC-1, AC-5, AC-6, CAP-7, CAP-19
         i = self.new()

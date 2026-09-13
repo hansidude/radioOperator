@@ -14,11 +14,13 @@ from flask import Blueprint, abort, current_app, jsonify, make_response, redirec
 
 from . import identity as ID
 from . import logons as L
+from . import times as T
 from . import watch as W
 from .db import cursor
 
 HERE = Path(__file__).resolve().parent
 bp = Blueprint('radio', __name__, template_folder=str(HERE / 'templates'))
+bp.add_app_template_filter(T.fmt_time, 'hhmm')     # every time of day on every radio page: 4-digit 24-hour
 
 
 def host():
