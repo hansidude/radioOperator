@@ -96,12 +96,12 @@ class Pages(unittest.TestCase):
         self.assertRegex(page, r'id="f-callDay"[^>]+value="[^"]+"')
         self.assertIn('id="f-callTime" class="form-control is-invalid" data-field="callTime" value=""', page)   # red from the first look
         self.assertNotIn("addEventListener('change', function () { save", page)
-        self.assertIn('>0 drafts</div>', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('>0 drafts</div>', self.a.get('/logons?status=draft').get_data(as_text=True))
 
         missing = self.a.post('/logons/new', json={'fields': {'callDay': date.today().isoformat()}})
         self.assertEqual(missing.status_code, 400)
         self.assertEqual(set(missing.json['fields']), {'callTime', 'memberNumber', 'registration', 'mobile'})
-        self.assertIn('>0 drafts</div>', self.a.get('/logons').get_data(as_text=True))
+        self.assertIn('>0 drafts</div>', self.a.get('/logons?status=draft').get_data(as_text=True))
 
         saved = self.a.post('/logons/new', json={'fields': {
             'callDay': date.today().isoformat(), 'callTime': '08:15', 'registration': 'AB123Q'}})
@@ -214,9 +214,10 @@ class Pages(unittest.TestCase):
         self.assertIn('id="roSort"', page)
         self.assertIn('name="q"', page)
 
-        # Drafts by default, for today, newest first.
-        self.assertIn('<option value="draft" selected>📝 Drafts</option>', page)
+        # All by default, for today, newest first.
+        self.assertIn('<option value="all" selected>📋 All</option>', page)
         self.assertIn('id="roDayOn" name="dayOn" checked', page)
+        self.assertNotIn('id="roDayOn" name="dayOn" checked', self.a.get('/logons?status=all').get_data(as_text=True))  # a link for all: every day
         self.assertIn('<option value="newest" selected>Newest first</option>', page)
         self.assertIn('<option value="due">Due first</option>', page)
         self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
@@ -228,7 +229,8 @@ class Pages(unittest.TestCase):
         self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
         self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)
         self.assertIn('data-record="%d"' % draft, page)
-        self.assertNotIn('data-record="%d"' % watching, page)   # a watch is not a draft
+        self.assertIn('data-record="%d"' % watching, page)      # All: the watch is listed too
+        self.assertNotIn('data-record="%d"' % watching, self.a.get('/logons?status=draft').get_data(as_text=True))   # a watch is not a draft
 
         # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
@@ -440,7 +442,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % mixed).get_data(as_text=True)
         self.assertIn('CONFLICT', page)
         self.assertIn('different boats or people', page)
-        self.assertNotIn('CONFLICT', self.a.get('/logons').get_data(as_text=True))  # draft rows are paper fields only
+        self.assertNotIn('CONFLICT', self.a.get('/logons?status=draft').get_data(as_text=True))  # draft rows are paper fields only
         for name, value in (('pob', '2'), ('departurePoint', 'Marina'), ('destination', 'Bay'),
                             ('etaDay', 'today'), ('eta', '2300')):
             self.field(mixed, name, value)

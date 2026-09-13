@@ -12,7 +12,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   `parent_link` button on a log on.
 - One collection through Quackit's shared `record_grid`: compact aligned rows on desktop/tablet,
   labelled cards at phone width, paper-log column order, width capped at 1920px.
-- Toolbar: status (All, Drafts, Logged on, Overdue, Closed; default Drafts), call date (default today,
+- Toolbar: status (All, Drafts, Logged on, Overdue, Closed; default All), call date (default today,
   untickable), sort (Newest first by default, Oldest first, **Due first**), search. It rides in Quackit's
   fixed navbar (`data-navbar-controls`), so it stays on screen while the log scrolls. Swapped in place by
   Quackit's htmx; state kept in the URL; 30s refresh.

@@ -83,11 +83,12 @@ def _filters():
     The date is an applied filter with a tick, not a mandatory picker: untick it and the date stops
     narrowing anything. `f=1` marks a submitted toolbar, which is what separates 'unticked it' from
     'has not touched it yet' -- without it an unticked box is indistinguishable from a first load."""
-    status = request.args.get('status', 'draft')
+    status = request.args.get('status', 'all')       # the log opens on everything, for today
     if status != 'all' and status not in L.STATUS_WHERE:
         abort(400)
     submitted = request.args.get('f') == '1'
-    day_on = (request.args.get('dayOn') == '1') if submitted else (status not in DAY_DEFAULT_OFF)
+    # First load (no status asked for): today. A link asking for all or overdue: every day.
+    day_on = (request.args.get('dayOn') == '1') if submitted else ('status' not in request.args or status not in DAY_DEFAULT_OFF)
     raw = request.args.get('day')
     if raw:
         try:

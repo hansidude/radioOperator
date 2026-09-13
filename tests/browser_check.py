@@ -32,6 +32,10 @@ def main(engine='chromium'):
         context = browser.new_context(viewport={'width': 1920, 'height': 1080})
         # Model an existing browser holding the old unversioned stylesheet. New
         # markup must request a new URL, rather than relying on a hard refresh.
+        # The same for the view buttons' script: an old copy without the size buttons, as a browser that
+        # had the Cards/Paragraphs rollout still holds. New buttons must never run against it.
+        context.route('**/static/js/record_view.js', lambda route: route.fulfill(
+            status=200, content_type='application/javascript', body='/* cached script predating the size buttons */'))
         context.route('**/static/css/record_views.css', lambda route: route.fulfill(
             status=200, content_type='text/css', body='/* cached stylesheet predating the shared grid */'))
         context.tracing.start(screenshots=True, snapshots=True, sources=True)
@@ -74,6 +78,8 @@ def main(engine='chromium'):
             expect(page.locator('.navbar')).to_be_visible()
             href = page.locator('link[href*="/css/record_views.css"]').get_attribute('href')
             assert '?v=' in href, 'New grid markup must not reuse the cached stylesheet URL'
+            script = page.locator('script[src*="/js/record_view.js"]').get_attribute('src')
+            assert '?v=' in script, 'New view buttons must not reuse the cached script URL'
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
             expect(page.locator('#ro-entry-pane .ro-primary-actions [data-save-record]')).to_be_visible()
