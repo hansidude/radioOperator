@@ -34,15 +34,19 @@ KINDS = {
     'cars': {'table': 'Cars', 'label': 'Cars', 'one': 'car',
              'fields': ('registration', 'make', 'model', 'colour'), 'required': ('registration',)},
     'public': {'table': 'Vessels', 'label': 'Public vessel', 'one': 'public vessel',
-               'fields': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'),
+               'fields': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail', 'notes'),
                'required': ('ownerName', 'ownerPhone'), 'one_of': ('vesselName', 'registration')},
 }
 CHILDREN = ('contacts', 'vessels', 'trailers', 'cars')
+# Who holds records of those kinds, and by which column: a member holds all four; a public vessel, whose record
+# stands for a public user, holds emergency contacts.
+OWNERS = {'member': {'key': 'memberId', 'kinds': CHILDREN}, 'vessel': {'key': 'vesselId', 'kinds': ('contacts',)}}
+LONG_TEXT = ('notes',)
 LABELS = dict({f: L.LABELS[f] for f in VESSEL_FIELDS if f in L.LABELS},
               vesselName='Vessel Name', registration='Rego', memberNumber='Member No.', name='Name', address='Address',
               firstName='First name', lastName='Last name', mobile=L.LABELS['mobile'],
               phone='Phone', email='Email', relationship='Relationship', colour='Colour', ais='AIS / MMSI',
-              ownerName='Owner name', ownerPhone='Owner phone', ownerEmail='Owner email')
+              ownerName='Owner name', ownerPhone='Owner phone', ownerEmail='Owner email', notes='Notes')
 PHONES = ('mobile', 'phone', 'ownerPhone')
 EMAILS = ('email', 'ownerEmail')
 EMAIL = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
@@ -65,7 +69,7 @@ def _clean(kind, values):
     sets, red = {}, []
     for field in spec['fields']:
         value = (values.get(field) or '').strip()
-        if len(value) > 255:
+        if len(value) > (65535 if field in LONG_TEXT else 255):
             raise L.Refused('%s: too long to store' % LABELS[field])
         if field in PHONES and value:
             value, wrong = L.written_mobile(value)       # the log on's rule: 10 digits, written 0412 345 678
@@ -132,8 +136,11 @@ def _search(rows, search, fields, extra=None):
     return out
 
 
-def children(cur, kind, member_id):
-    cur.execute('SELECT * FROM %s WHERE memberId = %%s AND isActive = 1 ORDER BY id' % KINDS[kind]['table'], (member_id,))
+def children(cur, kind, owner_id, owner='member'):
+    """The records of this kind a member (or a public vessel) holds."""
+    if kind not in OWNERS[owner]['kinds']:
+        raise L.Refused('A %s holds no %s' % (owner, KINDS[kind]['label'].lower()))
+    cur.execute('SELECT * FROM %s WHERE %s = %%s AND isActive = 1 ORDER BY id' % (KINDS[kind]['table'], OWNERS[owner]['key']), (owner_id,))
     return cur.fetchall() or []
 
 
@@ -211,12 +218,14 @@ def create_member(cur, values, user, unit, now):
     raise L.Refused('Could not allocate a member number after several attempts')
 
 
-def add_child(cur, kind, member, values, user, now):
-    if kind not in CHILDREN:
-        raise L.Refused('No such record kind: %s' % kind)
-    sets = dict(_clean(kind, values), memberId=member['id'], **_stamp(user, now))
+def add_child(cur, kind, holder, values, user, now, owner='member'):
+    """Add a contact, vessel, trailer or car to a member, or a contact to a public vessel (`owner`)."""
+    if kind not in OWNERS[owner]['kinds']:
+        raise L.Refused('A %s holds no %s' % (owner, KINDS[kind]['label'].lower()))
+    sets = dict(_clean(kind, values), **_stamp(user, now))
+    sets[OWNERS[owner]['key']] = holder['id']
     if kind == 'vessels':
-        sets['unit'] = member['unit']
+        sets['unit'] = holder['unit']
     return _insert(cur, KINDS[kind]['table'], sets)
 
 

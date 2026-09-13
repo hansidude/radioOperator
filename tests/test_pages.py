@@ -395,7 +395,9 @@ class Pages(unittest.TestCase):
         self.assertNotIn('name="reason" form="logoffForm"', page)
         self.assertNotIn('placeholder=', page)
         self.assertIn('<label for="f-notes">Notes</label>\n  <textarea id="f-notes" class="form-control" rows="3" data-auto-grow data-field="notes" name="notes" form="logoffForm"', page)
-        self.assertEqual(page.count('<textarea'), 1)                         # one notes box: Log off carries it
+        capture = page[page.index('<form id="capture"'):page.index('</form>', page.index('<form id="capture"'))]
+        self.assertEqual(capture.count('<textarea'), 1)                      # one notes box: Log off carries it
+        self.assertNotIn('logoffNote', page)
         self.assertIn('data-status="overdue"', page)                      # overdue from the moment of acceptance
         self.assertIn('>Overdue</span>', page)
         listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)

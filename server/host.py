@@ -65,7 +65,7 @@ class Host:
     def history(self, cur, table, record_id, by='id_'):
         """The change history of the app's own `table` as the host's history viewer events (newest first), or
         None when this host keeps no history; the page then says so. `by` is the history column matched against
-        `record_id`: 'id_' for one row, 'memberId' for every row a member holds (their contacts, vessels ...)."""
+        `record_id`: 'id_' for one row, 'memberId' / 'vesselId' for every row a member or public vessel holds."""
         return None
 
     def system_actor(self):

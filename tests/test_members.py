@@ -445,6 +445,42 @@ class Members(unittest.TestCase):
         page = self.a.get('/member/%d' % m).get_data(as_text=True)                   # the member page itself stays plain forms
         self.assertNotIn('data-ro-json', page)
 
+    def test_a_public_vessel_has_emergency_contacts_and_notes(self):
+        r = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333',
+                                              'notes': 'Keeps a spare radio\nUsually two aboard'})
+        self.assertEqual(r.status_code, 302, r.data)
+        v = int(r.location.rsplit('/', 1)[1])
+        page = self.a.get('/vessel/%d' % v).get_data(as_text=True)
+        self.assertIn('>Keeps a spare radio\nUsually two aboard</textarea>', page)        # notes, a text box that grows
+        self.assertIn('<label for="public-notes">Notes</label>', page)
+        for tab in ('details', 'contacts', 'history'):
+            self.assertIn('data-entity-tab="%s"' % tab, page)
+        self.assertIn('id="radioVesselContacts" class="dc-record-view dc-record-grid"', page)   # the same list as a member's
+        self.assertIn('href="/vessel/%d/contacts/new"' % v, page)
+        bad = self.a.post('/vessel/%d/contacts' % v, data={'name': 'Sam'})
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn('id="contacts-new-phone" name="phone" class="form-control is-invalid"', bad.get_data(as_text=True))
+        added = self.a.post('/vessel/%d/contacts' % v, data={'name': 'Sam Duck', 'relationship': 'Brother', 'phone': '0499888777'})
+        self.assertTrue(added.location.endswith('/vessel/%d#contacts' % v))
+        contact = M.children(self.db(), 'contacts', v, 'vessel')[0]
+        self.assertEqual((contact['vesselId'], contact['memberId'], contact['phone']), (v, None, '0499 888 777'))
+        self.assertIn('Sam Duck', self.a.get('/vessel/%d' % v).get_data(as_text=True))
+        self.assertIn('value="Brother"', self.a.get('/vessel/%d/contacts/%d' % (v, contact['id'])).get_data(as_text=True))
+        json = {'Accept': 'application/json'}
+        saved = self.a.post('/vessel/%d/contacts/%d' % (v, contact['id']), data={'name': 'Sam Duck', 'phone': '0499888666', 'version': '0'}, headers=json)
+        self.assertEqual((saved.status_code, saved.json['kind']), (200, 'contacts'))
+        panel = self.a.get('/vessel/%d/panel' % v).get_data(as_text=True)
+        self.assertIn('hx-get="/vessel/%d/contacts/%d?panel=1" hx-target="#roWhoPanel"' % (v, contact['id']), panel)
+        form = self.a.get('/vessel/%d/contacts/new?panel=1' % v).get_data(as_text=True)
+        self.assertIn('hx-get="/vessel/%d/panel"' % v, form)                          # back to the vessel, in the tab
+        self.assertIn('data-ro-json', form)
+        self.assertEqual(self.a.post('/vessel/%d/contacts/%d/remove' % (v, contact['id']), data={'version': '1'}).status_code, 302)
+        self.assertEqual(M.children(self.db(), 'contacts', v, 'vessel'), [])
+        self.assertEqual(self.a.get('/vessel/%d/cars/new' % v).status_code, 404)     # a public vessel holds contacts only
+        m = self.member()
+        self.assertEqual(self.a.get('/member/%d/contacts/%d' % (m, contact['id'])).status_code, 404)   # not this member's
+        self.assertEqual(self.b.get('/vessel/%d/contacts/new' % v).status_code, 403)
+
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history
 
@@ -464,6 +500,11 @@ class Members(unittest.TestCase):
             def history(self, *a, **k):
                 return None
         self.assertIsNone(member_history(None, NoHistory(), 7))
+        from server.member_pages import VESSEL_HISTORY_SCOPES
+        h = FakeHost()
+        events = member_history(None, h, 9, VESSEL_HISTORY_SCOPES)
+        self.assertEqual(h.asked, [('Vessels', 9, 'id_'), ('EmergencyContacts', 9, 'vesselId')])
+        self.assertEqual([e['scope'] for e in events], ['Emergency contact', 'Details'])
 
 
 if __name__ == '__main__':

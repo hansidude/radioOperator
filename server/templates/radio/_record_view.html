@@ -5,23 +5,29 @@
 {% import 'myMacro_filters.html' as mf %}
 
 {# in_place: inside the log on page's tab, every form saves without leaving the page and a record opens in the tab. #}
+{# A member's or public vessel's contacts (and a member's vessels, trailers, cars): one row each through Quackit's shared
+   record_grid, with its view buttons (cards, paragraphs, text size) and the shared search over the rows, and an Add
+   button. A row opens its own page, or with in_place its form inside the log on page's tab. #}
+{% macro children_pane(owner, owner_id, kind, spec, labels, rows, in_place=False) %}
+{% set owner_url = '/%s/%d' % (owner, owner_id) %}
+{% set grid = 'radio' ~ owner|capitalize ~ kind|capitalize %}
+<section id="ro-{{ owner }}-{{ kind }}" class="ro-workspace-pane d-none">
+  <div class="dc-record-toolbar ro-toolbar">
+    <a class="btn btn-primary btn-sm" href="{{ owner_url }}/{{ kind }}/new"{% if in_place %} hx-get="{{ owner_url }}/{{ kind }}/new?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %}><i class="bi bi-plus-lg me-1"></i>Add {{ spec.one }}</a>
+    {{ records_ui.view_controls(grid ~ 'View') }}
+    {{ mf.render(owner ~ '-' ~ owner_id ~ '-' ~ kind, grid, row_selector='.dc-record-grid-row', show_logic=False) }}
+  </div>
+  <div id="{{ grid }}View">{{ ui.children_grid(owner_url, kind, spec, labels, rows, grid, in_place) }}</div>
+</section>
+{% endmacro %}
+
 {% macro member_panes(member, children, history, kinds, labels, failed, in_place=False) %}
 <section id="ro-member-details" class="ro-workspace-pane">
   <p class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</p>
   {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version, json=in_place) }}
 </section>
-{# Contacts, vessels, trailers and cars: one row each through Quackit's shared record_grid, with its view
-   buttons (cards, paragraphs, text size) and the shared search over the rows. A row opens its own page. #}
 {% for kind in ('contacts', 'vessels', 'trailers', 'cars') %}
-{% set grid = 'radioMember' ~ kind|capitalize %}
-<section id="ro-member-{{ kind }}" class="ro-workspace-pane d-none">
-  <div class="dc-record-toolbar ro-toolbar">
-    <a class="btn btn-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/new"{% if in_place %} hx-get="/member/{{ member.id }}/{{ kind }}/new?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %}><i class="bi bi-plus-lg me-1"></i>Add {{ kinds[kind].one }}</a>
-    {{ records_ui.view_controls(grid ~ 'View') }}
-    {{ mf.render('member-' ~ member.id ~ '-' ~ kind, grid, row_selector='.dc-record-grid-row', show_logic=False) }}
-  </div>
-  <div id="{{ grid }}View">{{ ui.member_children(member, kind, kinds[kind], labels, children[kind], grid, in_place) }}</div>
-</section>
+{{ children_pane('member', member.id, kind, kinds[kind], labels, children[kind], in_place) }}
 {% endfor %}
 {# Every change the member holds: their details and every contact, vessel, trailer and car, one list, each
    event marked with what it was a change to (the shared viewer's scope). #}
@@ -35,7 +41,7 @@
 </section>
 {% endmacro %}
 
-{% macro vessel_panes(vessel, history, kind, labels, failed, creating=False, in_place=False) %}
+{% macro vessel_panes(vessel, history, kind, labels, failed, creating=False, in_place=False, children=None, kinds=None) %}
 {# For a public user the vessel is the record: the boat, and who to reach about it. #}
 <section id="ro-vessel-details" class="ro-workspace-pane">
   <p class="ro-section-title">{{ ui.WHO.public.symbol }} {{ ui.WHO.public.label }}</p>
@@ -43,12 +49,13 @@
                     version=None if creating else vessel.version, json=in_place) }}
 </section>
 {% if not creating %}
+{{ children_pane('vessel', vessel.id, 'contacts', kinds.contacts, labels, children.contacts, in_place) }}
 <section id="ro-vessel-history" class="ro-workspace-pane d-none">
   <div class="container-fluid mySpacing px-0">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges %}
   {{ dcFn_ShowHistoryChanges(history, dcKey_i='vessel-history-' ~ vessel.id, dcTitle_i='Public vessel history', dcFieldLabelsDictionary_i=labels,
-                             dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
+                             dcShowScope_i=True, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
   </div>
 </section>
 {% endif %}

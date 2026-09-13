@@ -15,17 +15,19 @@ from .routes import _now, _open, _page, bp
 TABS = [('details', 'Details', 'person-vcard'), ('contacts', 'Emergency contacts', 'telephone-plus'),
         ('vessels', 'Vessels', 'life-preserver'), ('trailers', 'Trailers', 'truck-flatbed'),
         ('cars', 'Cars', 'car-front'), ('history', 'History', 'clock-history')]
-VESSEL_TABS = [('details', 'Details', 'life-preserver'), ('history', 'History', 'clock-history')]
-# What a member's History is made of: their own row, and every row of these tables they hold (history by memberId).
+VESSEL_TABS = [('details', 'Details', 'life-preserver'), ('contacts', 'Emergency contacts', 'telephone-plus'),
+               ('history', 'History', 'clock-history')]
+# What a History is made of: the record's own row, and every row of these tables it holds (history by that key).
 HISTORY_SCOPES = (('Members', 'id_', 'Details'), ('EmergencyContacts', 'memberId', 'Emergency contact'),
                   ('Vessels', 'memberId', 'Vessel'), ('Trailers', 'memberId', 'Trailer'), ('Cars', 'memberId', 'Car'))
+VESSEL_HISTORY_SCOPES = (('Vessels', 'id_', 'Details'), ('EmergencyContacts', 'vesselId', 'Emergency contact'))
 
 
-def member_history(cur, h, member_id):
-    """Every change a member holds, newest first: their details and each contact, vessel, trailer and car,
-    each event scoped to what it changed. None when the host keeps no history."""
+def member_history(cur, h, member_id, scopes=HISTORY_SCOPES):
+    """Every change a member (or with VESSEL_HISTORY_SCOPES a public vessel) holds, newest first: its details and
+    each record it holds, each event scoped to what it changed. None when the host keeps no history."""
     events = []
-    for table, by, scope in HISTORY_SCOPES:
+    for table, by, scope in scopes:
         got = h.history(cur, table, member_id, by)
         if got is None:
             return None
@@ -155,62 +157,88 @@ def member_page(member_id):
     return redirect('/member/%d' % member_id)
 
 
-def _child_page(cur, h, member, kind, row, failed=None, status=200):
-    """One contact, vessel, trailer or car: its form, reached from its row on the member's tab (like a log
-    on from the log). `row` is None for a new one."""
+def _public_vessel(cur, h, vessel_id, lock=False):
+    """A public vessel of this unit, or 404 / 403. A member's vessel is not one."""
+    vessel = M.get(cur, 'public', vessel_id, lock)
+    if not vessel or vessel['memberId']:
+        abort(404)
+    if vessel['unit'] != h.unit():
+        abort(403)
+    return vessel
+
+
+def _holder(cur, h, owner, owner_id, lock=False):
+    """The member or public vessel whose contacts (and for a member, vessels, trailers and cars) these are, and how
+    its pages name it and link to it."""
+    if owner == 'member':
+        row = _member(cur, h, owner_id, lock)
+        name = '%s %s %s' % (row['memberNumber'], row['firstName'], row['lastName'])
+    else:
+        row = _public_vessel(cur, h, owner_id, lock)
+        name = row['vesselName'] or row['registration']
+    return row, {'type': owner, 'id': row['id'], 'url': '/%s/%d' % (owner, row['id']), 'name': name,
+                 'icon': 'person-vcard' if owner == 'member' else 'life-preserver'}
+
+
+def _child_page(cur, h, holder, kind, row, failed=None, status=200):
+    """One contact, vessel, trailer or car: its form, reached from its row on its holder's tab (like a log on from
+    the log). `row` is None for a new one."""
     cur.close()
-    # ?panel=1: the same form as content for the log on page's Member tab, saved in place.
-    template = '_member_record_panel.html' if request.args.get('panel') == '1' else 'member_record.html'
-    return _page(template, member=member, kind=kind, spec=M.KINDS[kind], record=row or M.blank(kind),
+    # ?panel=1: the same form as content for the log on page's Member / Public vessel tab, saved in place.
+    template = '_child_record_panel.html' if request.args.get('panel') == '1' else 'child_record.html'
+    return _page(template, holder=holder, kind=kind, spec=M.KINDS[kind], record=row or M.blank(kind),
                  creating=row is None, failed=failed or {}, labels=M.LABELS), status
 
 
-@bp.route('/member/<int:member_id>/<kind>/new')
-def member_child_new(member_id, kind):
-    h, (conn, cur) = _open()
-    if kind not in M.CHILDREN:
+def _kind_for(owner, kind):
+    if kind not in M.OWNERS[owner]['kinds']:
         abort(404)
-    return _child_page(cur, h, _member(cur, h, member_id), kind, None)
 
 
-@bp.route('/member/<int:member_id>/<kind>', methods=['POST'])
-def member_add(member_id, kind):
-    """Add an emergency contact, vessel, trailer or car to a member."""
+@bp.route('/<any(member, vessel):owner>/<int:owner_id>/<kind>/new')
+def child_new(owner, owner_id, kind):
     h, (conn, cur) = _open()
-    if kind not in M.CHILDREN:
-        abort(404)
-    member = _member(cur, h, member_id)
+    _kind_for(owner, kind)
+    row, holder = _holder(cur, h, owner, owner_id)
+    return _child_page(cur, h, holder, kind, None)
+
+
+@bp.route('/<any(member, vessel):owner>/<int:owner_id>/<kind>', methods=['POST'])
+def child_add(owner, owner_id, kind):
+    """Add an emergency contact, vessel, trailer or car to a member, or an emergency contact to a public vessel."""
+    h, (conn, cur) = _open()
+    _kind_for(owner, kind)
+    row, holder = _holder(cur, h, owner, owner_id)
     values = _values(kind)
     try:
-        child_id = M.add_child(cur, kind, member, values, h.user(), _now())
+        child_id = M.add_child(cur, kind, row, values, h.user(), _now(), owner)
     except L.Refused as e:
         conn.rollback()
         if _wants_json():
             return _json_refused(cur, e)
-        return _child_page(cur, h, member, kind, None, _refused(e, kind + '-new', values), 400)
+        return _child_page(cur, h, holder, kind, None, _refused(e, kind + '-new', values), 400)
     conn.commit()
     if _wants_json():
         return _json_saved(cur, kind, child_id)
     cur.close()
-    return redirect('/member/%d#%s' % (member_id, kind))
+    return redirect('%s#%s' % (holder['url'], kind))
 
 
-def _child(cur, h, member_id, kind, child_id, lock=True):
-    if kind not in M.CHILDREN:
-        abort(404)
-    member = _member(cur, h, member_id)
+def _child(cur, h, owner, owner_id, kind, child_id, lock=True):
+    _kind_for(owner, kind)
+    holder_row, holder = _holder(cur, h, owner, owner_id)
     row = M.get(cur, kind, child_id, lock=lock)
-    if not row or row['memberId'] != member['id']:
+    if not row or row[M.OWNERS[owner]['key']] != holder_row['id']:
         abort(404)
-    return member, row
+    return holder, row
 
 
-@bp.route('/member/<int:member_id>/<kind>/<int:child_id>', methods=['GET', 'POST'])
-def member_child_save(member_id, kind, child_id):
+@bp.route('/<any(member, vessel):owner>/<int:owner_id>/<kind>/<int:child_id>', methods=['GET', 'POST'])
+def child_save(owner, owner_id, kind, child_id):
     h, (conn, cur) = _open()
-    member, row = _child(cur, h, member_id, kind, child_id, lock=request.method == 'POST')
+    holder, row = _child(cur, h, owner, owner_id, kind, child_id, lock=request.method == 'POST')
     if request.method == 'GET':
-        return _child_page(cur, h, member, kind, row)
+        return _child_page(cur, h, holder, kind, row)
     values = _values(kind)
     try:
         M.save(cur, kind, row, values, h.user(), _now(), request.form.get('version'))
@@ -218,30 +246,30 @@ def member_child_save(member_id, kind, child_id):
         conn.rollback()
         if _wants_json():
             return _json_refused(cur, e)
-        return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), values), 409 if isinstance(e, L.Stale) else 400)
+        return _child_page(cur, h, holder, kind, row, _refused(e, '%s-%d' % (kind, child_id), values), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
     if _wants_json():
         return _json_saved(cur, kind, child_id)
     cur.close()
-    return redirect('/member/%d#%s' % (member_id, kind))
+    return redirect('%s#%s' % (holder['url'], kind))
 
 
-@bp.route('/member/<int:member_id>/<kind>/<int:child_id>/remove', methods=['POST'])
-def member_child_remove(member_id, kind, child_id):
+@bp.route('/<any(member, vessel):owner>/<int:owner_id>/<kind>/<int:child_id>/remove', methods=['POST'])
+def child_remove(owner, owner_id, kind, child_id):
     h, (conn, cur) = _open()
-    member, row = _child(cur, h, member_id, kind, child_id)
+    holder, row = _child(cur, h, owner, owner_id, kind, child_id)
     try:
         M.remove(cur, kind, row, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
         if _wants_json():
             return _json_refused(cur, e)
-        return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), {}), 409 if isinstance(e, L.Stale) else 400)
+        return _child_page(cur, h, holder, kind, row, _refused(e, '%s-%d' % (kind, child_id), {}), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
     if _wants_json():
         return _json_saved(cur, kind, child_id, removed=True)
     cur.close()
-    return redirect('/member/%d#%s' % (member_id, kind))
+    return redirect('%s#%s' % (holder['url'], kind))
 
 
 # ---------- what the log on's shared search picker asks (myMacro_search_picker.html) ----------
@@ -301,26 +329,28 @@ def vessels_page():
     return _list_response('vessels.html', vessels=rows, search=q)
 
 
+def _vessel_context(cur, h, vessel, failed=None):
+    ctx = {'vessel': vessel, 'failed': failed or {}, 'kind': M.KINDS['public'], 'kinds': M.KINDS, 'labels': M.LABELS,
+           'vessel_tabs': VESSEL_TABS, 'history': None, 'children': {'contacts': []}}
+    if vessel.get('id'):
+        ctx['history'] = member_history(cur, h, vessel['id'], VESSEL_HISTORY_SCOPES)
+        ctx['children'] = {'contacts': M.children(cur, 'contacts', vessel['id'], 'vessel')}
+    return ctx
+
+
 def _vessel_page(cur, h, vessel, failed=None, status=200):
-    history = h.history(cur, 'Vessels', vessel['id']) if vessel.get('id') else None
+    ctx = _vessel_context(cur, h, vessel, failed)
     cur.close()
-    return _page('vessel.html', creating=not vessel.get('id'), vessel=vessel, failed=failed or {}, history=history,
-                 kind=M.KINDS['public'], labels=M.LABELS, vessel_tabs=VESSEL_TABS), status
+    return _page('vessel.html', creating=not vessel.get('id'), **ctx), status
 
 
 @bp.route('/vessel/<int:vessel_id>/panel')
 def vessel_panel(vessel_id):
     """A public vessel's page content on its own, for the log on page's Public vessel tab."""
     h, (conn, cur) = _open()
-    vessel = M.get(cur, 'public', vessel_id)
-    if not vessel or vessel['memberId']:
-        abort(404)
-    if vessel['unit'] != h.unit():
-        abort(403)
-    history = h.history(cur, 'Vessels', vessel_id)
+    ctx = _vessel_context(cur, h, _public_vessel(cur, h, vessel_id))
     cur.close()
-    return _page('_vessel_panel.html', vessel=vessel, failed={}, history=history, kind=M.KINDS['public'],
-                 labels=M.LABELS, vessel_tabs=VESSEL_TABS)
+    return _page('_vessel_panel.html', **ctx)
 
 
 @bp.route('/vessels/new', methods=['GET', 'POST'])

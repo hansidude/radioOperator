@@ -12,5 +12,5 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-{{ views.vessel_panes(vessel, history, kind, labels, failed, creating) }}
+{{ views.vessel_panes(vessel, history, kind, labels, failed, creating, children=children, kinds=kinds) }}
 {% endblock %}

@@ -76,8 +76,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   each. Each of those four tabs is a list like the log (Quackit's `record_grid`: one row each, Cards / Paragraphs /
   text size, search over the rows) with an Add button; a row opens its own page to edit or Remove it. Remove
   makes a row inactive, never deletes it. The Members and Public vessels lists have the same view buttons.
-- A public vessel is the record for a public user: the boat plus its owner's name and phone (both required)
-  and email. A vessel needs a name or a rego.
+- A public vessel is the record for a public user: the boat plus its owner's name and phone (both required),
+  email and **notes** (a text box that grows), with an **Emergency contacts** tab like a member's and a History that
+  includes its contacts' changes. A vessel needs a name or a rego. Contacts, vessels, trailers and cars share one set
+  of pages whichever holds them (`/<member|vessel>/<id>/<kind>/…`, `members.OWNERS`).
 - Emergency contact and owner phones follow the same mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
   writes nothing, keeps what was typed and turns its boxes red; each form comes back to its own tab.
 - **A log on is a member's or a public user's** (owner, 2026-09-14; spec CAP-24). The Member No. box offers the

@@ -382,7 +382,7 @@
 {%- set shown = failed['values'].get(name, '') if mine else (value if value is not none else '') -%}
 {%- set red = mine and name in failed.red -%}
 <div class="{{ cols }}"><label for="{{ form }}-{{ name }}">{{ label }}</label>
-  {%- if name == 'address' %}<textarea id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" rows="3" data-auto-grow{% if red %} aria-invalid="true"{% endif %}>{{ shown }}</textarea>
+  {%- if name in ('address', 'notes') %}<textarea id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" rows="3" data-auto-grow{% if red %} aria-invalid="true"{% endif %}>{{ shown }}</textarea>
   {%- else %}<input id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" value="{{ shown }}"{% if name in ('email', 'ownerEmail') %} type="email"{% elif name in ('mobile', 'phone', 'ownerPhone') %} type="tel" inputmode="numeric"{% endif %}{% if red %} aria-invalid="true"{% endif %}>{% endif %}
 </div>
 {%- endmacro %}
@@ -411,18 +411,28 @@
 {% set CHILD_SYMBOLS = {'vesselName': FIELD_SYMBOLS.vesselName, 'registration': FIELD_SYMBOLS.registration,
                         'length': FIELD_SYMBOLS.length, 'hullColour': FIELD_SYMBOLS.hullColour, 'make': FIELD_SYMBOLS.make,
                         'model': FIELD_SYMBOLS.model, 'phone': FIELD_SYMBOLS.mobile} %}
-{% macro member_children(member, kind, spec, labels, rows, key, in_place=False) %}
+{% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False) %}
 {% set grid = namespace(columns=[], rows=[]) %}
 {% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': CHILD_SYMBOLS.get(f, ''),
                                                                'width': 'minmax(0,1.3fr)' if loop.first else 'minmax(0,1fr)'}] %}{% endfor %}
 {% set grid.columns = grid.columns + [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
-  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/{{ c.id }}"{% if in_place %} hx-get="/member/{{ member.id }}/{{ kind }}/{{ c.id }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="{{ owner_url }}/{{ kind }}/{{ c.id }}"{% if in_place %} hx-get="{{ owner_url }}/{{ kind }}/{{ c.id }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
   {% set _ = cells.update({'action': action}) %}
   {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells}] %}
 {% endfor %}
 {{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower) }}
+{% endmacro %}
+
+{# The form for one of those records: add (creating) or edit with Remove. in_place saves without leaving the page. #}
+{% macro child_form(holder, kind, spec, labels, record, failed, creating, in_place=False) %}
+{% if creating %}
+{{ record_form(kind ~ '-new', '%s/%s' % (holder.url, kind), spec.fields, labels, record, failed, submit='Add ' ~ spec.one, json=in_place) }}
+{% else %}
+{{ record_form('%s-%d' % (kind, record.id), '%s/%s/%d' % (holder.url, kind, record.id), spec.fields, labels, record, failed,
+               version=record.version, remove='%s/%s/%d/remove' % (holder.url, kind, record.id), json=in_place) }}
+{% endif %}
 {% endmacro %}
 
 {# Quackit's navbar links from the log to the standing records, and back. #}

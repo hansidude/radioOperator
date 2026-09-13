@@ -1,0 +1,8 @@
+{# A member's or public vessel's contact (or a member's vessel, trailer, car), opened inside the log on page's tab: the
+   same form as its own page, saved in place. Back returns to the member or vessel. #}
+{% import 'radio/_ui.html' as ui %}
+<div class="ro-panel-tabs">
+  <button type="button" class="btn btn-outline-success btn-sm" hx-get="{{ holder.url }}/panel" hx-target="#roWhoPanel" hx-swap="innerHTML"><i class="bi bi-arrow-left me-1"></i>{{ holder.name }}</button>
+  <strong>{{ 'New ' ~ spec.one if creating else spec.one|capitalize }}</strong>
+</div>
+<section class="ro-workspace-pane">{{ ui.child_form(holder, kind, spec, labels, record, failed, creating, in_place=True) }}</section>

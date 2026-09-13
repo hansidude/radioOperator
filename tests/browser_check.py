@@ -175,9 +175,19 @@ def main(engine='chromium'):
             page.locator('#public-registration').fill('VESSEL-' + token)
             page.locator('#public-ownerName').fill('Verify Public ' + token)
             page.locator('#public-ownerPhone').fill('0411222333')
+            page.locator('#public-notes').fill('Verify notes\nsecond line')                     # a public vessel has notes
             page.locator('#ro-vessel-details button.btn-warning').click()
             page.wait_for_url(re.compile('/vessel/[0-9]+$'))
             public_vessel = int(page.url.rsplit('/', 1)[1])
+            expect(page.locator('#public-notes')).to_have_value('Verify notes\nsecond line')
+            page.locator('[data-entity-tab="contacts"]').click()                                  # and emergency contacts
+            page.locator('#ro-vessel-contacts a[href$="/contacts/new"]').click()
+            page.wait_for_url(re.compile(r'/vessel/[0-9]+/contacts/new$'))
+            page.locator('#contacts-new-name').fill('Verify Public Contact ' + token)
+            page.locator('#contacts-new-phone').fill('0499777666')
+            page.locator('form#contacts-new button.btn-warning').click()
+            page.wait_for_url(re.compile(r'/vessel/[0-9]+#contacts$'))
+            expect(page.locator('#radioVesselContacts .dc-record-grid-row')).to_contain_text('Verify Public Contact ' + token)
             visit('/vessels?q=' + token)
             expect(page.locator('#radioVessels .dc-record-grid-row')).to_have_count(1)
             # Member or public user, answered through Quackit's shared search picker without leaving the page.
@@ -273,6 +283,8 @@ def main(engine='chromium'):
             expect(who_tab).to_have_text(re.compile('Public vessel'))
             who_tab.click()
             expect(panel.locator('#public-ownerName')).to_have_value('Verify Public ' + token)
+            panel.locator('[data-entity-tab="contacts"]').click()                                # its contacts, in the tab
+            expect(panel.locator('#radioVesselContacts .dc-record-grid-row')).to_contain_text('Verify Public Contact ' + token)
             page.locator('[data-ro-tab="entry"]').click()
             page.locator('#roWhoNow [data-ro-clear="vessel"]').click()                            # a public user's vessel is the pick: all goes
             for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'vesselId'):
@@ -650,7 +662,8 @@ def main(engine='chromium'):
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
             bottoms = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
-            expect(page.locator('#ro-entry-pane textarea')).to_have_count(1)                       # one notes box
+            expect(page.locator('#capture textarea')).to_have_count(1)                            # one notes box on the log on
+            expect(page.locator('#logoffNote')).to_have_count(0)
             expect(page.locator('label[for="f-notes"]')).to_have_text('Notes')
             note_height = lambda: page.locator('#f-notes').evaluate('el => el.getBoundingClientRect().height')
             three = note_height()
