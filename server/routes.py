@@ -97,10 +97,10 @@ def _filters():
     else:
         day = _now().date()
     sort = request.args.get('sort', 'newest')
-    if sort not in ('newest', 'oldest'):
+    if sort not in L.SORTS:
         abort(400)
     return {'status': status, 'day': day, 'dayOn': day_on, 'sort': sort,
-            'newest': sort == 'newest', 'search': (request.args.get('q') or '').strip()}
+            'search': (request.args.get('q') or '').strip()}
 
 
 def _alerts(cur, h):
@@ -126,7 +126,7 @@ def logons_page():
     rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
                      status=None if f['status'] == 'all' else f['status'],
                      day=f['day'] if f['dayOn'] else None,
-                     search=f['search'], newest_first=f['newest'])
+                     search=f['search'], sort=f['sort'])
     alerts, health = _alerts(cur, h)
     cur.close()
     return _page('logons.html', records=rows, filters=f, alerts=alerts, health=health,
@@ -146,7 +146,7 @@ def logons_rows():
     rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
                      status=None if f['status'] == 'all' else f['status'],
                      day=f['day'] if f['dayOn'] else None,
-                     search=f['search'], newest_first=f['newest'])
+                     search=f['search'], sort=f['sort'])
     alerts, health = _alerts(cur, h)
     cur.close()
     response = make_response(_page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,

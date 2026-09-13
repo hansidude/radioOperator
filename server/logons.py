@@ -276,15 +276,20 @@ STATUS_WHERE = {
 SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination')
 
 
-def records(cur, unit, now, approaching_minutes, status=None, day=None, search=None, newest_first=True):
+SORTS = ('newest', 'oldest', 'due')
+
+
+def records(cur, unit, now, approaching_minutes, status=None, day=None, search=None, sort='newest'):
     """The radio log, filtered. `status` is one of STATUS_WHERE or None for every record; `day` limits
-    to one call date; `search` matches any of SEARCH_FIELDS.
+    to one call date; `search` matches any of SEARCH_FIELDS; `sort` is one of SORTS.
 
     Newest first by default, which is the paper log read from the bottom up: the call that just came
     in is the one being worked on. Order is by the call time, never by the entry time, so a delayed
     paper record entered tonight sits where it was called, not at the top (REC-2)."""
     if status is not None and status not in STATUS_WHERE:
         raise Refused('No such status filter: %r' % status)
+    if sort not in SORTS:
+        raise Refused('No such sort: %r' % sort)
     where = 'SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s'
     args = [unit]
     if status is not None:
@@ -300,7 +305,15 @@ def records(cur, unit, now, approaching_minutes, status=None, day=None, search=N
         needle = str(search).strip().lower()
         rows = [r for r in rows
                 if any(needle in str(r[field]).lower() for field in SEARCH_FIELDS if r.get(field) is not None)]
-    rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=bool(newest_first))
+    rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=sort != 'oldest')
+    return due_first(rows) if sort == 'due' else rows
+
+
+def due_first(rows):
+    """The watch order (WAT-1): overdue first, then by deadline. What is not watched (drafts, closed) has
+    no deadline and follows in the order it came in. One rule for the log's Due first sort and queue()."""
+    rows.sort(key=lambda r: (RANK[r['condition']], r['eta'] or r['createdAt'])
+              if r['condition'] != 'notwatched' else (RANK['notwatched'], datetime.min))
     return rows
 
 
@@ -310,14 +323,12 @@ def queue(cur, unit, now, approaching_minutes):
 
     The watch order is the queue's own: it is a worklist, not the log. The log's own order is
     records()."""
-    rows = records(cur, unit, now, approaching_minutes, status='loggedon')
-    rows.sort(key=lambda r: (RANK[r['condition']], r['eta'] or r['createdAt']))
-    return rows
+    return due_first(records(cur, unit, now, approaching_minutes, status='loggedon'))
 
 
 def drafts(cur, unit, now, approaching_minutes, day=None):
     """Saved drafts, oldest first: the oldest unaccepted call is the one that needs chasing."""
-    return records(cur, unit, now, approaching_minutes, status='draft', day=day, newest_first=False)
+    return records(cur, unit, now, approaching_minutes, status='draft', day=day, sort='oldest')
 
 
 def recent_closed(cur, unit, now, approaching_minutes, limit=20):

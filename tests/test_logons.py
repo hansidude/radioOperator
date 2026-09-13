@@ -101,6 +101,18 @@ class LogOns(unittest.TestCase):
         with self.assertRaises(L.Refused):
             L.accept(self.cur, i, 'alice', T0)                          # already accepted
 
+    def test_due_first_is_the_watch_order_then_the_rest_newest_first(self):
+        late = self.accepted(rego='LATE01', member='1001', time='2000')
+        over = self.accepted(rego='OVER01', member='1002', time='1000')  # past at 1432
+        soon = self.accepted(rego='SOON01', member='1003', time='1450')  # inside the 30 minute window
+        older = L.create(self.cur, 'alice', '', T0 - timedelta(minutes=5))
+        newer = L.create(self.cur, 'alice', '', T0 + timedelta(minutes=5))
+        ids = [r['id'] for r in L.records(self.cur, '', T0, 30, sort='due')]
+        self.assertEqual(ids, [over, soon, late, newer, older])
+        self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [over, soon, late])
+        with self.assertRaises(L.Refused):
+            L.records(self.cur, '', T0, 30, sort='sideways')
+
     def test_a_watch_starts_the_moment_it_is_accepted(self):            # AC-52, ACC-4
         i = L.create(self.cur, 'alice', '', T0)
         self.mandatory(i, time='0600')                                  # already past

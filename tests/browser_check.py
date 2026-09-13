@@ -173,6 +173,11 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile(r'/logons\?.*status=loggedon'))
             with page.expect_response(rows_for(status='draft', q=vessel)):
                 page.select_option('#roStatus', 'draft')
+            with page.expect_response(rows_for(sort='due', q=vessel)):          # Due first swaps in place too
+                page.select_option('#roSort', 'due')
+            expect(page).to_have_url(re.compile(r'/logons\?.*sort=due'))
+            with page.expect_response(rows_for(sort='newest', q=vessel)):
+                page.select_option('#roSort', 'newest')
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             page.reload()
             expect(page.locator('#roSearch')).to_have_value(vessel)

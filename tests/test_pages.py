@@ -214,6 +214,9 @@ class Pages(unittest.TestCase):
         self.assertIn('<option value="draft" selected>📝 Drafts</option>', page)
         self.assertIn('id="roDayOn" name="dayOn" checked', page)
         self.assertIn('<option value="newest" selected>Newest first</option>', page)
+        self.assertIn('<option value="due">Due first</option>', page)
+        self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
+        self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)
         self.assertIn('data-record="%d"' % draft, page)
         self.assertNotIn('data-record="%d"' % watching, page)   # a watch is not a draft
 

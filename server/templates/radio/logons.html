@@ -40,6 +40,7 @@
   <select class="form-select form-select-sm" id="roSort" name="sort">
     <option value="newest"{% if filters.sort == 'newest' %} selected{% endif %}>Newest first</option>
     <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
+    <option value="due"{% if filters.sort == 'due' %} selected{% endif %}>Due first</option>
   </select>
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
 </form>
