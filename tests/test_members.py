@@ -501,6 +501,8 @@ class Members(unittest.TestCase):
         self.logon(registration='AB123Q', destination='Tangalooma', notes='Called from the ramp')
         page = self.a.get('/radio/search').get_data(as_text=True)
         self.assertIn('Type two or more characters', page)
+        self.assertIn('data-grp-toggle-all="radioSearch" data-grp-noun="kinds"', page)                 # collapse / expand all
+        self.assertIn('<div class="container-fluid mySpacing">', page)                                  # Quackit's usual page width
         self.assertIn('href="/radio/search"', self.a.get('/logons').get_data(as_text=True))          # on the RadioLogs navbar
         found = lambda q: self.a.get('/radio/search?q=' + q).get_data(as_text=True)
         self.assertIn('data-found="members"', found('EPIRB'))                                        # notes are searched

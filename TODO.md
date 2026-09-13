@@ -113,7 +113,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   public vessel the number belongs to and fills an empty Mobile) and **🔎 Search** (the Search page in a new tab).
 - **🔎 Search** page (`/radio/search`, on the RadioLogs navbar): one box over log ons, members, emergency contacts,
   vessels, trailers and cars, in any field including notes, grouped by kind as each kind's own list; each kind
-  collapses from its header (Quackit's `myMacro_groups`, remembered in this browser across searches); rows open their
+  collapses from its header, and myTimes' collapse / expand all button does every kind (Quackit's `myMacro_groups`,
+  remembered in this browser across searches); the page is Quackit's usual ~1200px width (`mySpacing`); rows open their
   record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
 - Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
   one map, `_ui.FIELD_SYMBOLS`.

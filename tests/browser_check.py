@@ -347,6 +347,19 @@ def main(engine='chromium'):
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
+            search_width = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid').getBoundingClientRect().width")
+            assert 900 < search_width < 1300, 'Search is not at the usual ~1200px page width: %s' % search_width
+            toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
+            expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
+            toggle_all.click()
+            for grid in ('#radioFoundMembers', '#radioFoundContacts', '#radioFoundVessels'):
+                expect(page.locator(grid)).to_be_hidden()
+            expect(toggle_all).to_have_attribute('title', 'Expand all kinds')
+            expect(toggle_all.locator('i')).to_have_class('bi bi-chevron-double-down')
+            toggle_all.click()
+            for grid in ('#radioFoundMembers', '#radioFoundContacts', '#radioFoundVessels'):
+                expect(page.locator(grid)).to_be_visible()
+            expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
             expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Contact ' + token)).to_contain_text(member_no)   # held by
             expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Public Contact ' + token)).to_contain_text('PUBLIC-' + token)
             page.locator('#radioFoundMembers a[title^="Open member"]').first.click()               # a row opens its record

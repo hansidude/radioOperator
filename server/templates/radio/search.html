@@ -5,7 +5,8 @@
 {% from 'myMacro_filters.html' import search_controls %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-search me-1"></i>Search{% endblock %}
-{% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
+{# Quackit's usual ~1200px page width (layout's mySpacing). #}
+{% block body_wrap_class %}container-fluid mySpacing{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Search">
   <div class="entity-nav-links">{{ entity_nav.parent_link('/logons', brand, 'broadcast') }}</div>
@@ -20,6 +21,7 @@
       hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-swap="outerHTML"
       hx-trigger="input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
   {{ view_controls('roFoundView') }}
+  {{ grp.collapseAllButton('radioSearch', 'kinds') }}
   {{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
 <div id="roFoundView"><div id="roFound">
