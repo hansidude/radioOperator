@@ -332,6 +332,36 @@ def main(engine='chromium'):
             page.locator('[data-dc-record-view="paragraphs"]').click()
             expect(value).to_have_css('white-space', 'nowrap')
             expect(view).to_have_class('')
+            # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
+            readout = page.locator('[data-dc-record-size-readout]')
+            larger = page.get_by_role('button', name='Larger text')
+            time_value = page.locator('#radioRecords [data-column="time"] .dc-record-grid-value').first
+            font = lambda: time_value.evaluate('el => parseFloat(getComputedStyle(el).fontSize)')
+            expect(readout).to_have_text('100%')
+            expect(page.get_by_role('button', name='Reset text size')).to_be_disabled()
+            base = font()
+            for _ in range(4):
+                larger.click()
+            expect(readout).to_have_text('200%')
+            expect(larger).to_be_disabled()
+            assert abs(font() - 2 * base) < 0.6, 'Text did not double at 200%%: %s -> %s' % (base, font())
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Page overflows at 200%'
+            page.locator('[data-dc-record-view="cards"]').click()
+            page.screenshot(path=str(ARTIFACTS / ('radio-cards-200-%s.png' % engine)), full_page=True)
+            spill = grid_rows.evaluate_all('''rows => rows.filter(r => {
+                const b = r.querySelector('.dc-record-grid-action .btn').getBoundingClientRect(), c = r.getBoundingClientRect();
+                return b.top < c.top - 1 || b.bottom > c.bottom + 1 || b.right > c.right + 1; }).length''')
+            assert spill == 0, '%s open buttons spill out of their cards at 200%%' % spill
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Cards overflow at 200%'
+            page.reload()
+            expect(readout).to_have_text('200%')                                              # remembered
+            assert abs(font() - 2 * base) < 0.6, 'Remembered size not applied after reload'
+            page.get_by_role('button', name='Smaller text').click()
+            expect(readout).to_have_text('175%')
+            page.get_by_role('button', name='Reset text size').click()
+            expect(readout).to_have_text('100%')
+            assert abs(font() - base) < 0.3, 'Reset did not return to 100%'
+            assert page.evaluate("Object.keys(localStorage).filter(k => k.indexOf('dc-record-size:') === 0).length") == 0
             visit('/logon/%s' % record)
             page.locator('[data-ro-tab="identity"]').click()
             page.locator('#findBox').fill(vessel)

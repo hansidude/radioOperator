@@ -23,7 +23,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   🔖 Rego …) so operators learn them; one-line cards show the symbol alone, the word in its tooltip.
 - View buttons (Quackit's shared `record_grid` `view_controls`): **Cards** at any width, fields on one
   line; **Paragraphs**, a line per field (or wrapped row values). Kept across refreshes, not across
-  page loads.
+  page loads. Text size buttons (A−, 100–200%, A+, reset) grow the list's text, symbols and icons;
+  remembered in this browser.
 - Rows tinted faintly by status: draft orange, logged on green, overdue red, closed near-black.
 - Dates always carry a 2-digit year (`Sun 13/9/26`); times always 4-digit 24-hour (`1400`).
 - Daily `No.` counts from 1 per call date; `Trip ID No.` (`T-00042`) is the record's key.
