@@ -91,6 +91,7 @@ class Pages(unittest.TestCase):
     def test_new_is_unsaved_until_the_minimum_is_explicitly_saved(self):
         page = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('id="saveRecord"', page)
+        self.assertIn('<div class="ro-primary-actions"><button type="button" class="btn btn-warning "', page)   # bottom Save on a new log on
         self.assertIn('>Not saved</span>', page)
         self.assertRegex(page, r'id="f-callDay"[^>]+value="[^"]+"')
         self.assertIn('id="f-callTime" class="form-control is-invalid" data-field="callTime" value=""', page)   # red from the first look
@@ -125,7 +126,10 @@ class Pages(unittest.TestCase):
         for name in ('pob', 'departurePoint', 'destination', 'etaDay', 'eta', 'memberNumber', 'vesselName', 'registration'):
             self.assertIn('id="f-%s" class="form-control is-invalid"' % name, page)
         self.assertIn('id="f-mobile" class="form-control" data-field', page)              # heard, so not red
-        self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 2)         # Save in the navbar and beside Accept
+        self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 4)         # navbar, beside Accept, Contact, Vessel
+        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-contact-pane"')]
+        self.assertIn('action="/logon/%d/discard"' % i, entry)          # discard sits on the Log on tab's bottom row
+        self.assertEqual(page.count('/discard"'), 1)
         self.assertIn('<label for="f-vesselName">Vessel Name</label>', page)
         self.assertNotIn('function minimum', page)                   # the rule lives on the server only
         # leaving a box asks the server which boxes are red; nothing is written
@@ -181,7 +185,7 @@ class Pages(unittest.TestCase):
         self.assertNotIn('id="queuePane"', page)
         self.assertIn('font-size:1.2rem', page)
         self.assertNotIn('<table', page)
-        self.assertNotIn('placeholder=', entry)
+        self.assertNotIn('placeholder=', entry[:entry.index('</form>')])   # the paper fields carry no hints; action rows may
         self.assertNotIn('class="ro-basis"', entry)
         self.assertNotIn('class="ro-warn"', entry)
         self.assertNotIn('max-width:72rem', page)

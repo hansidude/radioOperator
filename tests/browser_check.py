@@ -76,6 +76,7 @@ def main(engine='chromium'):
             assert '?v=' in href, 'New grid markup must not reuse the cached stylesheet URL'
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
+            expect(page.locator('#ro-entry-pane .ro-primary-actions [data-save-record]')).to_be_visible()
             expect(page.locator('#ro-entry-pane .capture-row')).to_have_count(5)
             expect(page.locator('form form')).to_have_count(0)
             expect(page.locator('#f-callTime')).to_have_value('')
@@ -219,6 +220,13 @@ def main(engine='chromium'):
             # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
             visit('/logon/%s' % layout_records[0])
             expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
+            bottom = page.locator('#ro-entry-pane .ro-primary-actions')
+            expect(bottom.locator('[data-save-record]')).to_be_visible()                 # Save, Accept, Discard in one row
+            expect(bottom.locator('input[name="reason"]')).to_be_visible()
+            expect(bottom.get_by_role('button', name='Discard draft')).to_be_visible()
+            page.locator('[data-ro-tab="contact"]').click()
+            expect(page.locator('#ro-contact-pane .ro-primary-actions [data-save-record]')).to_be_visible()
+            page.locator('[data-ro-tab="entry"]').click()
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-registration')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-callTime')).to_have_value('1400')
@@ -281,7 +289,7 @@ def main(engine='chromium'):
             expect(page.locator('#findHits')).to_contain_text(vessel)
             page.locator('[data-ro-tab="entry"]').click()
             page.locator('form[action="/logon/%s/accept"] button' % record).click()
-            expect(page.locator('.ro-primary-actions')).to_contain_text('Logged on and watched')
+            expect(page.locator('#ro-entry-pane .ro-primary-actions')).to_contain_text('Logged on and watched')
             watching = True
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
