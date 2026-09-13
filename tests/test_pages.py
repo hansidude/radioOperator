@@ -250,6 +250,7 @@ class Pages(unittest.TestCase):
         self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
             self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
+        self.assertIn('data-dc-record-width aria-controls="roRecordView"', page)                    # shared page width button
         self.assertIn('<div id="roRecordView"><div id="roLiveRecords">', page)
         self.assertIn('data-navbar-controls="RadioLogs filters"', page)                             # lives in the navbar                    # outside what refreshes replace
         self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))

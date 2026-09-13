@@ -91,6 +91,7 @@ def main(engine='chromium'):
             page.locator('.navbar a[href="/members"]').first.click()
             page.wait_for_url(re.compile('/members$'))
             expect(page.locator('.navbar a[href="/vessels"]')).to_have_count(0)               # no Public vessels button on Members
+            expect(page.locator('[data-dc-record-width]:visible')).to_have_attribute('title', 'Usual page width')   # Members starts wide
             page.locator('a[href="/members/new"]').click()
             page.wait_for_url(re.compile('/members/new$'))
             usual_width('#ro-member-details', 'New member')
@@ -359,6 +360,19 @@ def main(engine='chromium'):
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
             usual_width('#roFoundView', 'Search')
+            width_button = page.locator('[data-dc-record-width]:visible')                          # contained or full width, remembered
+            expect(width_button).to_have_attribute('title', 'Full width')
+            width_button.click()
+            expect(width_button).to_have_attribute('title', 'Usual page width')
+            expect(width_button.locator('i')).to_have_class('bi bi-arrows-angle-contract')
+            full = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid.mySpacing').getBoundingClientRect().width")
+            assert full > 1700, 'Full width did not widen Search: %s' % full
+            page.reload()
+            expect(page.locator('[data-dc-record-width]:visible')).to_have_attribute('title', 'Usual page width')
+            page.locator('[data-dc-record-width]:visible').click()
+            usual_width('#roFoundView', 'Search back in its container')
+            page.locator('#roFindAll').fill(token)
+            expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
             toggle_all.click()

@@ -117,6 +117,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   remembered in this browser across searches); the page is Quackit's usual ~1200px width (`mySpacing`), as are the member, public vessel and
   contact / vessel / trailer / car pages (new and edit); rows open their
   record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
+- Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page).
 - Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
   one map, `_ui.FIELD_SYMBOLS`.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
