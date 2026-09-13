@@ -13,7 +13,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - One collection through Quackit's shared `record_grid`: compact aligned rows on desktop/tablet,
   labelled cards at phone width, paper-log column order, width capped at 1920px.
 - Toolbar: status (All, Drafts, Logged on, Overdue, Closed; default Drafts), call date (default today,
-  untickable), sort (Newest first by default, Oldest first, **Due first**), search. Swapped in place by
+  untickable), sort (Newest first by default, Oldest first, **Due first**), search. It rides in Quackit's
+  fixed navbar (`data-navbar-controls`), so it stays on screen while the log scrolls. Swapped in place by
   Quackit's htmx; state kept in the URL; 30s refresh.
 - Due first: overdue, then by return time; drafts and closed after, newest call first. One rule,
   `logons.due_first`, also used by `queue()`.

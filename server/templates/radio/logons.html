@@ -21,7 +21,9 @@
    the address bar. Only the list is swapped: the alerts carry their own alarm script, which must run
    once per page, not once per refresh. hx-history="false" keeps vessel and caller details out of
    htmx's localStorage page cache. #}
-<form id="roFilters" class="dc-record-toolbar ro-toolbar" method="get" action="/logons"
+{# data-navbar-controls: Quackit moves the whole form into its fixed navbar, as on My Times and Lists, so the
+   filters stay on screen however far the log scrolls. The standalone shell has no slot and leaves it here. #}
+<form id="roFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="RadioLogs filters" method="get" action="/logons"
       hx-get="/logons/rows" hx-vals='{"partial": "1"}' hx-target="#roLiveRecords" hx-select="#roLiveRecords"
       hx-swap="outerHTML" hx-trigger="change, input from:#roSearch delay:300ms, submit, every 30s"
       hx-sync="this:replace" hx-history="false">

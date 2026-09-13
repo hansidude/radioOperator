@@ -221,7 +221,8 @@ class Pages(unittest.TestCase):
         self.assertIn('<option value="due">Due first</option>', page)
         self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
         self.assertIn('data-dc-record-view="paragraphs" aria-controls="roRecordView"', page)
-        self.assertIn('<div id="roRecordView"><div id="roLiveRecords">', page)                    # outside what refreshes replace
+        self.assertIn('<div id="roRecordView"><div id="roLiveRecords">', page)
+        self.assertIn('data-navbar-controls="RadioLogs filters"', page)                             # lives in the navbar                    # outside what refreshes replace
         self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
         self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)
         self.assertIn('data-record="%d"' % draft, page)

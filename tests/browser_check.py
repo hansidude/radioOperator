@@ -247,6 +247,7 @@ def main(engine='chromium'):
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')   # checking wrote nothing
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
+            expect(page.locator('#appNavbarControls #roFilters')).to_have_count(1)            # the filters ride in the navbar
             for width in (2560, 1920, 1328, 1280, 1190, 1184, 1024, 960, 900, 768, 576, 390, 320):
                 page.set_viewport_size({'width': width, 'height': 800})
                 expect(page.locator('table')).to_have_count(0)
@@ -280,6 +281,16 @@ def main(engine='chromium'):
                         + '[data-column="time"] .dc-record-grid-value, [data-column="returnTime"] .dc-record-grid-value')]
                         .filter(v => v.scrollWidth > v.clientWidth + 1).map(v => v.textContent)""")
                     assert not cut, 'Date/time cut off at %spx: %s' % (width, cut)
+                if width == 390:                        # a list longer than the screen: scrolled to the end, the filters are still there
+                    # Bootstrap sets scroll-behavior: smooth; an instant scroll is where it says it is when read.
+                    page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
+                    assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
+                    expect(page.locator('#roStatus')).to_be_in_viewport()
+                    expect(page.locator('#roSearch')).to_be_in_viewport()
+                    page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+                    nav = page.locator('.navbar.fixed-top').evaluate('el => el.getBoundingClientRect().bottom')
+                    first = page.locator('.dc-record-grid-row').first.evaluate('el => el.getBoundingClientRect().top')
+                    assert first >= nav - 1, 'The first record starts under the navbar: %s < %s' % (first, nav)
                 if width in (1920, 1328, 960, 900, 390):
                     page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
             # Chosen views on a desktop: cards on one line, a line per field, wrapped rows; a refresh keeps them.
