@@ -21,7 +21,7 @@ def install_standalone_ui(app):
 
     templates = Path(os.environ.get('RADIO_SHARED_TEMPLATES') or
                      Path(__file__).resolve().parents[2] / 'dflask' / 'templates')
-    for name in ('myMacro_record_view.html', 'myMacro_filters.html',
+    for name in ('myMacro_record_view.html', 'myMacro_filters.html', 'myMacro_entity_nav.html',
                  '../static/css/record_views.css', '../static/css/navbar_controls.css',
                  '../static/css/search_controls.css', '../static/js/search_controls.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js'):
@@ -36,7 +36,7 @@ def install_standalone_ui(app):
 
 class Host:
     base_template = 'radio/_base.html'   # a host with its own layout passes its own
-    brand = 'Log on'
+    brand = 'RadioLogs'
     login_url = None                     # where to send someone who is not logged in; None -> a plain 403
 
     # Operational values, every one of them a placeholder a host overrides. The spec makes these

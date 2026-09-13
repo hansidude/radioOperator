@@ -163,6 +163,10 @@ def logons_new():
     if request.method == 'POST':
         body = request.get_json(silent=True) or {}
         try:
+            if body.get('check'):          # which boxes are red, nothing written
+                out = L.check_fields(L.blank(now, h.unit()), body.get('fields'))
+                cur.close()
+                return jsonify(out)
             out = L.create_saved(cur, body.get('fields'), h.user(), h.unit(), now)
         except (L.Refused, L.Stale) as e:
             conn.rollback()
@@ -182,7 +186,7 @@ def logons_new():
     cond, minutes = L.condition(row, now, h.approaching_minutes)
     return _page('logon.html', creating=True, logon=row, queue=[], drafts=[], alerts=[], health=None,
                  identifiers=[], gaps=L.gaps(row), condition=cond, minutes=minutes, verified=verified,
-                 missing=L.missing(row), clash=None, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
+                 missing=L.missing(row), red=L.check_fields(row, L.form_values(row))['red'], clash=None, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
                  labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS, column=L.column,
                  box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, close_reasons=L.CLOSE_REASONS,
                  reference=L.reference, window=h.approaching_minutes)
@@ -203,6 +207,7 @@ def logon_page(logon_id):
     return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,
                  identifiers=idents, gaps=L.gaps(row),
                  condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
+                 red=L.check_fields(row, L.form_values(row))['red'] if row['watchStatus'] not in ('loggedoff', 'discarded', 'cancelled') else [],
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
                  day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
                  close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes)
@@ -265,10 +270,14 @@ def api_set_field(logon_id):
     """{field, value, version} -> the stored value and what to show beside it. 409 when stale, 400 when refused.
     A 200 is the durable acknowledgment the page's Saved status waits for (CAP-19)."""
     h, (conn, cur) = _open()
-    _logon(cur, logon_id, h, lock=True)
     body = request.get_json(silent=True) or {}
+    row = _logon(cur, logon_id, h, lock=not body.get('check'))
     now = _now()
     try:
+        if body.get('check'):              # which boxes are red, nothing written
+            out = L.check_fields(row, body.get('fields'))
+            cur.close()
+            return jsonify(out)
         if 'fields' in body:
             out = L.save_fields(cur, logon_id, body['fields'], h.user(), now, body.get('version'))
         elif 'field' in body:

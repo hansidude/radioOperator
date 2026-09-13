@@ -93,7 +93,7 @@ class Pages(unittest.TestCase):
         self.assertIn('id="saveRecord"', page)
         self.assertIn('>Not saved</span>', page)
         self.assertRegex(page, r'id="f-callDay"[^>]+value="[^"]+"')
-        self.assertIn('id="f-callTime" class="form-control" data-field="callTime" value=""', page)
+        self.assertIn('id="f-callTime" class="form-control is-invalid" data-field="callTime" value=""', page)   # red from the first look
         self.assertNotIn("addEventListener('change', function () { save", page)
         self.assertIn('>0 drafts</div>', self.a.get('/logons').get_data(as_text=True))
 
@@ -127,6 +127,17 @@ class Pages(unittest.TestCase):
         self.assertIn('id="f-mobile" class="form-control" data-field', page)              # heard, so not red
         self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 2)         # Save in the navbar and beside Accept
         self.assertIn('<label for="f-vesselName">Vessel Name</label>', page)
+        self.assertNotIn('function minimum', page)                   # the rule lives on the server only
+        # leaving a box asks the server which boxes are red; nothing is written
+        red = self.a.post('/api/logon/%d' % i, json={'check': True, 'fields': {
+            'callDay': date.today().isoformat(), 'callTime': 'soon', 'pob': 'abc', 'mobile': '0400000001'}})
+        self.assertEqual(red.status_code, 200, red.data)
+        self.assertTrue({'callTime', 'pob', 'departurePoint', 'etaDay', 'eta'} <= set(red.json['red']), red.json)
+        self.assertNotIn('mobile', red.json['red'])
+        # nothing written: the version-0 save below still succeeds
+        new = self.a.post('/logons/new', json={'check': True, 'fields': {'callDay': date.today().isoformat()}})
+        self.assertEqual(new.status_code, 200, new.data)
+        self.assertTrue({'callTime', 'memberNumber', 'registration', 'mobile'} <= set(new.json['red']), new.json)
         r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '3pm', 'version': 0})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.json['version'], 1)

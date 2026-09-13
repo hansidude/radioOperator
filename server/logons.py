@@ -411,7 +411,8 @@ def blank(now, unit='', call_day=None):
 
 
 def _prepare_fields(row, values):
-    """Validate and interpret one explicit form save without writing anything."""
+    """Validate and interpret one explicit form save without writing anything. `required` lists the
+    draft minimum still absent; the caller decides whether that refuses a save or only turns boxes red."""
     if not isinstance(values, dict):
         raise Refused('expected fields')
     unknown = sorted(set(values) - set(FIELDS))
@@ -454,15 +455,32 @@ def _prepare_fields(row, values):
             required.append('callTime')
         if not any(after.get(field) for field in ('memberNumber', 'registration', 'mobile')):
             required.extend(('memberNumber', 'registration', 'mobile'))
-    if required:
-        raise InvalidDraft(required)
-    return sets, after, sorted(set(invalid)), displays
+    return sets, after, sorted(set(invalid)), displays, required
+
+
+def check_fields(row, values):
+    """The boxes the form's current values turn red, writing nothing: the draft minimum, what cannot be
+    read, and on a draft what still stops acceptance (ACC-1). The page asks this as focus leaves a box,
+    so there is one rule, here, and not a second copy in the browser."""
+    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    red = set(required) | set(invalid)
+    if row['watchStatus'] == 'draft':
+        for m in missing(after):
+            red.update(m['boxes'])
+    return {'red': sorted(red)}
+
+
+def form_values(row):
+    """What the form's boxes hold when the page opens, so its first red is the same check as later."""
+    return {field: box(row, field) for field in FIELDS}
 
 
 def save_fields(cur, logon_id, values, user, now, version=None):
     """Save one whole operator form as one LogOns update and therefore one host history event."""
     row = _open_row(cur, logon_id, version)
-    sets, after, invalid, displays = _prepare_fields(row, values)
+    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    if required:
+        raise InvalidDraft(required)
     for field in IDENT_FIELDS:
         if field in values:
             _record_identifier(cur, logon_id, field, after.get(field), row.get(field), user, now)
@@ -480,7 +498,9 @@ def save_fields(cur, logon_id, values, user, now, version=None):
 def create_saved(cur, values, user, unit, now):
     """Create the first durable draft only after the explicit form save passes its minimum."""
     row = blank(now, unit)
-    sets, after, invalid, displays = _prepare_fields(row, values)
+    sets, after, invalid, displays, required = _prepare_fields(row, values)
+    if required:
+        raise InvalidDraft(required)
     day = after['callDate']
 
     synthetic = [{'kind': field, 'raw': after[field], 'normalized': normalize(field, after[field]),

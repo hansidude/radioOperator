@@ -37,9 +37,12 @@ def main(engine='chromium'):
         context.tracing.start(screenshots=True, snapshots=True, sources=True)
         page = context.new_page()
         errors, writes = [], []
+        # A field check (focus leaving a box) posts {check: true} and writes nothing; a save is every other POST.
+        is_check = lambda request: '"check":true' in (request.post_data or '')
+        is_save = lambda r: r.request.method == 'POST' and '/logon' in r.url and not is_check(r.request)
         context.on('page', lambda p: p.on('pageerror', lambda e: errors.append(e.stack)))
         page.on('pageerror', lambda e: errors.append(e.stack))
-        page.on('request', lambda r: writes.append(r.url) if r.method == 'POST' and '/logon' in r.url else None)
+        page.on('request', lambda r: writes.append(r.url) if r.method == 'POST' and '/logon' in r.url and not is_check(r) else None)
 
         def visit(path):
             response = page.goto(URL + path)
@@ -48,7 +51,7 @@ def main(engine='chromium'):
 
         def save(status=200):
             nonlocal record
-            with page.expect_response(lambda r: r.request.method == 'POST' and '/logon' in r.url) as pending:
+            with page.expect_response(is_save) as pending:
                 page.locator('#saveRecord').click()
             response = pending.value
             assert response.status == status, 'Save HTTP %s: %s' % (response.status, response.text()[:1000])
@@ -77,10 +80,11 @@ def main(engine='chromium'):
             expect(page.locator('form form')).to_have_count(0)
             expect(page.locator('#f-callTime')).to_have_value('')
             expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
-            before = len(writes)
-            page.locator('#saveRecord').click()
+            save(400)                                   # the server refuses the minimum; nothing is created
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
-            assert len(writes) == before, 'Invalid minimum attempted a write'
+            expect(page).to_have_url(re.compile('/logons/new$'))
+            expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
+            before = len(writes)
             for name, value in fields.items():
                 page.locator('#f-' + name).fill(value)
             page.locator('[data-picker-target="callDay"]').evaluate(
@@ -120,7 +124,7 @@ def main(engine='chromium'):
             other.on('dialog', lambda dialog: dialog.accept())
             other.goto(URL + '/logon/%s' % record)
             other.locator('#f-destination').fill('Saved by second operator')
-            with other.expect_response(lambda r: '/api/logon/' in r.url) as pending:
+            with other.expect_response(lambda r: '/api/logon/' in r.url and not is_check(r.request)) as pending:
                 other.locator('#saveRecord').click()
             assert pending.value.status == 200, pending.value.text()
             expect(other.locator('#saveStatus')).to_have_text('Saved')
@@ -210,9 +214,19 @@ def main(engine='chromium'):
             expect(page.locator('#f-registration')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-callTime')).to_have_value('1400')
             page.screenshot(path=str(ARTIFACTS / ('radio-draft-%s.png' % engine)))
+            page.locator('#f-pob').fill('abc')          # red as soon as focus leaves, from the server's check
+            expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))
+            page.locator('#f-pob').press('Tab')
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             page.locator('#f-pob').fill('2')
             expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))
+            page.locator('#f-pob').press('Tab')
+            page.locator('#f-callTime').fill('soon')
+            page.locator('#f-callTime').press('Tab')
+            expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-destination')).to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')   # checking wrote nothing
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
             for width in (2560, 1920, 1328, 1280, 1190, 1184, 1024, 960, 900, 768, 576, 390, 320):
