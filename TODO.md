@@ -42,8 +42,9 @@ are marked **FUTURE** in that picture and remain a separate task.
       and its index exists. The earlier missing-column report is stale; no migration needed.
 Publication and rollout follow Quackit `DEVELOPMENT.md`: radio first, host pointer on
 `feature/contexts` next, then personalDB `myUpdate`. The end-of-task report records the
-published revisions and actual rollout result. The personal smoke check does not
-create or delete fixture records.
+published revisions and script invocation. The owner's latest procedure is to run
+`myUpdate` only: no personal checks of any kind before or afterward. Earlier personal
+inspection/smoke-check notes below are historical, not instructions for future work.
 
 Corrections to historical notes below: initial red minimum highlighting is committed;
 unsaved-navigation and stale-version browser acceptance checks are already implemented;
@@ -448,11 +449,9 @@ Checked on the **port 80** stack (same MariaDB image, same generated history tri
 
 Still to do:
 
-- [ ] Run the browser/runtime checks against the **personal** Quackit Docker stack.
-- [ ] Run `/home/hansi/personalDb/myUpdate`, apply Admin -> Database -> Generate -> Execute for
-      `LogOns.tripRef` and its index, then verify the updated personal site.
-- [ ] Delete the existing personal records (irreversible; backup at
-      `~/personalDb/backup_2026_09_12-132334.zip` and the website's own DB backup).
+- Personal rollout: follow Quackit's current DEVELOPMENT.md and run `myUpdate` only.
+  The earlier personal browser/schema checks, migration and record-wipe plan are
+  superseded; they are not rollout steps.
 - [ ] Warn-before-leaving and the stale-version 409, exercised through a browser rather than
       only in unit tests.
 - [ ] Resolve the CAP-19 specification conflict above.
