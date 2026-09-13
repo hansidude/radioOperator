@@ -1,4 +1,5 @@
 """Real Flask routes and SQL on an isolated database with a test host; never uses a host's data."""
+import re
 import sys
 import tempfile
 from datetime import date
@@ -260,6 +261,24 @@ class Pages(unittest.TestCase):
         self.assertNotIn('class="ro-status-counts"', page)
         # The site's own record classes, not a second look invented for radio.
         self.assertIn('class="dc-record-toolbar ro-toolbar"', page)
+
+    def test_a_draft_row_shows_what_it_still_needs_as_a_question_mark(self):
+        def row_of(page, i):
+            row = page[page.index('data-record="%d"' % i):]
+            return row[:row.index('</article>')]
+        mobile_only = self.new()                                   # one ID: the other three are still needed
+        rego_only = self.new()
+        self.field(rego_only, 'mobile', '')
+        self.field(rego_only, 'registration', 'AB123Q')
+        watch = self.accepted(rego='WW111Q', member='9001')
+        page = self.a.get('/logons').get_data(as_text=True)
+        needed = lambda i: set(re.findall(r'aria-label="([^"]+) still needed"', row_of(page, i)))
+        self.assertEqual(needed(mobile_only), {'Member No.', 'Vessel Name', 'Rego', 'POB', 'Departure', 'Going to',
+                                               'Return date', 'Time'})
+        self.assertEqual(needed(rego_only), {'Member No.', 'Vessel Name', 'Mobile', 'POB', 'Departure', 'Going to',
+                                             'Return date', 'Time'})   # together: every column logons.missing can name
+        self.assertEqual(needed(watch), set())                     # drafts only
+        self.assertIn('dc-record-grid-blank" data-column="vessel"', row_of(page, mobile_only))  # not needed: stays blank
 
     def test_shared_record_presentation_keeps_identity_and_escapes_input(self):
         i = self.new()

@@ -25,6 +25,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   line; **Paragraphs**, a line per field (or wrapped row values). Kept across refreshes, not across
   page loads. Text size buttons (A−, 100–200%, A+, reset) grow the list's text, symbols and icons;
   remembered in this browser.
+- Draft rows show what still blocks Accept as an orange `?` (after its symbol on cards, in the cell on rows);
+  other empty fields stay blank. Logged-on and closed rows show no `?`.
 - Rows tinted faintly by status: draft orange, logged on green, overdue red, closed near-black.
 - Dates always carry a 2-digit year (`Sun 13/9/26`); times always 4-digit 24-hour (`1400`).
 - Daily `No.` counts from 1 per call date; `Trip ID No.` (`T-00042`) is the record's key.

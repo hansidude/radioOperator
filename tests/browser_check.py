@@ -328,6 +328,9 @@ def main(engine='chromium'):
             expect(label.locator('.dc-record-grid-label-text')).to_have_css('position', 'absolute')
             expect(label).to_have_attribute('title', 'Member No.')
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-%s.png' % engine)), full_page=True)
+            gap = page.locator('[data-record="%s"] [data-column="pob"]' % layout_records[0])      # the sparse draft
+            expect(gap.locator('.dc-record-grid-missing')).to_have_text('?')                     # symbol and ?, not gone
+            expect(gap.locator('.dc-record-grid-symbol')).to_be_visible()
             with page.expect_response(rows_for(sort='oldest', q=token)):
                 page.select_option('#roSort', 'oldest')
             expect(grid_rows).to_have_count(4)
