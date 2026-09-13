@@ -24,7 +24,7 @@ VESSEL_FIELDS = ('vesselName', 'registration', 'length', 'hullColour', 'vesselTy
 # and labels, because they describe the same boat.
 KINDS = {
     'member': {'table': 'Members', 'label': 'Details', 'one': 'member',
-               'fields': ('firstName', 'lastName', 'mobile', 'email', 'address'), 'required': ('firstName', 'lastName')},
+               'fields': ('firstName', 'lastName', 'mobile', 'email', 'address', 'notes'), 'required': ('firstName', 'lastName')},
     'contacts': {'table': 'EmergencyContacts', 'label': 'Emergency contacts', 'one': 'emergency contact',
                  'fields': ('name', 'relationship', 'phone', 'email'), 'required': ('name', 'phone')},
     'vessels': {'table': 'Vessels', 'label': 'Vessels', 'one': 'vessel',

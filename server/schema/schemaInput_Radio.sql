@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS `Members` (
   `address` VARCHAR(255) DEFAULT NULL,
   `mobile` VARCHAR(32) DEFAULT NULL,                          -- 10 digits, written 0412 345 678
   `email` VARCHAR(255) DEFAULT NULL,
+  `notes` TEXT DEFAULT NULL,
   `version` INT NOT NULL DEFAULT 0,
   `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
   `createdAt` DATETIME DEFAULT NOW(),

@@ -50,6 +50,13 @@ class Members(unittest.TestCase):
         self.assertEqual(M.get(cur, 'member', first)['memberNumber'], 'm00001')
         self.assertEqual(M.get(cur, 'member', second)['memberNumber'], 'm00002')
         self.assertEqual(M.get(cur, 'member', first)['mobile'], '0412 345 678')         # written like the log on's mobile
+        self.assertIsNone(M.get(cur, 'member', first)['notes'])
+        noted = self.a.post('/member/%d' % first, data={'firstName': 'Jane', 'lastName': 'Smith', 'mobile': '0412345678', 'email': 'jane@example.com', 'notes': 'Prefers channel 16\nHas a PLB',
+                                                         'version': '0'})
+        self.assertEqual(noted.status_code, 302, noted.data)
+        page = self.a.get('/member/%d' % first).get_data(as_text=True)
+        self.assertIn('<label for="member-notes">Notes</label>', page)
+        self.assertIn('>Prefers channel 16\nHas a PLB</textarea>', page)
         page = self.a.get('/members').get_data(as_text=True)
         self.assertIn('m00001', page)
         self.assertIn('>Jones</span>', page)
