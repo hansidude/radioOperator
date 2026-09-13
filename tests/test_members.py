@@ -96,6 +96,8 @@ class Members(unittest.TestCase):
         new = self.a.get('/member/%d/vessels/new' % i).get_data(as_text=True)
         self.assertIn('<form id="vessels-new" method="post" action="/member/%d/vessels"' % i, new)
         self.assertNotIn('placeholder=', new)
+        for form in ('/members/new', '/member/%d' % i, '/vessels/new', '/member/%d/vessels/new' % i):
+            self.assertIn('<div class="container-fluid mySpacing">', self.a.get(form).get_data(as_text=True))   # usual page width
 
     def test_a_member_holds_many_of_each_and_removes_them_without_deleting(self):
         i = self.member()

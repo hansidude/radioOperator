@@ -55,6 +55,11 @@ def main(engine='chromium'):
             assert response and response.status == 200, 'GET %s: HTTP %s' % (path, response.status if response else 'none')
             assert '/login' not in page.url, 'Sample login failed'
 
+        def usual_width(inside, what):
+            # Quackit's usual ~1200px page width (layout's mySpacing), measured at the 1920px viewport.
+            width = page.evaluate("s => document.querySelector(s).closest('.container-fluid.mySpacing').getBoundingClientRect().width", inside)
+            assert 900 < width < 1300, '%s is not at the usual ~1200px page width: %s' % (what, width)
+
         def save(status=200):
             nonlocal record
             with page.expect_response(is_save) as pending:
@@ -87,6 +92,8 @@ def main(engine='chromium'):
             page.wait_for_url(re.compile('/members$'))
             expect(page.locator('.navbar a[href="/vessels"]')).to_have_count(0)               # no Public vessels button on Members
             page.locator('a[href="/members/new"]').click()
+            page.wait_for_url(re.compile('/members/new$'))
+            usual_width('#ro-member-details', 'New member')
             page.locator('#member-firstName').fill('Verify')
             page.locator('#member-mobile').fill('0412 345')                                # not 10 digits: refused, red
             page.locator('#ro-member-details button.btn-warning').click()
@@ -100,6 +107,7 @@ def main(engine='chromium'):
             page.locator('#ro-member-details button.btn-warning').click()
             page.wait_for_url(re.compile('/member/[0-9]+$'))
             member_page = page.url
+            usual_width('#ro-member-details', 'Member')
             member_no = page.locator('#ro-member-details .ro-section-title').inner_text().split()[-1]
             assert re.match(r'^m[0-9]{5}$', member_no), 'Member number is not mXXXXX: %r' % member_no
             expect(page.locator('#member-mobile')).to_have_value('0412 345 678')
@@ -171,6 +179,7 @@ def main(engine='chromium'):
             visit('/vessels')
             expect(page.locator('.navbar a[href="/members"]')).to_have_count(0)               # no Members button on Public vessels
             visit('/vessels/new')
+            usual_width('#ro-vessel-details', 'New public vessel')
             page.locator('#public-vesselName').fill('PUBLIC-' + token)
             page.locator('#public-registration').fill('VESSEL-' + token)
             page.locator('#public-ownerName').fill('Verify Public ' + token)
@@ -179,10 +188,12 @@ def main(engine='chromium'):
             page.locator('#ro-vessel-details button.btn-warning').click()
             page.wait_for_url(re.compile('/vessel/[0-9]+$'))
             public_vessel = int(page.url.rsplit('/', 1)[1])
+            usual_width('#ro-vessel-details', 'Public vessel')
             expect(page.locator('#public-notes')).to_have_value('Verify notes\nsecond line')
             page.locator('[data-entity-tab="contacts"]').click()                                  # and emergency contacts
             page.locator('#ro-vessel-contacts a[href$="/contacts/new"]').click()
             page.wait_for_url(re.compile(r'/vessel/[0-9]+/contacts/new$'))
+            usual_width('form#contacts-new', 'New emergency contact')
             page.locator('#contacts-new-name').fill('Verify Public Contact ' + token)
             page.locator('#contacts-new-phone').fill('0499777666')
             page.locator('form#contacts-new button.btn-warning').click()
@@ -347,8 +358,7 @@ def main(engine='chromium'):
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
-            search_width = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid').getBoundingClientRect().width")
-            assert 900 < search_width < 1300, 'Search is not at the usual ~1200px page width: %s' % search_width
+            usual_width('#roFoundView', 'Search')
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
             toggle_all.click()
