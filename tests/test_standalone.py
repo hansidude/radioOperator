@@ -15,7 +15,7 @@ class Standalone(unittest.TestCase):
             shared = Path(__file__).resolve().parents[2] / 'dflask' / 'static'
             page = c.get('/logons').get_data(as_text=True)
             for asset in ('css/record_views.css', 'css/navbar_controls.css',
-                          'css/search_controls.css', 'js/search_controls.js'):
+                          'css/search_controls.css', 'js/search_controls.js', 'js/record_view.js'):
                 self.assertIn('/radio-shared/static/' + asset, page)
                 response = c.get('/radio-shared/static/' + asset)
                 self.assertEqual(response.status_code, 200)

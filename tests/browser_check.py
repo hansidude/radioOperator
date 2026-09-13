@@ -282,7 +282,36 @@ def main(engine='chromium'):
                     assert not cut, 'Date/time cut off at %spx: %s' % (width, cut)
                 if width in (1920, 1328, 960, 900, 390):
                     page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
+            # Chosen views on a desktop: cards on one line, a line per field, wrapped rows; a refresh keeps them.
             page.set_viewport_size({'width': 1920, 'height': 1080})
+            view = page.locator('#roRecordView')
+            grid_rows = page.locator('#radioRecords .dc-record-grid-row')
+            heights = lambda: grid_rows.evaluate_all('rows => rows.map(r => r.getBoundingClientRect().height)')
+            page.locator('[data-dc-record-view="cards"]').click()
+            expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
+            expect(page.locator('[data-dc-record-view="cards"]')).to_have_attribute('aria-pressed', 'true')
+            expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_hidden()
+            expect(grid_rows.first).to_have_css('display', 'flex')
+            got = heights()
+            assert min(got) <= 40 and max(got) <= 64, 'Cards are not compact at 1920px: %s' % got
+            page.screenshot(path=str(ARTIFACTS / ('radio-cards-%s.png' % engine)), full_page=True)
+            with page.expect_response(rows_for(sort='oldest', q=token)):
+                page.select_option('#roSort', 'oldest')
+            expect(grid_rows).to_have_count(4)
+            expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
+            expect(grid_rows.first).to_have_css('display', 'flex')                        # the swapped list is still cards
+            page.locator('[data-dc-record-view="paragraphs"]').click()
+            expect(grid_rows.first).to_have_css('display', 'grid')
+            got = heights()
+            assert min(got) > 64, 'Paragraph cards do not give each field a line: %s' % got
+            page.screenshot(path=str(ARTIFACTS / ('radio-paragraphs-%s.png' % engine)), full_page=True)
+            page.locator('[data-dc-record-view="cards"]').click()                          # rows again, values wrapped
+            expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_visible()
+            value = page.locator('#radioRecords [data-column="destination"] .dc-record-grid-value').first
+            expect(value).to_have_css('white-space', 'normal')
+            page.locator('[data-dc-record-view="paragraphs"]').click()
+            expect(value).to_have_css('white-space', 'nowrap')
+            expect(view).to_have_class('')
             visit('/logon/%s' % record)
             page.locator('[data-ro-tab="identity"]').click()
             page.locator('#findBox').fill(vessel)

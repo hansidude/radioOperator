@@ -23,7 +23,7 @@ def install_standalone_ui(app):
                      Path(__file__).resolve().parents[2] / 'dflask' / 'templates')
     for name in ('myMacro_record_view.html', 'myMacro_filters.html', 'myMacro_entity_nav.html',
                  '../static/css/record_views.css', '../static/css/navbar_controls.css',
-                 '../static/css/search_controls.css', '../static/js/search_controls.js',
+                 '../static/css/search_controls.css', '../static/js/search_controls.js', '../static/js/record_view.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js'):
         if not (templates / name).is_file():
             raise RuntimeError('Missing shared UI file %s; use quackit/radio or set '

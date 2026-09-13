@@ -1,6 +1,7 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% from 'myMacro_filters.html' import search_controls %}
+{% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>{{ brand }}{% endblock %}
 {# The shared record grid uses the host's wide collection wrapper, capped at 1920px. #}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
@@ -42,8 +43,10 @@
     <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
     <option value="due"{% if filters.sort == 'due' %} selected{% endif %}>Due first</option>
   </select>
+  {{ view_controls('roRecordView') }}
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
 </form>
 {{ ui.alert_list(alerts, health) }}
-<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>
+{# The chosen view lives on roRecordView, outside roLiveRecords, so a refresh keeps it. #}
+<div id="roRecordView"><div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
 {% endblock %}
