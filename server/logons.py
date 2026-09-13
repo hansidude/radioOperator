@@ -894,21 +894,27 @@ def reopen(cur, logon_id, user, now, reason, version=None):
     return _bump(cur, row, {'watchStatus': back, 'reopenedAt': _s(now), 'reopenReason': reason}, user, now)
 
 
-def log_off(cur, logon_id, user, now, note, reason='returned', version=None):
+def log_off(cur, logon_id, user, now, notes=None, reason='returned', version=None):
     """End the watch on an accepted log on, with the time, the evidence and the reason: the paper's
     'Time Arrived or Return' (§3.3, WAT-7). Every reason ends this way, the vessel having returned
-    or never departed, because a log on that happened is logged off."""
+    or never departed, because a log on that happened is logged off.
+
+    `notes` is the record's one Notes box as it stands when Log off is pressed (owner, 2026-09-14: one
+    notes box), saved in the same update; None leaves Notes as it is. `loggedOffNote` is no longer
+    written; rows that have one keep it."""
     row = _open_row(cur, logon_id, version)
     if row['watchStatus'] != 'loggedOn':
         raise Refused('This is a draft, not a log on. Finish and accept it, or discard it.')
     reason = (reason or 'returned').strip()
     if reason not in dict(CLOSE_REASONS):
         raise Refused('Log off reason must be one of: ' + ', '.join(k for k, _ in CLOSE_REASONS))
-    note = (note or '').strip()
-    if len(note) > 255:
-        raise Refused('Log off note: too long to store')
-    return _bump(cur, row, {'watchStatus': 'loggedOff', 'loggedOffAt': _s(now),
-                            'loggedOffNote': note or None, 'closeReason': reason}, user, now)
+    sets = {'watchStatus': 'loggedOff', 'loggedOffAt': _s(now), 'closeReason': reason}
+    if notes is not None:
+        notes = notes.strip()
+        if len(notes) > 65535:
+            raise Refused('Notes: too long to store')
+        sets['notes'] = notes or None
+    return _bump(cur, row, sets, user, now)
 
 
 def apply_profile(cur, logon_id, key, user, now, version=None):

@@ -272,7 +272,7 @@ def logon_reopen(logon_id):
 @bp.route('/logon/<int:logon_id>/logoff', methods=['POST'])
 def logon_logoff(logon_id):
     return _action(logon_id, lambda cur, v: L.log_off(cur, logon_id, host().user(), _now(),
-                                                      request.form.get('note'), request.form.get('reason'), v))
+                                                      request.form.get('notes'), request.form.get('reason'), v))
 
 
 # ---------- API ----------

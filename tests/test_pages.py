@@ -393,7 +393,8 @@ class Pages(unittest.TestCase):
         self.assertNotIn('Logged on and watched', page)                   # no words and no reason dropdown
         self.assertNotIn('name="reason" form="logoffForm"', page)
         self.assertNotIn('placeholder=', page)
-        self.assertIn('<label for="logoffNote">Note</label><textarea id="logoffNote" name="note" form="logoffForm" class="form-control" rows="3" data-auto-grow', page)
+        self.assertIn('<label for="f-notes">Notes</label>\n  <textarea id="f-notes" class="form-control" rows="3" data-auto-grow data-field="notes" name="notes" form="logoffForm"', page)
+        self.assertEqual(page.count('<textarea'), 1)                         # one notes box: Log off carries it
         self.assertIn('data-status="overdue"', page)                      # overdue from the moment of acceptance
         self.assertIn('>Overdue</span>', page)
         listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)
@@ -413,7 +414,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         self.assertIn('One vessel has one log on', page)
         self.assertIn('AB123Q', page)                                     # nothing captured was discarded
-        self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
+        self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'notes': 'back'}).status_code, 302)
         self.assertTrue(self.save(second)['accepted'])                   # now the vessel is free
 
     def test_a_draft_is_discarded_and_a_log_on_is_logged_off(self):       # AC-54, ACC-7
@@ -500,19 +501,19 @@ class Pages(unittest.TestCase):
 
     def test_a_closure_made_in_error_is_corrected_not_erased(self):       # §3.3 Correct mistaken closure
         i = self.accepted(time='0001')                                                # a return time long past
-        self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'note': 'thought it was back'}).status_code, 302)
+        self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'notes': 'thought it was back'}).status_code, 302)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': ''}).status_code, 400)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'wrong boat'}).status_code, 302)
         row = L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)          # History shows these on quackit
         self.assertEqual(row['reopenReason'], 'wrong boat')
-        self.assertEqual(row['loggedOffNote'], 'thought it was back')                 # the closure event is kept
+        self.assertEqual(row['notes'], 'thought it was back')                         # the closure event is kept
         reopened = self.a.get('/logons?f=1&status=all').get_data(as_text=True)
         self.assertIn('data-record="%d"' % i, reopened)
         self.assertIn('OVERDUE', reopened)                                            # time did not stop
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,
-                                     data={'reason': 'notdeparted', 'note': 'never sailed'}).status_code, 302)
+                                     data={'reason': 'notdeparted', 'notes': 'never sailed'}).status_code, 302)
 
     def test_units_do_not_see_each_others_records(self):
         i = self.new()

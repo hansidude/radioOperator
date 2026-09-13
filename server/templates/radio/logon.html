@@ -29,7 +29,7 @@
 {% set needed = name in checked.red %}
 {% set hint = name in checked.orange %}
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
-  {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="3" data-auto-grow data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
+  {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="3" data-auto-grow data-field="{{ name }}"{% if open and not draft %} name="notes" form="logoffForm"{% endif %} {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
   {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% elif hint %} ro-hint{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %} {% if name == 'memberNumber' %}list="roMembers"{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
 </div>
@@ -62,7 +62,6 @@
     <div class="ro-action-text"><label for="discardReason">Reason</label><textarea id="discardReason" name="reason" form="discardForm" class="form-control" rows="3" data-auto-grow maxlength="255" required></textarea></div>
     <div class="ro-primary-actions">{{ save_button() }}<button form="discardForm" class="btn btn-outline-danger text-nowrap"><i class="bi bi-trash me-1"></i>Discard draft</button></div>
     {% elif open %}
-    <div class="ro-action-text"><label for="logoffNote">Note</label><textarea id="logoffNote" name="note" form="logoffForm" class="form-control" rows="3" data-auto-grow maxlength="255"></textarea></div>
     <div class="ro-primary-actions">{{ save_button() }}<button form="logoffForm" class="btn btn-success text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></div>
     <form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: end the watch on this log on?')"><input type="hidden" name="back" value="/logons"></form>
     {% endif %}
@@ -161,8 +160,10 @@
         console.error('Log on field check failed', e);
       });
   }
+  var changedFields = {};
   function changed(el) {
     dirty = true;
+    changedFields[el.dataset.field] = true;
     el.classList.remove('is-invalid', 'ro-hint');
     el.setAttribute('aria-invalid', 'false');
     setStatus('Unsaved changes', 'text-secondary');
@@ -237,6 +238,11 @@
     });
   });
   saveButtons.forEach(function (b) { b.addEventListener('click', save); });
+  // Log off carries the one Notes box with it (name="notes" form="logoffForm"), so Notes alone is not unsaved work.
+  var logoffForm = document.getElementById('logoffForm');
+  if (logoffForm) logoffForm.addEventListener('submit', function (ev) {
+    if (!ev.defaultPrevented && Object.keys(changedFields).every(function (f) { return f === 'notes'; })) dirty = false;
+  });
   window.addEventListener('beforeunload', function (ev) {
     if (!dirty) return;
     ev.preventDefault(); ev.returnValue = '';

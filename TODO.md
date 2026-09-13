@@ -40,7 +40,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   🚨 Overdue, ✅ Logged off, 🏠 Never departed, 🗑️ Discarded). Tabs: Log on and History only.
 - Five paper rows on the Log on tab: Date | Time; Member No. | Vessel Name | Rego | Mobile;
   Length | Hull colour | Make | Model; POB | Departure | Going to; Return day | Time. Then Notes (three lines,
-  grows), back on the form since 2026-09-14.
+  grows), back on the form since 2026-09-14: the only notes box. Log off saves what is in it; the separate
+  log off Note is gone (old rows keep their `loggedOffNote`, shown in History).
 - Explicit save only: nothing is written until Save, one save is one update and one history event,
   a stale version is refused visibly (409), leaving with unsaved changes warns.
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every

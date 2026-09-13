@@ -481,14 +481,15 @@ def main(engine='chromium'):
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
             bottoms = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
-            expect(page.locator('label[for="logoffNote"]')).to_have_text('Note')
-            note_height = lambda: page.locator('#logoffNote').evaluate('el => el.getBoundingClientRect().height')
+            expect(page.locator('#ro-entry-pane textarea')).to_have_count(1)                       # one notes box
+            expect(page.locator('label[for="f-notes"]')).to_have_text('Notes')
+            note_height = lambda: page.locator('#f-notes').evaluate('el => el.getBoundingClientRect().height')
             three = note_height()
             assert three >= 3 * 20, 'The Note box is not three lines tall: %spx' % three
-            page.locator('#logoffNote').fill('one\ntwo\nthree\nfour\nfive\nsix')
-            expect(page.locator('#logoffNote')).not_to_have_css('height', '%spx' % three)             # it grows with the text
+            page.locator('#f-notes').fill('one\ntwo\nthree\nfour\nfive\nsix')
+            expect(page.locator('#f-notes')).not_to_have_css('height', '%spx' % three)             # it grows with the text
             assert note_height() > three + 30, 'The Note box did not grow: %s -> %s' % (three, note_height())
-            page.locator('#logoffNote').fill('')
+            page.locator('#f-notes').fill('')
             expect(page.locator('#ro-entry-pane [placeholder]')).to_have_count(0)
             expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
             expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
@@ -504,9 +505,14 @@ def main(engine='chromium'):
             expect(row.get_by_role('img', name='Logged on', exact=True)).to_be_visible()
             expect(row).to_have_css('background-color', 'rgba(25, 135, 84, 0.1)')         # logged on: faint green
             visit('/logon/%s' % record)
-            page.locator('#logoffNote').fill('Verification complete ' + token)
+            page.locator('#f-notes').fill('Verification complete ' + token)                      # Log off saves Notes with it
+            leave_warnings = []
+            seen = lambda dialog: leave_warnings.append(dialog.type)          # the page's accept-all handler answers it
+            page.on('dialog', seen)
             page.locator('button[form="logoffForm"]').click()
             page.wait_for_url(re.compile('/logons$'))
+            page.remove_listener('dialog', seen)
+            assert leave_warnings == ['confirm'], 'Log off with only Notes typed warned about unsaved work: %s' % leave_warnings
             closed = True
             visit('/logons?status=closed&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
@@ -545,7 +551,7 @@ def main(engine='chromium'):
             if record and not closed:
                 action = 'logoff' if watching else 'discard'
                 response = context.request.post(URL + '/logon/%s/%s' % (record, action),
-                                                form={'reason': 'other' if watching else 'Verification cleanup', 'note': vessel})
+                                                form={'reason': 'other' if watching else 'Verification cleanup'})
                 if not response.ok:
                     print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (record, response.status))
             for fixture_id in layout_records:
