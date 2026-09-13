@@ -51,7 +51,7 @@ def due_draft_followups(cur, now, minutes):
 
 def due_overdue(cur, now):
     """Accepted log ons whose return time has passed (WAT-3)."""
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND watchStatus = 'watching' AND eta IS NOT NULL AND eta <= %s",
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND watchStatus = 'loggedOn' AND eta IS NOT NULL AND eta <= %s",
                 (_s(now),))
     return [(L._row(r), L._row(r)['eta']) for r in cur.fetchall() or []]
 
@@ -115,7 +115,7 @@ def sweep(cur, now, followup_minutes, repeat_minutes=None, notify=None):
         if key not in wanted:
             row = L.get(cur, alert['logOnId'])
             reason = (row or {}).get('watchStatus') or 'withdrawn'
-            resolve(cur, alert['id'], now, reason if reason in ('watching', 'loggedoff', 'discarded', 'draft') else 'withdrawn')
+            resolve(cur, alert['id'], now, reason if reason in ('loggedOn', 'loggedOff', 'discarded', 'draft') else 'withdrawn')
             resolved.append(alert['id'])
 
     for key, (row, due) in wanted.items():
@@ -246,6 +246,9 @@ class Checker(threading.Thread):
                 if not take_lease(cur, now, self.every * 3):
                     conn.commit()
                     return None
+                renamed = L.rename_statuses(cur)     # rows stored under the pre-2026-09-13 status words
+                if renamed:
+                    log.warning('renamed %d stored statuses (watching -> loggedOn, loggedoff -> loggedOff)', renamed)
                 out = sweep(cur, now, self.host.draft_followup_minutes,
                             self.host.alert_repeat_minutes, getattr(self.host, 'notify', None))
             except Exception as e:

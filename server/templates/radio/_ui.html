@@ -20,7 +20,7 @@
    is not a colour of its own), overdue red, closed near-black. */
 .ro-record-card.draft{border-left-color:var(--bs-orange);background:rgba(253,126,20,.1)}
 .ro-record-card.overdue{border-left-color:var(--bs-danger);background:rgba(var(--bs-danger-rgb),.14)}
-.ro-record-card.watching{border-left-color:var(--bs-success);background:rgba(var(--bs-success-rgb),.1)}
+.ro-record-card.loggedOn{border-left-color:var(--bs-success);background:rgba(var(--bs-success-rgb),.1)}
 .ro-record-card.closed{border-left-color:var(--bs-black);background:rgba(var(--bs-black-rgb),.3)}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 /* Layout comes from dc-record-toolbar; only the control widths are radio's. */
@@ -153,29 +153,29 @@
    and the refresh partial must say the same thing. #}
 {% set EMPTY_LABELS = {'all': 'records', 'draft': 'drafts', 'loggedon': 'logged on', 'overdue': 'overdue', 'closed': 'closed'} %}
 
-{% macro state(r) %}{% if r.watchStatus in ('loggedoff', 'discarded', 'cancelled') %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'watching' %}watching{% else %}draft{% endif %}{% endmacro %}
+{% macro state(r) %}{% if r.watchStatus in ('loggedOff', 'discarded', 'cancelled') %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'loggedOn' %}loggedOn{% else %}draft{% endif %}{% endmacro %}
 
 {# Radio owns the status vocabulary; shared presentation only receives metadata. #}
 {% set STATES = {
   'all': {'symbol': '📋', 'label': 'All', 'tone': 'secondary'},
   'draft': {'symbol': '📝', 'label': 'Draft', 'tone': 'secondary'},
-  'watching': {'symbol': '👀', 'label': 'Logged on', 'tone': 'primary'},
+  'loggedOn': {'symbol': '👀', 'label': 'Logged on', 'tone': 'primary'},
   'overdue': {'symbol': '🚨', 'label': 'Overdue', 'tone': 'danger'},
   'closed': {'symbol': '✅', 'label': 'Closed', 'tone': 'secondary'},
-  'loggedoff': {'symbol': '✅', 'label': 'Logged off', 'tone': 'secondary'},
+  'loggedOff': {'symbol': '✅', 'label': 'Logged off', 'tone': 'secondary'},
   'notdeparted': {'symbol': '🏠', 'label': 'Never departed', 'tone': 'secondary'},
   'discarded': {'symbol': '🗑️', 'label': 'Discarded', 'tone': 'secondary'},
   'conflict': {'symbol': '⚠️', 'label': 'CONFLICT', 'tone': 'danger'}
 } %}
 {% set FILTERS = [('all', 'all', 'All'), ('draft', 'draft', 'Drafts'),
-                  ('loggedon', 'watching', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
+                  ('loggedon', 'loggedOn', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
                   ('closed', 'closed', 'Closed')] %}
 
 {% macro state_label(r) -%}
   {%- set key = 'discarded' if r.watchStatus in ('discarded', 'cancelled') else
-               ('notdeparted' if r.closeReason == 'notdeparted' else 'loggedoff') if r.watchStatus == 'loggedoff' else
+               ('notdeparted' if r.closeReason == 'notdeparted' else 'loggedOff') if r.watchStatus == 'loggedOff' else
                'draft' if r.watchStatus == 'draft' else
-               'overdue' if r.condition == 'overdue' else 'watching' -%}
+               'overdue' if r.condition == 'overdue' else 'loggedOn' -%}
   {%- set status = STATES[key] -%}
   {{- records_ui.symbol(status.symbol, status.label, tone=status.tone) -}}
   {%- if r.watchStatus != 'draft' and r.verifyOutcome == 'conflict' -%}
@@ -184,21 +184,26 @@
 {%- endmacro %}
 
 {# DAT-6: paper field order remains radio's; Quackit owns headers, cells and cards. #}
+{# One symbol per field, taught in the log's headings and shown again in each log on's History. #}
+{% set FIELD_SYMBOLS = {'dayNumber': '#️⃣', 'callDay': '📅', 'callTime': '🕒', 'memberNumber': '👤', 'vesselName': '🛥️',
+                        'registration': '🔖', 'mobile': '📱', 'vesselDetails': '📏', 'length': '📏', 'hullColour': '📏',
+                        'make': '📏', 'model': '📏', 'pob': '👥', 'departurePoint': '⚓', 'destination': '🧭',
+                        'etaDay': '📆', 'eta': '⏰', 'tripRef': '🎫', 'watchStatus': '🚦'} %}
 {% set COLUMNS = [
-  {'key': 'number', 'label': 'No.', 'symbol': '#️⃣', 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
-  {'key': 'day', 'label': 'Date', 'symbol': '📅', 'width': 'minmax(0,1.15fr)'},
-  {'key': 'time', 'label': 'Time', 'symbol': '🕒', 'width': 'minmax(0,.5fr)'},
-  {'key': 'member', 'label': 'Member No.', 'symbol': '👤', 'width': 'minmax(0,.8fr)'},
-  {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': '🛥️', 'width': 'minmax(0,1.2fr)'},
-  {'key': 'rego', 'label': 'Rego', 'symbol': '🔖', 'width': 'minmax(0,.95fr)'},
-  {'key': 'mobile', 'label': 'Mobile', 'symbol': '📱', 'width': 'minmax(0,1.1fr)'},
-  {'key': 'vessel', 'label': 'Vessel details', 'symbol': '📏', 'width': 'minmax(0,1.35fr)'},
-  {'key': 'pob', 'label': 'POB', 'symbol': '👥', 'width': 'minmax(0,.45fr)'},
-  {'key': 'departure', 'label': 'Departure', 'symbol': '⚓', 'width': 'minmax(0,1.1fr)'},
-  {'key': 'destination', 'label': 'Going to', 'symbol': '🧭', 'width': 'minmax(0,1.2fr)'},
-  {'key': 'returnDay', 'label': 'Return date', 'symbol': '📆', 'width': 'minmax(0,1.15fr)'},
-  {'key': 'returnTime', 'label': 'Time', 'symbol': '⏰', 'width': 'minmax(0,.5fr)'},
-  {'key': 'trip', 'label': 'Trip ID No.', 'symbol': '🎫', 'width': 'minmax(0,.9fr)'},
+  {'key': 'number', 'label': 'No.', 'symbol': FIELD_SYMBOLS.dayNumber, 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
+  {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay, 'width': 'minmax(0,1.15fr)'},
+  {'key': 'time', 'label': 'Time', 'symbol': FIELD_SYMBOLS.callTime, 'width': 'minmax(0,.5fr)'},
+  {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'width': 'minmax(0,.8fr)'},
+  {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.2fr)'},
+  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration, 'width': 'minmax(0,.95fr)'},
+  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1.1fr)'},
+  {'key': 'vessel', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails, 'width': 'minmax(0,1.35fr)'},
+  {'key': 'pob', 'label': 'POB', 'symbol': FIELD_SYMBOLS.pob, 'width': 'minmax(0,.45fr)'},
+  {'key': 'departure', 'label': 'Departure', 'symbol': FIELD_SYMBOLS.departurePoint, 'width': 'minmax(0,1.1fr)'},
+  {'key': 'destination', 'label': 'Going to', 'symbol': FIELD_SYMBOLS.destination, 'width': 'minmax(0,1.2fr)'},
+  {'key': 'returnDay', 'label': 'Return date', 'symbol': FIELD_SYMBOLS.etaDay, 'width': 'minmax(0,1.15fr)'},
+  {'key': 'returnTime', 'label': 'Time', 'symbol': FIELD_SYMBOLS.eta, 'width': 'minmax(0,.5fr)'},
+  {'key': 'trip', 'label': 'Trip ID No.', 'symbol': FIELD_SYMBOLS.tripRef, 'width': 'minmax(0,.9fr)'},
   {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}
 ] %}
 {# The form box behind each column that logons.missing can name: a draft's still-needed values show as ? #}

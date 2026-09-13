@@ -204,14 +204,14 @@ def logon_page(logon_id):
     verified = ID.verify(cur, row, idents)
     unaccepted = _drafts(cur, h)
     alerts, health = _alerts(cur, h)
-    clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] != 'watching' else None
+    clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] != 'loggedOn' else None
     history = h.history(cur, 'LogOns', logon_id)
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,
                  identifiers=idents, gaps=L.gaps(row),
                  condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
-                 checked=L.check_fields(row, L.form_values(row)) if row['watchStatus'] not in ('loggedoff', 'discarded', 'cancelled') else {'red': [], 'orange': []},
+                 checked=L.check_fields(row, L.form_values(row)) if row['watchStatus'] not in ('loggedOff', 'discarded', 'cancelled') else {'red': [], 'orange': []},
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
                  day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
                  close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes,
@@ -376,7 +376,7 @@ def api_queue():
             if r.get(k):
                 r[k] = r[k].isoformat()
     return jsonify({'now': _now().isoformat(), 'approachingMinutes': h.approaching_minutes,
-                    'watching': rows, 'drafts': unaccepted})
+                    'loggedOn': rows, 'drafts': unaccepted})
 
 
 @bp.errorhandler(NotLoggedIn)

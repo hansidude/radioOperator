@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   -- One state, not two (§3.3): a draft is saved and not watched; accepting it is what starts the
   -- watch and what the unit tells the vessel; it then ends by log off. A draft that was never a
   -- log on is discarded instead (ACC-7).
-  `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | watching | loggedoff | discarded
+  `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | loggedOn | loggedOff | discarded (renamed from watching / loggedoff 2026-09-13)
   `dayNumber` INT DEFAULT NULL,                               -- counts from 1 each day: what operators say out loud (REC-9)
   `dayDate` DATE DEFAULT NULL,                                -- the day that number belongs to
   -- Paper column 'Trip ID No.', pre-printed 'T-' (spec A.1). One running sequence, not per day:
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS `Alerts` (
   `acknowledgedAt` DATETIME DEFAULT NULL,                     -- attention, not resolution
   `acknowledgedBy` VARCHAR(255) DEFAULT NULL,
   `resolvedAt` DATETIME DEFAULT NULL,
-  `resolvedReason` VARCHAR(64) DEFAULT NULL,                  -- accepted | discarded | loggedoff | withdrawn
+  `resolvedReason` VARCHAR(64) DEFAULT NULL,                  -- the record's status when the alert stopped: draft | loggedOn | loggedOff | discarded | withdrawn
   `isActive` BOOL DEFAULT 1,
   FOREIGN KEY (`logOnId`) REFERENCES `LogOns`(`id`)
 );

@@ -94,7 +94,7 @@ class LogOns(unittest.TestCase):
         self.assertTrue(L.acceptable(L.get(self.cur, i)))
         L.accept(self.cur, i, 'alice', T0)
         row = L.get(self.cur, i)
-        self.assertEqual((row['watchStatus'], row['acceptedBy']), ('watching', 'alice'))
+        self.assertEqual((row['watchStatus'], row['acceptedBy']), ('loggedOn', 'alice'))
         self.assertEqual(row['acceptedAt'], T0)
         self.assertEqual([r['id'] for r in L.queue(self.cur, '', T0, 30)], [i])
         self.assertEqual(L.drafts(self.cur, '', T0, 30), [])
@@ -111,7 +111,7 @@ class LogOns(unittest.TestCase):
         out = L.save_fields(self.cur, i, dict(base, eta='1800'), 'bob', T0, version=out['version'])
         self.assertTrue(out['accepted'])
         row = L.get(self.cur, i)
-        self.assertEqual((row['watchStatus'], row['acceptedBy'], row['acceptedAt'], row['version']), ('watching', 'bob', T0, 2))
+        self.assertEqual((row['watchStatus'], row['acceptedBy'], row['acceptedAt'], row['version']), ('loggedOn', 'bob', T0, 2))
         new = L.create_saved(self.cur, dict(base, eta='1900', registration='NEW01', memberNumber='5000'), 'carol', '', T0)
         self.assertTrue(new['accepted'])                                   # complete on its very first save
         clash = L.create_saved(self.cur, dict(base, eta='1900'), 'carol', '', T0)
@@ -179,7 +179,7 @@ class LogOns(unittest.TestCase):
         self.assertEqual(L.get(self.cur, second)['registration'], 'AB123Q')    # nothing captured is lost
         L.log_off(self.cur, first, 'alice', T0, 'back')
         L.accept(self.cur, second, 'alice', T0)                          # now the vessel is free
-        self.assertEqual(L.get(self.cur, second)['watchStatus'], 'watching')
+        self.assertEqual(L.get(self.cur, second)['watchStatus'], 'loggedOn')
 
     def test_a_draft_is_discarded_and_a_log_on_is_logged_off(self):      # AC-54, ACC-7
         d = L.create(self.cur, 'alice', '', T0)
@@ -237,7 +237,7 @@ class LogOns(unittest.TestCase):
         row = L.get(self.cur, i)
         self.assertEqual((row['etaRaw'], row['eta']), ('+2h', T0 + timedelta(hours=2)))
         L.accept(self.cur, i, 'alice', T0) if L.acceptable(row) else None
-        row = dict(L.get(self.cur, i), watchStatus='watching')
+        row = dict(L.get(self.cur, i), watchStatus='loggedOn')
         self.assertEqual(L.condition(row, T0, 30)[0], 'notdue')
         self.assertEqual(L.condition(row, T0 + timedelta(hours=1, minutes=40), 30)[0], 'approaching')
         self.assertEqual(L.condition(row, T0 + timedelta(hours=2), 30), ('overdue', 0))
@@ -359,7 +359,7 @@ class LogOns(unittest.TestCase):
             L.accept(self.cur, i, 'alice', T0)
         L.log_off(self.cur, i, 'alice', T0 + timedelta(hours=3), 'radio call, alongside')
         row = L.get(self.cur, i)
-        self.assertEqual((row['watchStatus'], row['loggedOffNote']), ('loggedoff', 'radio call, alongside'))
+        self.assertEqual((row['watchStatus'], row['loggedOffNote']), ('loggedOff', 'radio call, alongside'))
         self.assertEqual(L.queue(self.cur, '', T0, 30), [])
         self.assertEqual([r['id'] for r in L.recent_closed(self.cur, '', T0, 30)], [i])
         with self.assertRaises(L.Refused):

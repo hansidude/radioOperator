@@ -317,9 +317,9 @@ class Pages(unittest.TestCase):
     def test_status_symbols_distinguish_every_closure_and_conflict(self):
         ui = self.app.jinja_env.get_template('radio/_ui.html').module
         for watch, reason, condition, label in [
-                ('draft', '', '', 'Draft'), ('watching', '', 'future', 'Logged on'),
-                ('watching', '', 'overdue', 'Overdue'), ('loggedoff', 'returned', '', 'Logged off'),
-                ('loggedoff', 'notdeparted', '', 'Never departed'), ('discarded', '', '', 'Discarded')]:
+                ('draft', '', '', 'Draft'), ('loggedOn', '', 'future', 'Logged on'),
+                ('loggedOn', '', 'overdue', 'Overdue'), ('loggedOff', 'returned', '', 'Logged off'),
+                ('loggedOff', 'notdeparted', '', 'Never departed'), ('discarded', '', '', 'Discarded')]:
             r = dict(watchStatus=watch, closeReason=reason, condition=condition,
                      verifyOutcome='conflict', verifyBasis='different registration')
             html = str(ui.state_label(r))
@@ -372,12 +372,12 @@ class Pages(unittest.TestCase):
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertNotIn('ro-record-card overdue', listing)
         self.assertNotIn('not watched', listing.lower())
-        self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])
+        self.assertEqual(self.a.get('/api/logons/queue').json['loggedOn'], [])
         self.assertEqual(len(self.a.get('/api/logons/queue').json['drafts']), 1)
 
     def test_saving_a_complete_draft_logs_it_on_at_once(self):           # AC-51, AC-52, ACC-3, ACC-4
         i = self.mandatory(self.new(), time='0001')                       # a return time already long past
-        self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])   # filled in, not saved: nothing accepted
+        self.assertEqual(self.a.get('/api/logons/queue').json['loggedOn'], [])   # filled in, not saved: nothing accepted
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertNotIn('/accept"', page)                                # there is no Accept button
         saved = self.save(i)
@@ -389,7 +389,7 @@ class Pages(unittest.TestCase):
         self.assertIn('aria-label="Overdue"', listing)
         self.assertIn('data-record="%d"' % i, listing)
         self.assertNotIn('class="ro-status-counts"', listing)
-        self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
+        self.assertEqual(self.a.get('/api/logons/queue').json['loggedOn'][0]['condition'], 'overdue')
         self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 404)  # no separate accept action
         self.assertFalse(self.save(i)['accepted'])                        # saving a log on again changes nothing
 

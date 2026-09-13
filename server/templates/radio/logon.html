@@ -2,8 +2,8 @@
 {% import 'radio/_ui.html' as ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 {% set creating = creating|default(false) %}
-{% set open = creating or logon.watchStatus not in ('loggedoff', 'discarded', 'cancelled') %}
-{% set draft = creating or logon.watchStatus not in ('watching', 'loggedoff', 'discarded', 'cancelled') %}
+{% set open = creating or logon.watchStatus not in ('loggedOff', 'discarded', 'cancelled') %}
+{% set draft = creating or logon.watchStatus not in ('loggedOn', 'loggedOff', 'discarded', 'cancelled') %}
 {% block body_wrap_class %}container-fluid{% endblock %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
 {# Yellow as quackit's Update button (lists/editList.html): it changes the record. One button, shown twice. #}
@@ -109,7 +109,10 @@
 <section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges with context %}
-  {{ dcFn_ShowHistoryChanges(history, dcKey_i='logon-history', dcTitle_i='Log on history', dcFieldLabelsDictionary_i=history_labels, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
+  {% set history_symbols = {} %}{% for field, symbol in ui.FIELD_SYMBOLS.items() %}{% set _ = history_symbols.update({column(field): symbol}) %}{% endfor %}
+  {% set status_words = {} %}{% for key in ('draft', 'loggedOn', 'loggedOff', 'discarded') %}{% set _ = status_words.update({key: ui.STATES[key].symbol ~ ' ' ~ key}) %}{% endfor %}
+  {{ dcFn_ShowHistoryChanges(history, dcKey_i='logon-history', dcTitle_i='Log on history', dcFieldLabelsDictionary_i=history_labels, dcSortControls_i=True, dcAdvancedSearch_i=True,
+                             dcFieldSymbolsDictionary_i=history_symbols, dcValueLabelsDictionary_i={'watchStatus': status_words}) }}{% endif %}
 </section>
 {{ ui.find_script(logon.id) }}
 {% endif %}

@@ -60,9 +60,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Behind it
 
-- One record table, `LogOns`, with one status column (`watchStatus`: draft, watching, loggedoff,
-  discarded). quackit's migration generator gives it `LogOns_history` and triggers. The **History** tab
-  shows that history in quackit's shared viewer (through `Host.history`); the old summary line is gone.
+- One record table, `LogOns`, with one status column (`watchStatus`: draft, loggedOn, loggedOff,
+  discarded; renamed from watching / loggedoff on 2026-09-13, converted by the checker's first pass). quackit's migration generator gives it `LogOns_history` and triggers. The **History** tab
+  shows that history in quackit's shared viewer (through `Host.history`), statuses with their emoji
+  and fields with the log's symbols; the old summary line is gone.
 - Side tables: `Identifiers` (every ID value heard), `Alerts` (what the checker raised), `WatchHealth`
   (the checker's heartbeat and lease).
 
@@ -104,6 +105,9 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Define "smart" widths before building (content-sized up to a cap, blank columns shrink).
 
 ### Clean-up
+
+- [ ] Remove `logons.rename_statuses` and `STATUS_RENAMES` once 8080 and every other database has been
+      converted (the checker logs `renamed N stored statuses` when it converts any).
 
 - [ ] **`Identifiers` overlaps `LogOns_history`.** Every change to Member No., Rego, Mobile and Vessel
       Name is already in history; `Identifiers` adds the normalised copy the identity check matches

@@ -25,12 +25,15 @@ from datetime import date, datetime, timedelta
 from . import identity, times
 
 DT = '%Y-%m-%d %H:%M:%S'
-OPEN = ('draft', 'watching')            # a record still on someone's hands: unaccepted, or being watched
-CLOSED = ('loggedoff', 'discarded', 'cancelled')     # cancelled is superseded; rows written under it remain
+# Stored status words renamed by the owner on 2026-09-13. rename_statuses converts rows written before;
+# remove it and this map once every database has been converted.
+STATUS_RENAMES = {'watching': 'loggedOn', 'loggedoff': 'loggedOff'}
+OPEN = ('draft', 'loggedOn')            # a record still on someone's hands: unaccepted, or being watched
+CLOSED = ('loggedOff', 'discarded', 'cancelled')     # cancelled is superseded; rows written under it remain
 # Anything that is neither watched nor closed is treated as a draft and chased. A state this version
 # does not know about, left by an earlier one or by a hand-edited row, must be conspicuous rather
 # than invisible: a record in limbo is exactly the thing nobody is counting down.
-NOT_CLOSED = "watchStatus NOT IN ('watching', 'loggedoff', 'discarded', 'cancelled')"
+NOT_CLOSED = "watchStatus NOT IN ('loggedOn', 'loggedOff', 'discarded', 'cancelled')"
 CHANNELS = ('radio', 'phone', 'person', 'self')
 # Why a log on ended. A trip that never sailed is still a log on that happened, so it is logged
 # off like any other; only the reason differs (§3.3).
@@ -268,7 +271,7 @@ def acceptable(row):
 def condition(row, now, approaching_minutes):
     """The deadline condition of an accepted log on (§3.3): notdue | approaching | overdue, and the
     minutes to go. A draft is not watched, so it has no condition at all (ACC-2)."""
-    if row['watchStatus'] != 'watching':
+    if row['watchStatus'] != 'loggedOn':
         return 'notwatched', None
     eta = row['eta']
     if eta is None:
@@ -297,8 +300,8 @@ def _decorate(rows, now, approaching_minutes):
 # fetch: it is not a column but a reading of the deadline against now (see condition()).
 STATUS_WHERE = {
     'draft': NOT_CLOSED,
-    'loggedon': "watchStatus = 'watching'",
-    'overdue': "watchStatus = 'watching'",
+    'loggedon': "watchStatus = 'loggedOn'",
+    'overdue': "watchStatus = 'loggedOn'",
     'closed': 'watchStatus IN (' + ', '.join("'%s'" % state for state in CLOSED) + ')',
 }
 # What Find searches. The trip reference and the day number are how an operator refers to a record
@@ -446,6 +449,22 @@ def create(cur, user, unit, now):
     raise Refused('Could not allocate a number for today after several attempts')
 
 
+def rename_statuses(cur):
+    """Convert statuses stored under their old words, once: LogOns.watchStatus and Alerts.resolvedReason.
+    Matched in Python, exactly, because MariaDB compares text without case and 'loggedOff' would
+    otherwise match 'loggedoff' again, and write a history event, on every pass. Returns rows changed."""
+    changed = 0
+    for table, col in (('LogOns', 'watchStatus'), ('Alerts', 'resolvedReason')):
+        cur.execute('SELECT id, %s FROM %s WHERE %s IN (%s)' % (col, table, col, ', '.join(['%s'] * len(STATUS_RENAMES))),
+                    tuple(STATUS_RENAMES))
+        for row in cur.fetchall() or []:
+            new = STATUS_RENAMES.get(row[col])
+            if new:
+                cur.execute('UPDATE %s SET %s = %%s WHERE id = %%s' % (table, col), (new, row['id']))
+                changed += 1
+    return changed
+
+
 def blank(now, unit='', call_day=None):
     """An unsaved browser form. It is deliberately not a database record."""
     row = {field: None for field in FIELDS}
@@ -551,7 +570,7 @@ def save_fields(cur, logon_id, values, user, now, version=None):
     sets.update(acceptance(cur, after, user, now))       # a complete draft is logged on by this save (ACC-3)
     saved_version = _bump(cur, row, sets, user, now)
     return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after),
-            'accepted': sets.get('watchStatus') == 'watching'}
+            'accepted': sets.get('watchStatus') == 'loggedOn'}
 
 
 def create_saved(cur, values, user, unit, now):
@@ -592,7 +611,7 @@ def create_saved(cur, values, user, unit, now):
         if after.get(field):
             _record_identifier(cur, logon_id, field, after[field], None, user, now)
     return {'id': logon_id, 'version': 0, 'invalid': invalid, 'displays': displays,
-            'accepted': sets.get('watchStatus') == 'watching'}
+            'accepted': sets.get('watchStatus') == 'loggedOn'}
 
 
 def _open_row(cur, logon_id, version):
@@ -728,7 +747,7 @@ def open_for_vessel(cur, unit, row):
     key = identity.vessel_key(row)
     if not key:
         return None
-    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'watching' AND id <> %s",
+    cur.execute("SELECT * FROM LogOns WHERE isActive = 1 AND unit = %s AND watchStatus = 'loggedOn' AND id <> %s",
                 (unit, row['id']))
     for other in [_row(r) for r in cur.fetchall() or []]:
         if identity.vessel_key(other) == key:
@@ -743,7 +762,7 @@ def acceptance(cur, row, user, now):
     count from this save, so a return time already past is overdue at once (ACC-4)."""
     if row['watchStatus'] != 'draft' or missing(row) or open_for_vessel(cur, row['unit'], row):
         return {}
-    return {'watchStatus': 'watching', 'acceptedAt': _s(now), 'acceptedBy': str(user)}
+    return {'watchStatus': 'loggedOn', 'acceptedAt': _s(now), 'acceptedBy': str(user)}
 
 
 def accept(cur, logon_id, user, now, version=None):
@@ -751,7 +770,7 @@ def accept(cur, logon_id, user, now, version=None):
     applies `acceptance` in the same update. This is the same transition for the logic's own tests
     and tools, with the reason spelled out when it is refused."""
     row = _open_row(cur, logon_id, version)
-    if row['watchStatus'] == 'watching':
+    if row['watchStatus'] == 'loggedOn':
         raise Refused('This log on is already accepted and being watched')
     short = missing(row)
     if short:
@@ -768,7 +787,7 @@ def discard(cur, logon_id, user, now, reason, version=None):
     anything identifying was given. An accepted log on can never be discarded; it is logged off.
     The record stays, searchable and auditable, and counts as evidence of no vessel or person."""
     row = _open_row(cur, logon_id, version)
-    if row['watchStatus'] == 'watching':
+    if row['watchStatus'] == 'loggedOn':
         raise Refused('This is an accepted log on. A log on that happened is logged off, not discarded.')
     reason = (reason or '').strip()
     if not reason:
@@ -796,8 +815,8 @@ def reopen(cur, logon_id, user, now, reason, version=None):
         raise Stale('Changed by someone else since you loaded it (now version %d, you had %s).' % (row['version'], version))
     # A reopened record goes back to being watched: whoever reopens it is taking it on. A discarded
     # one returns as a draft, because discarding said it was never a log on.
-    back = 'draft' if row['watchStatus'] == 'discarded' else 'watching'
-    if back == 'watching':
+    back = 'draft' if row['watchStatus'] == 'discarded' else 'loggedOn'
+    if back == 'loggedOn':
         other = open_for_vessel(cur, row['unit'], row)
         if other:
             raise Refused('%s is already logged on as %s, so this one cannot be reopened as a watch.'
@@ -810,7 +829,7 @@ def log_off(cur, logon_id, user, now, note, reason='returned', version=None):
     'Time Arrived or Return' (§3.3, WAT-7). Every reason ends this way, the vessel having returned
     or never departed, because a log on that happened is logged off."""
     row = _open_row(cur, logon_id, version)
-    if row['watchStatus'] != 'watching':
+    if row['watchStatus'] != 'loggedOn':
         raise Refused('This is a draft, not a log on. Finish and accept it, or discard it.')
     reason = (reason or 'returned').strip()
     if reason not in dict(CLOSE_REASONS):
@@ -818,7 +837,7 @@ def log_off(cur, logon_id, user, now, note, reason='returned', version=None):
     note = (note or '').strip()
     if len(note) > 255:
         raise Refused('Log off note: too long to store')
-    return _bump(cur, row, {'watchStatus': 'loggedoff', 'loggedOffAt': _s(now),
+    return _bump(cur, row, {'watchStatus': 'loggedOff', 'loggedOffAt': _s(now),
                             'loggedOffNote': note or None, 'closeReason': reason}, user, now)
 
 

@@ -231,7 +231,7 @@ shall never imply otherwise. A draft is either finished and accepted, or discard
 was never a log on (ACC-7). It is never left alone: an unaccepted draft is chased under ACC-5,
 because the caller may be at sea believing the opposite.
 
-**Watching.** The mandatory set is complete and an operator has saved it, which accepts the log on
+**Logged on** (stored `loggedOn`). The mandatory set is complete and an operator has saved it, which accepts the log on
 (ACC-1, ACC-3). This is the moment the unit takes the watch and the moment the vessel is told it is
 logged on. Deadlines are evaluated from this instant, so a return time already in the past is
 overdue immediately (ACC-4). One vessel has one open log on; a vessel already being watched
@@ -263,7 +263,7 @@ capture and transfer do not close it.
 |---|---|
 | Begin capture | Create a Draft owned by the capturing unit. Not watched. Visible and chased under ACC-5. |
 | Enrich | Add or amend any value on a draft or an accepted log on, in any order, at any time (CAP-3, CAP-13). |
-| Save with the mandatory set complete | Accepts the log on in the same save (ACC-3), unless another open log on holds this vessel (ACC-6), when it stays a draft and keeps everything. Draft → Watching; record the saving operator and time; evaluate deadlines immediately (ACC-4). |
+| Save with the mandatory set complete | Accepts the log on in the same save (ACC-3), unless another open log on holds this vessel (ACC-6), when it stays a draft and keeps everything. Draft → Logged on; record the saving operator and time; evaluate deadlines immediately (ACC-4). |
 | Discard | A draft only, and only one that was never a log on: begun in error, or abandoned before anything identifying was given. Record actor, time and reason (ACC-7). |
 | Deadline passes | An accepted log on becomes Overdue for that obligation; alert under WAT-3. |
 | Amend obligation | Retain the previous deadline and its reason and source; recompute the condition. An existing escalation requires explicit disposition. |
@@ -1300,6 +1300,8 @@ revisions add identifiers; they do not renumber.
   because the vessel is logging on, so the save that completes them is the acceptance. The save is
   recorded against the operator and time; ACC-1, ACC-4 and ACC-6 are unchanged. §1.2, the glossary,
   §3.3 and its actions table, the ideal call, AC-50, AC-51 and AC-52 follow.
+- The logged-on state is named **Logged on** (stored `loggedOn`, logged off `loggedOff`), replacing
+  Watching (`watching`, `loggedoff`). Existing records are converted.
 
 <a id="section-version-10-changes-from-09"></a>
 

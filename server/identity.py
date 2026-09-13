@@ -227,7 +227,7 @@ def search(cur, unit, q, limit=25):
         return []
     rows = past(cur, unit)                      # discarded records stand for no boat and no person
     vessels, people = known(rows)
-    at_sea = [r for r in rows if r['watchStatus'] == 'watching']       # a draft is not at sea
+    at_sea = [r for r in rows if r['watchStatus'] == 'loggedOn']       # a draft is not at sea
     open_ids = {r['vesselKey'] for r in at_sea} | {r['personKey'] for r in at_sea}
     needle = q.lower()
     loose = normalize('registration', q)
@@ -247,7 +247,7 @@ def search(cur, unit, q, limit=25):
                                                 number if number is not None else '#%d' % r['id'],
                                                 r.get('registration') or r.get('vesselName') or r.get('memberNumber') or ''),
                          'sublabel': r.get('destination'), 'detail': r.get('vesselDetails'),
-                         'state': r['watchStatus'], 'atSea': r['watchStatus'] == 'watching',
+                         'state': r['watchStatus'], 'atSea': r['watchStatus'] == 'loggedOn',
                          'lastTrip': r['id'], 'lastSeen': r.get('createdAt'), 'trips': 1})
     hits.sort(key=lambda h: ({'vessel': 0, 'person': 1, 'trip': 2}[h['kind']], -(h.get('lastTrip') or 0)))
     return hits[:limit]
