@@ -84,21 +84,24 @@ def main(engine='chromium'):
             # Members and public vessels, reached from the log's navbar. The Member No. on a log on has to be one.
             page.locator('.navbar a[href="/members"]').first.click()
             page.wait_for_url(re.compile('/members$'))
+            expect(page.locator('.navbar a[href="/vessels"]')).to_have_count(0)               # no Public vessels button on Members
             page.locator('a[href="/members/new"]').click()
-            page.locator('#member-name').fill('Verify Member ' + token)
-            page.locator('#member-phone').fill('0412 345')                                 # not 10 digits: refused, red
+            page.locator('#member-firstName').fill('Verify')
+            page.locator('#member-mobile').fill('0412 345')                                # not 10 digits: refused, red
             page.locator('#ro-member-details button.btn-warning').click()
-            expect(page.locator('#member-phone')).to_have_class(re.compile('is-invalid'))
-            expect(page.locator('#member-name')).to_have_value('Verify Member ' + token)     # what was typed stays
+            expect(page.locator('#member-mobile')).to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#member-lastName')).to_have_class(re.compile('is-invalid'))  # a last name is required
+            expect(page.locator('#member-firstName')).to_have_value('Verify')                 # what was typed stays
             expect(page.locator('#ro-member-details [placeholder]')).to_have_count(0)
-            page.locator('#member-phone').fill('0412345678')
+            page.locator('#member-lastName').fill('Member ' + token)
+            page.locator('#member-mobile').fill('0412345678')
             page.locator('#member-email').fill('verify@example.com')
             page.locator('#ro-member-details button.btn-warning').click()
             page.wait_for_url(re.compile('/member/[0-9]+$'))
             member_page = page.url
             member_no = page.locator('#ro-member-details .ro-section-title').inner_text().split()[-1]
             assert re.match(r'^m[0-9]{5}$', member_no), 'Member number is not mXXXXX: %r' % member_no
-            expect(page.locator('#member-phone')).to_have_value('0412 345 678')
+            expect(page.locator('#member-mobile')).to_have_value('0412 345 678')
             page.locator('[data-entity-tab="vessels"]').click()
             expect(page.locator('#ro-member-vessels')).to_be_visible()
             page.locator('#vessels-new-vesselName').fill(vessel)
@@ -136,6 +139,8 @@ def main(engine='chromium'):
                 page.set_viewport_size({'width': width, 'height': 800})
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Members overflow at %spx' % width
             page.set_viewport_size({'width': 1920, 'height': 1080})
+            visit('/vessels')
+            expect(page.locator('.navbar a[href="/members"]')).to_have_count(0)               # no Members button on Public vessels
             visit('/vessels/new')
             page.locator('#public-vesselName').fill('PUBLIC-' + token)
             page.locator('#public-registration').fill('VESSEL-' + token)

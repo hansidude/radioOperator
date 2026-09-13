@@ -24,7 +24,7 @@ VESSEL_FIELDS = ('vesselName', 'registration', 'length', 'hullColour', 'vesselTy
 # and labels, because they describe the same boat.
 KINDS = {
     'member': {'table': 'Members', 'label': 'Details', 'one': 'member',
-               'fields': ('name', 'address', 'phone', 'email'), 'required': ('name',)},
+               'fields': ('firstName', 'lastName', 'mobile', 'email', 'address'), 'required': ('firstName', 'lastName')},
     'contacts': {'table': 'EmergencyContacts', 'label': 'Emergency contacts', 'one': 'emergency contact',
                  'fields': ('name', 'relationship', 'phone', 'email'), 'required': ('name', 'phone')},
     'vessels': {'table': 'Vessels', 'label': 'Vessels', 'one': 'vessel',
@@ -40,9 +40,10 @@ KINDS = {
 CHILDREN = ('contacts', 'vessels', 'trailers', 'cars')
 LABELS = dict({f: L.LABELS[f] for f in VESSEL_FIELDS if f in L.LABELS},
               vesselName='Vessel Name', registration='Rego', memberNumber='Member No.', name='Name', address='Address',
+              firstName='First name', lastName='Last name', mobile=L.LABELS['mobile'],
               phone='Phone', email='Email', relationship='Relationship', colour='Colour', ais='AIS / MMSI',
               ownerName='Owner name', ownerPhone='Owner phone', ownerEmail='Owner email')
-PHONES = ('phone', 'ownerPhone')
+PHONES = ('mobile', 'phone', 'ownerPhone')
 EMAILS = ('email', 'ownerEmail')
 EMAIL = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
@@ -97,9 +98,9 @@ def get(cur, kind, record_id, lock=False):
 
 
 def members(cur, unit, search=None):
-    """Every member of this unit, by number, each with the names of their vessels. `search` matches the
-    number, name, phone, email or any of their vessels' names and regos."""
-    cur.execute('SELECT * FROM Members WHERE unit = %s AND isActive = 1 ORDER BY memberNumber', (unit,))
+    """Every member of this unit, by last then first name, each with the names of their vessels. `search`
+    matches the number, either name, mobile, email or any of their vessels' names and regos."""
+    cur.execute('SELECT * FROM Members WHERE unit = %s AND isActive = 1 ORDER BY lastName, firstName, memberNumber', (unit,))
     rows = cur.fetchall() or []
     cur.execute('SELECT memberId, vesselName, registration FROM Vessels WHERE unit = %s AND isActive = 1 AND memberId IS NOT NULL '
                 'ORDER BY id', (unit,))
@@ -109,7 +110,7 @@ def members(cur, unit, search=None):
     for r in rows:
         r['vessels'] = boats.get(r['id'], [])
         r['vesselNames'] = ', '.join(v['vesselName'] or v['registration'] for v in r['vessels'])
-    return _search(rows, search, ('memberNumber', 'name', 'phone', 'email', 'vesselNames'),
+    return _search(rows, search, ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'vesselNames'),
                    extra=lambda r: ' '.join(v['registration'] or '' for v in r['vessels']))
 
 

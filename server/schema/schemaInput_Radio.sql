@@ -160,9 +160,11 @@ CREATE TABLE IF NOT EXISTS `Members` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `unit` VARCHAR(64) NOT NULL DEFAULT '',
   `memberNumber` VARCHAR(16) NOT NULL,
-  `name` VARCHAR(255) NOT NULL,
+  -- name and phone until 2026-09-14: split into first and last name, and phone renamed mobile (the log on's rule)
+  `firstName` VARCHAR(128) NOT NULL,
+  `lastName` VARCHAR(128) NOT NULL,
   `address` VARCHAR(255) DEFAULT NULL,
-  `phone` VARCHAR(32) DEFAULT NULL,
+  `mobile` VARCHAR(32) DEFAULT NULL,                          -- 10 digits, written 0412 345 678
   `email` VARCHAR(255) DEFAULT NULL,
   `version` INT NOT NULL DEFAULT 0,
   `createdBy` VARCHAR(255) NOT NULL DEFAULT '',

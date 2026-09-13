@@ -8,5 +8,5 @@ MEMBER_NUMBERS = ('1', '2', '3', '1001', '1002', '1003', '4471', '5000', '7788',
 def known_members(conn, unit=''):
     cur = conn.cursor()
     for number in MEMBER_NUMBERS:
-        cur.execute('INSERT INTO Members (unit, memberNumber, name) VALUES (%s, %s, %s)', (unit, number, 'Member ' + number))
+        cur.execute('INSERT INTO Members (unit, memberNumber, firstName, lastName) VALUES (%s, %s, %s, %s)', (unit, number, 'Member', number))
     conn.commit()

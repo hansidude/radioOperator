@@ -346,11 +346,13 @@
 
 {# A log on's own page: the member or public vessel it is tied to, linked to that record. #}
 {% macro who_badge(member, vessel) -%}
-{%- if member -%}<a class="ro-who" href="/member/{{ member.id }}" data-who="member">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=member.memberNumber ~ ' ' ~ member.name) }}</a>
+{%- if member -%}<a class="ro-who" href="/member/{{ member.id }}" data-who="member">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=member.memberNumber ~ ' ' ~ full_name(member)) }}</a>
 {%- elif vessel -%}<a class="ro-who" href="/vessel/{{ vessel.id }}" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public · ' ~ (vessel.vesselName or vessel.registration)) }}</a>
 {%- else -%}<span class="ro-who" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public') }}</span>
 {%- endif -%}
 {%- endmacro %}
+
+{% macro full_name(m) %}{{ m.firstName }} {{ m.lastName }}{% endmacro %}
 
 {# One labelled box on a member or vessel form: label on top, nothing written inside it, red when the save
    was refused for it. `failed` is the refused save when it came from this form. #}
@@ -360,7 +362,7 @@
 {%- set red = mine and name in failed.red -%}
 <div class="{{ cols }}"><label for="{{ form }}-{{ name }}">{{ label }}</label>
   {%- if name == 'address' %}<textarea id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" rows="3" data-auto-grow{% if red %} aria-invalid="true"{% endif %}>{{ shown }}</textarea>
-  {%- else %}<input id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" value="{{ shown }}"{% if name in ('email', 'ownerEmail') %} type="email"{% elif name in ('phone', 'ownerPhone') %} type="tel"{% endif %}{% if red %} aria-invalid="true"{% endif %}>{% endif %}
+  {%- else %}<input id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" value="{{ shown }}"{% if name in ('email', 'ownerEmail') %} type="email"{% elif name in ('mobile', 'phone', 'ownerPhone') %} type="tel" inputmode="numeric"{% endif %}{% if red %} aria-invalid="true"{% endif %}>{% endif %}
 </div>
 {%- endmacro %}
 

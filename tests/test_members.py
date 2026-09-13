@@ -29,7 +29,7 @@ class Members(unittest.TestCase):
         return Connection(self.path).cursor()
 
     def member(self, **fields):
-        values = dict({'name': 'Jane Smith', 'address': '1 Wharf St', 'phone': '0412345678', 'email': 'jane@example.com'}, **fields)
+        values = dict({'firstName': 'Jane', 'lastName': 'Smith', 'address': '1 Wharf St', 'mobile': '0412345678', 'email': 'jane@example.com'}, **fields)
         r = self.a.post('/members/new', data=values)
         self.assertEqual(r.status_code, 302, r.data)
         return int(re.search(r'/member/(\d+)$', r.location).group(1))
@@ -45,27 +45,30 @@ class Members(unittest.TestCase):
     # ---- members ----
 
     def test_a_member_gets_the_next_member_number(self):
-        first, second = self.member(), self.member(name='Bob Jones', email='bob@example.com')
+        first, second = self.member(), self.member(firstName='Bob', lastName='Jones', email='bob@example.com')
         cur = self.db()
         self.assertEqual(M.get(cur, 'member', first)['memberNumber'], 'm00001')
         self.assertEqual(M.get(cur, 'member', second)['memberNumber'], 'm00002')
-        self.assertEqual(M.get(cur, 'member', first)['phone'], '0412 345 678')          # written like the log on's mobile
+        self.assertEqual(M.get(cur, 'member', first)['mobile'], '0412 345 678')         # written like the log on's mobile
         page = self.a.get('/members').get_data(as_text=True)
         self.assertIn('m00001', page)
-        self.assertIn('Bob Jones', page)
+        self.assertIn('>Jones</span>', page)
+        self.assertIn('First name', page)
         self.assertIn('href="/members/new"', page)
-        self.assertIn('href="/vessels"', page)
-        self.assertNotIn('Bob Jones', self.a.get('/members?q=jane').get_data(as_text=True))
-        self.assertIn('Jane Smith', self.a.get('/members?q=0412345678').get_data(as_text=True))
+        self.assertNotIn('href="/vessels"', page)                                   # no Public vessels button on Members
+        self.assertNotIn('href="/members"', self.a.get('/vessels').get_data(as_text=True))   # nor Members on Public vessels
+        self.assertNotIn('Jones', self.a.get('/members?q=jane').get_data(as_text=True))
+        self.assertIn('Smith', self.a.get('/members?q=0412345678').get_data(as_text=True))
         logons = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('href="/members"', logons)                                    # reached from the log's navbar
         self.assertIn('href="/vessels"', logons)
 
     def test_a_refused_member_save_writes_nothing_and_turns_its_boxes_red(self):
-        r = self.a.post('/members/new', data={'name': '', 'phone': '12345', 'email': 'not-an-email', 'address': 'kept'})
+        r = self.a.post('/members/new', data={'firstName': 'Jane', 'lastName': '', 'mobile': '04123456789', 'email': 'not-an-email', 'address': 'kept'})
         self.assertEqual(r.status_code, 400)
         page = r.get_data(as_text=True)
-        for name in ('name', 'phone', 'email'):
+        self.assertIn('<label for="member-mobile">Mobile Phone Number</label>', page)    # the log on's label and rule
+        for name in ('lastName', 'mobile', 'email'):
             self.assertIn('id="member-%s" name="%s" class="form-control is-invalid"' % (name, name), page)
         self.assertIn('>kept</textarea>', page)                                     # what was typed stays
         self.assertNotIn('placeholder=', page.split('id="ro-member-details"')[1])   # labels on top, nothing inside a box
@@ -126,7 +129,7 @@ class Members(unittest.TestCase):
         i = self.member()
         self.assertEqual(self.b.get('/member/%d' % i).status_code, 403)
         self.assertEqual(self.b.post('/member/%d/cars' % i, data={'registration': 'X'}).status_code, 403)
-        self.assertNotIn('Jane Smith', self.b.get('/members').get_data(as_text=True))
+        self.assertNotIn('Smith', self.b.get('/members').get_data(as_text=True))
         other = self.b.post('/logons/new', json={'fields': {'callDay': date.today().isoformat(), 'callTime': '0900',
                                                             'memberNumber': 'm00001', 'mobile': '0400000002'}})
         self.assertEqual(other.status_code, 200, other.data)

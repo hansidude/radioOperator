@@ -52,7 +52,7 @@
       <div class="ro-notes-row row g-3">{{ field('notes', 'col-12') }}</div>
     </form>
     {# The Member No. box offers the unit's members; a number that is not one is emptied (logons._links). #}
-    <datalist id="roMembers">{% for m in member_options %}<option value="{{ m.memberNumber }}">{{ m.name }}{% if m.vesselNames %} · {{ m.vesselNames }}{% endif %}</option>{% endfor %}</datalist>
+    <datalist id="roMembers">{% for m in member_options %}<option value="{{ m.memberNumber }}">{{ ui.full_name(m) }}{% if m.vesselNames %} · {{ m.vesselNames }}{% endif %}</option>{% endfor %}</datalist>
     {# Save is at the bottom of every editable pane, first in the row, as well as in the navbar. #}
     {% if creating %}
     <div class="ro-primary-actions">{{ save_button() }}</div>

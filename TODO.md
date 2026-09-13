@@ -66,14 +66,15 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Members and public vessels (`/members`, `/member/<id>`, `/vessels`, `/vessel/<id>`)
 
-- Reached from the RadioLogs navbar (Members, Public vessels). Lists through Quackit's `record_grid`, server
-  search swapped in by htmx like the log.
-- A member: Member No. issued automatically as `m00001`, name (required), address, phone, email. Tabs (Quackit's
+- Reached from the RadioLogs navbar (Members, Public vessels); neither list links to the other. Lists through
+  Quackit's `record_grid`, server search swapped in by htmx like the log.
+- A member: Member No. issued automatically as `m00001`, first name and last name (both required), Mobile Phone
+  Number (the log on's rule: 10 digits, shown `0412 345 678`), email, address. Listed by last name. Tabs (Quackit's
   shared `entity_nav.tabs`): Details, Emergency contacts, Vessels, Trailers, Cars, History. Any number of
   each; Remove makes a row inactive, never deletes it.
 - A public vessel is the record for a public user: the boat plus its owner's name and phone (both required)
   and email. A vessel needs a name or a rego.
-- Phones follow the log on's mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
+- Emergency contact and owner phones follow the same mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
   writes nothing, keeps what was typed and turns its boxes red; each form comes back to its own tab.
 - **A log on is a member's or a public user's** (owner, 2026-09-14; spec CAP-24). The Member No. box offers the
   unit's members; a number that is not a member is emptied as focus leaves the box and written into **Notes**
