@@ -18,6 +18,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Due first: overdue, then by return time; drafts and closed after, newest call first. One rule,
   `logons.due_first`, also used by `queue()`.
 - Status symbol after the daily number (emoji with accessible name); member and vessel badges.
+- View buttons (Quackit's shared `record_grid` `view_controls`): **Cards** at any width, fields on one
+  line; **Paragraphs**, a line per field (or wrapped row values). Kept across refreshes, not across
+  page loads.
 - Rows tinted faintly by status: draft orange, logged on green, overdue red, closed near-black.
 - Dates always carry a 2-digit year (`Sun 13/9/26`); times always 4-digit 24-hour (`1400`).
 - Daily `No.` counts from 1 per call date; `Trip ID No.` (`T-00042`) is the record's key.
