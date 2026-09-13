@@ -7,6 +7,32 @@ only ever stores and compares; that is what keeps `LogOns` free of foreign keys.
 """
 
 
+def install_standalone_ui(app):
+    """Compatibility shell consumes Quackit's real presentation files, never copies.
+
+    The mounted checkout resolves them automatically. A separate compatibility
+    consumer must explicitly provide RADIO_SHARED_TEMPLATES (the templates directory).
+    This is a file-loader boundary only; it does not import Quackit's application/data.
+    """
+    import os
+    from pathlib import Path
+    from flask import Blueprint
+    from jinja2 import ChoiceLoader, FileSystemLoader
+
+    templates = Path(os.environ.get('RADIO_SHARED_TEMPLATES') or
+                     Path(__file__).resolve().parents[2] / 'dflask' / 'templates')
+    for name in ('myMacro_record_view.html', 'myMacro_filters.html',
+                 '../static/css/record_views.css', '../static/css/navbar_controls.css',
+                 '../static/css/search_controls.css', '../static/js/search_controls.js'):
+        if not (templates / name).is_file():
+            raise RuntimeError('Missing shared UI file %s; use quackit/radio or set '
+                               'RADIO_SHARED_TEMPLATES to Quackit templates.' % (templates / name))
+    app.jinja_loader = ChoiceLoader([app.jinja_loader, FileSystemLoader(str(templates))])
+    app.register_blueprint(Blueprint('radio_shared', __name__,
+                                    static_folder=str(templates.parent / 'static'),
+                                    static_url_path='/radio-shared/static'))
+
+
 class Host:
     base_template = 'radio/_base.html'   # a host with its own layout passes its own
     brand = 'Log on'

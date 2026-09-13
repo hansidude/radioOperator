@@ -75,7 +75,9 @@ checkout these are [../DEVELOPMENT.md](../DEVELOPMENT.md) and
 Quackit Docker build consumes; continue development in the mounted submodule.
 
 The existing standalone adapter is retained for compatibility and isolated tests.
-It is not an alternative development or acceptance-test environment. Its copied
-base styles remain a documented consolidation task before further shared UI work.
+It is not an alternative development or acceptance-test environment. Its shell loads Quackit's actual templates and static assets; it carries no copies of the shared record,
+navbar or search styles. A separate compatibility checkout sets `RADIO_SHARED_TEMPLATES`
+to Quackit's `dflask/templates/`; legacy Compose requires `QUACKIT_UI_ROOT` pointing to
+`dflask/` and mounts it read-only. Missing shared files stop startup explicitly.
 Browser acceptance runs through the actual Quackit layout and MariaDB using the
 host's verification entry point. Deployment and migrations follow the host procedure.

@@ -190,17 +190,17 @@ class Pages(unittest.TestCase):
         self.assertIn('name="q"', page)
 
         # Drafts by default, for today, newest first.
-        self.assertIn('<option value="draft" selected>Drafts</option>', page)
+        self.assertIn('<option value="draft" selected>📝 Drafts</option>', page)
         self.assertIn('id="roDayOn" name="dayOn" checked', page)
         self.assertIn('<option value="newest" selected>Newest first</option>', page)
         self.assertIn('data-record="%d"' % draft, page)
         self.assertNotIn('data-record="%d"' % watching, page)   # a watch is not a draft
 
         # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
-        self.assertIn('class="ro-paper-grid ro-paper-head"', page)
+        self.assertIn('class="dc-record-grid-head"', page)
         self.assertIn('<span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
-        self.assertIn('<span>Time</span><span>Trip ID No.</span><span></span>', page)
-        self.assertIn('class="dc-record-card ro-record-card ro-paper-grid ro-paper-row draft', page)
+        self.assertIn('<span>Return time</span><span>Trip ID No.</span><span></span>', page)
+        self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)
         draft_at = page.index('data-record="%d"' % draft)
@@ -214,13 +214,41 @@ class Pages(unittest.TestCase):
         self.assertNotIn('data-record="%d"' % draft, on)
         # Same card class as the draft above -- one renderer. The state word after it depends on
         # the clock (an 1800 return is overdue after 1800), so it is not pinned here.
-        self.assertIn('class="dc-record-card ro-record-card ro-paper-grid ro-paper-row', on)
-        self.assertIn('class="ro-paper-grid ro-paper-head"', on)
+        self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card', on)
+        self.assertIn('class="dc-record-grid-head"', on)
 
         # Counts do not sit beside the filters (a number on a filter nobody picked is noise).
         self.assertNotIn('class="ro-status-counts"', page)
         # The site's own record classes, not a second look invented for radio.
         self.assertIn('class="dc-record-toolbar ro-toolbar"', page)
+
+    def test_shared_record_presentation_keeps_identity_and_escapes_input(self):
+        i = self.new()
+        self.field(i, 'memberNumber', '12345')
+        self.field(i, 'vesselName', '<img src=x onerror=alert(1)>')
+        page = self.a.get('/logons').get_data(as_text=True)
+        row = page[page.index('data-record="%d"' % i):]
+        row = row[:row.index('</article>')]
+        self.assertLess(row.index('aria-label="Draft"'), row.index('data-column="day"'))
+        self.assertIn('aria-label="Member number"', row)
+        self.assertIn('aria-label="Vessel name"', row)
+        self.assertIn('12345', row)
+        self.assertIn('&lt;img', row)
+        self.assertNotIn('<img', row)
+        self.assertIn('id="roSearch"', page)
+        self.assertIn('data-search-input1="roSearch"', page)
+
+    def test_status_symbols_distinguish_every_closure_and_conflict(self):
+        ui = self.app.jinja_env.get_template('radio/_ui.html').module
+        for watch, reason, condition, label in [
+                ('draft', '', '', 'Draft'), ('watching', '', 'future', 'Logged on'),
+                ('watching', '', 'overdue', 'Overdue'), ('loggedoff', 'returned', '', 'Logged off'),
+                ('loggedoff', 'notdeparted', '', 'Never departed'), ('discarded', '', '', 'Discarded')]:
+            r = dict(watchStatus=watch, closeReason=reason, condition=condition,
+                     verifyOutcome='conflict', verifyBasis='different registration')
+            html = str(ui.state_label(r))
+            self.assertIn('aria-label="%s"' % label, html)
+            self.assertEqual('aria-label="CONFLICT"' in html, watch != 'draft')
 
     def test_the_date_filter_is_a_tick_you_can_turn_off(self):
         i = self.new()
@@ -234,7 +262,7 @@ class Pages(unittest.TestCase):
         # Overdue starts with the date off, because an overdue record is never today's.
         overdue = self.a.get('/logons?status=overdue').get_data(as_text=True)
         self.assertNotIn('id="roDayOn" name="dayOn" checked', overdue)
-        self.assertIn('<option value="draft">Drafts</option>', overdue)
+        self.assertIn('<option value="draft">📝 Drafts</option>', overdue)
 
     def test_search_finds_a_record_by_what_an_operator_says_out_loud(self):
         i = self.new()
@@ -282,7 +310,7 @@ class Pages(unittest.TestCase):
         self.assertIn('Logged on and watched', page)
         self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
         listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)
-        self.assertIn('OVERDUE', listing)
+        self.assertIn('aria-label="Overdue"', listing)
         self.assertIn('data-record="%d"' % i, listing)
         self.assertNotIn('class="ro-status-counts"', listing)
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
@@ -321,8 +349,8 @@ class Pages(unittest.TestCase):
         self.assertIn('Draft 2', page)
         self.assertIn('draft 2 of', page)
         page = self.a.get('/logons').get_data(as_text=True)
-        self.assertIn('class="dc-record-index ro-paper-num" data-l="No." title="Record 1 of that day">1</span>', page)
-        self.assertIn('class="dc-record-index ro-paper-num" data-l="No." title="Record 2 of that day">2</span>', page)
+        self.assertIn('<span class="dc-record-index">1</span>', page)
+        self.assertIn('<span class="dc-record-index">2</span>', page)
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by

@@ -8,6 +8,19 @@ from standalone.app import create_app
 
 
 class Standalone(unittest.TestCase):
+    def test_shared_assets_are_served_from_the_owner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = create_app('sqlite:///' + str(Path(tmp) / 'radio.sqlite'))
+            c = app.test_client()
+            shared = Path(__file__).resolve().parents[2] / 'dflask' / 'static'
+            page = c.get('/logons').get_data(as_text=True)
+            for asset in ('css/record_views.css', 'css/navbar_controls.css',
+                          'css/search_controls.css', 'js/search_controls.js'):
+                self.assertIn('/radio-shared/static/' + asset, page)
+                response = c.get('/radio-shared/static/' + asset)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, (shared / asset).read_bytes())
+
     def test_pages_and_api_work_with_no_host(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = create_app('sqlite:///' + str(Path(tmp) / 'radio.sqlite'))

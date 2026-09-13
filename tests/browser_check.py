@@ -111,11 +111,38 @@ def main():
             expect(page.locator('#f-destination')).to_have_value('Saved by second operator')
             visit('/logons?status=draft&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
-            for width in (1920, 900, 390):
+            row = page.locator('[data-record="%s"]' % record)
+            expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
+            expect(row.get_by_role('img', name='Member number', exact=True)).to_be_visible()
+            expect(row.get_by_role('img', name='Vessel name', exact=True)).to_be_visible()
+            expect(row.locator('[data-column="identity"]')).to_contain_text(vessel)
+            expect(row.locator('[data-column="identity"]')).to_contain_text(token)
+            # Exercise the existing shared single-input search/reset via real GETs.
+            page.locator('#roSearch').fill('NO-MATCH-' + token)
+            page.get_by_role('button', name='Apply', exact=True).click()
+            expect(page.locator('#radioRecords')).to_have_text('0 drafts')
+            page.get_by_role('button', name='Reset search', exact=True).click()
+            expect(page.locator('#roSearch')).to_have_value('')
+            expect(page.locator('#roStatus')).to_have_value('draft')
+            page.locator('#roSearch').fill(vessel)
+            page.get_by_role('button', name='Apply', exact=True).click()
+            page.reload()
+            expect(page.locator('#roSearch')).to_have_value(vessel)
+            expect(row).to_have_count(1)
+            with page.expect_response(lambda r: '/logons/rows?' in r.url):
+                page.evaluate('refreshQueue()')
+            expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
+            for width in (2560, 1920, 1280, 1190, 1184, 1024, 900, 768, 576, 390, 320):
                 page.set_viewport_size({'width': width, 'height': 1080})
                 expect(page.locator('table')).to_have_count(0)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Overflow at %spx' % width
-                page.screenshot(path=str(ARTIFACTS / ('radio-list-%s.png' % width)), full_page=True)
+                assert page.locator('#radioRecords').evaluate('''el =>
+                    [el, ...el.querySelectorAll('.dc-record-grid-row, .dc-record-grid-cell, .dc-record-grid-value')]
+                    .every(node => node.scrollWidth <= node.clientWidth + 1)'''), 'List/cell overflow at %spx' % width
+                assert page.locator('.dc-record-wide').evaluate('el => el.getBoundingClientRect().width <= 1920'), 'Width cap'
+                expect(row.locator('[data-column="identity"]')).to_be_visible()
+                if width in (1920, 900, 390):
+                    page.screenshot(path=str(ARTIFACTS / ('radio-list-%s.png' % width)), full_page=True)
             page.set_viewport_size({'width': 1920, 'height': 1080})
             visit('/logon/%s' % record)
             page.locator('[data-ro-tab="identity"]').click()
@@ -127,6 +154,7 @@ def main():
             watching = True
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
+            expect(row.get_by_role('img', name='Logged on', exact=True)).to_be_visible()
             visit('/logon/%s' % record)
             page.locator('#logoffNote').fill('Verification complete ' + token)
             page.locator('button[form="logoffForm"]').click()
@@ -134,6 +162,7 @@ def main():
             closed = True
             visit('/logons?status=closed&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
+            expect(row.get_by_role('img', name='Logged off', exact=True)).to_be_visible()
             visit('/logon/%s#record' % record)
             expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
             expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)

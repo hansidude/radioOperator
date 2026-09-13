@@ -1,10 +1,9 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
+{% from 'myMacro_filters.html' import search_controls %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>Radio log{% endblock %}
-{# The log is a 14-column paper form, not prose: the host's reading-width cap (quackit's
-   .mySpacing, 120ch) squeezes it to 1548px on a wide screen and starts clipping cells. Both
-   base templates expose this block, so opting out is the host's own hook, not a CSS override. #}
-{% block body_wrap_class %}container-fluid ro-wide{% endblock %}
+{# The shared record grid uses the host's wide collection wrapper, capped at 1920px. #}
+{% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Radio log">
   <span id="queueNote" class="small text-danger me-auto" role="alert" hidden></span>
@@ -20,8 +19,8 @@
   <input type="hidden" name="f" value="1">
   <label for="roStatus">Status</label>
   <select class="form-select form-select-sm" id="roStatus" name="status">
-    {% for value, label in [('all', 'All'), ('draft', 'Drafts'), ('loggedon', 'Logged on'), ('overdue', 'Overdue'), ('closed', 'Closed')] %}
-    <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>
+    {% for value, state, label in ui.FILTERS %}
+    <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ ui.STATES[state].symbol }} {{ label }}</option>
     {% endfor %}
   </select>
   <div class="form-check ro-toolbar-tick">
@@ -34,9 +33,8 @@
     <option value="newest"{% if filters.sort == 'newest' %} selected{% endif %}>Newest first</option>
     <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
   </select>
-  <input class="form-control form-control-sm ro-toolbar-search" type="search" name="q" value="{{ filters.search }}"
-         placeholder="Trip, number, member, vessel, rego, mobile, going to" aria-label="Find">
-  <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-funnel me-1"></i>Apply</button>
+  {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
+  <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
 </form>
 {{ ui.alert_list(alerts, health) }}
 <div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>

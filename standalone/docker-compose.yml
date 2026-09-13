@@ -13,6 +13,9 @@ services:
       - RADIO_DB=mysql://radio:radio@db/radio
       - SECRET_KEY=change-me
       - TZ=Australia/Brisbane
+      - RADIO_SHARED_TEMPLATES=/quackit-ui/templates
+    volumes:
+      - ${QUACKIT_UI_ROOT:?Set QUACKIT_UI_ROOT to the Quackit dflask directory}:/quackit-ui:ro
     depends_on:
       db:
         condition: service_healthy

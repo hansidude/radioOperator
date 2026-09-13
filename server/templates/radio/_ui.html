@@ -1,3 +1,4 @@
+{% import 'myMacro_record_view.html' as records_ui %}
 {# Shared pieces for every log on page. Hosted, the pages wear the host's Bootstrap, icons and navbar rows;
    standalone, _base.html provides the same. Only what is log-on-specific is styled here. #}
 
@@ -17,7 +18,7 @@
 /* The card itself is the site's dc-record-card (border, radius, wrapping). Radio adds only the
    one thing that is its own: a left edge that says what state the record is in. */
 .ro-record-card{border-left:4px solid var(--bs-secondary);background:var(--bs-body-bg);line-height:1.3}
-.ro-record-card.draft{border-left-color:var(--bs-warning)}
+.ro-record-card.draft{border-left-color:var(--bs-secondary)}
 .ro-record-card.overdue{border-left-color:var(--bs-danger)}
 .ro-record-card.approaching{border-left-color:var(--bs-warning)}
 .ro-record-card.watching{border-left-color:var(--bs-primary)}
@@ -27,29 +28,6 @@
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
 .ro-toolbar select,.ro-toolbar .ro-toolbar-date{width:auto;min-width:7.5rem}
 .ro-toolbar .ro-toolbar-tick{display:flex;align-items:center;gap:.3rem;margin:0;min-height:0;padding-left:1.4rem}
-/* Grows to fill the row, but a search box the width of a 1920px screen is just a long empty bar. */
-.ro-toolbar .ro-toolbar-search{flex:1 1 16rem;min-width:10rem;max-width:30rem}
-/* The log's own width cap. Wide enough for all fourteen columns, still bounded so the rows do
-   not stretch to the width of a very large screen. */
-.ro-wide{max-width:1920px;margin-left:auto;margin-right:auto}
-.ro-paper-log{width:100%;overflow-x:auto;padding-bottom:.15rem}
-.ro-paper-grid{display:grid;grid-template-columns:4fr 8fr 5fr 11fr 8fr 10fr 11fr 5fr 10fr 10fr 8fr 5fr 7fr 2.8rem;min-width:56rem}
-.ro-paper-head{color:var(--bs-secondary-color);font-size:.62rem;font-weight:600;line-height:1.1;text-transform:uppercase}
-.ro-paper-head>span{display:flex;align-items:end;min-width:0;padding:.18rem .3rem}
-.ro-record-card.ro-paper-row{display:grid;gap:0;min-height:2.2rem;padding:0;border-left-width:1px;border-left-color:var(--bs-border-color);font-size:var(--dc-record-font,.82rem);line-height:1.15}
-.ro-paper-row+.ro-paper-row{margin-top:.18rem}
-.ro-paper-row>*{display:flex;align-items:center;min-width:0;padding:.28rem .3rem;border-right:1px solid var(--bs-border-color)}
-.ro-paper-row>*:last-child{border-right:0}
-.ro-paper-value{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-/* dc-record-index already gives tabular numerals and the muted colour. */
-.ro-paper-num{justify-content:flex-end;font-weight:600;color:inherit}
-.ro-paper-trip{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-.ro-paper-who{display:flex;align-items:center;gap:.3rem;min-width:0}
-.ro-paper-who .badge{font-size:.6rem;padding:.12rem .3rem;flex:none}
-.ro-paper-link{color:inherit;font-weight:600;overflow:hidden;text-decoration:none;white-space:nowrap;text-overflow:ellipsis}
-.ro-paper-link:hover{text-decoration:underline}
-.ro-paper-action{justify-content:center;padding:0}
-.ro-paper-action .btn{display:inline-flex;align-items:center;justify-content:center;width:1.8rem;height:1.8rem;padding:0}
 /* The empty state is dc-record-empty; a zero count is just said louder. */
 .ro-zero{font-size:1.05rem}
 .ro-gate{font-size:.82rem;border-left:3px solid var(--bs-warning);padding:.3rem .6rem;margin:.5rem 0}
@@ -104,23 +82,7 @@
   .ro-card-meta{flex-basis:100%}
   .ro-card-field{white-space:normal}
   .ro-card-top .ro-card-action{margin-left:0}
-  /* The paper grid becomes labelled cards. Every cell carries its column name in data-l, so the
-     label comes from the same markup the wide table uses; nothing is re-templated for phones.
-     Blank cells are hidden here only -- on a wide screen they must still occupy their column or
-     the grid stops lining up. */
-  .ro-paper-log{overflow-x:visible}
-  .ro-paper-head{display:none}
-  .ro-paper-grid{min-width:0}
-  /* One column of labelled lines, with the open button lifted out of the flow so it does not
-     stretch the first row and leave a gap under the number. */
-  .ro-record-card.ro-paper-row{position:relative;grid-template-columns:1fr;gap:.05rem;padding:.45rem 3rem .45rem .55rem;border-left-width:4px;min-height:0}
-  .ro-paper-row>*{grid-column:1;border-right:0;padding:.05rem 0;white-space:normal;overflow:visible;text-overflow:clip}
-  .ro-paper-row>.ro-blank{display:none}
-  .ro-paper-row>*::before{content:attr(data-l) ": ";color:var(--bs-secondary-color);font-size:.66rem;font-weight:600;text-transform:uppercase;margin-right:.3rem}
-  .ro-paper-num{justify-content:flex-start}
-  .ro-paper-link{font-size:.95rem}
-  .ro-paper-action{position:absolute;top:.4rem;right:.45rem;padding:0}
-  .ro-paper-action::before{content:none}
+
 }
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
@@ -186,61 +148,83 @@
 </script>
 {% endmacro %}
 
-{# The radio log itself. ONE renderer for every status (draft, logged on, overdue, closed): a status
-   is a property of a record, not a different kind of thing to draw. Status only picks the left edge
-   colour and the row label; the columns never move.
-
-   Wide: the paper log, column for column, in figure 5's order -- with the record number leading on
-   the left like every other quackit list (myMacro_actions.html card-index), and 'Trip ID No.' last
-   where the paper prints it. Narrow: the same markup becomes labelled cards, in CSS alone, off the
-   data-l attributes. There is no second template for phones. #}
+{# One adapter for every radio status. Field order and business labels stay in radio;
+   the host record_grid draws headers, values and the same labelled cells at every width. #}
 {# Exact wording for an empty result: '0 drafts', not 'Nothing at sea'. One map, because the page
    and the refresh partial must say the same thing. #}
 {% set EMPTY_LABELS = {'all': 'records', 'draft': 'drafts', 'loggedon': 'logged on', 'overdue': 'overdue', 'closed': 'closed'} %}
 
 {% macro state(r) %}{% if r.watchStatus in ('loggedoff', 'discarded', 'cancelled') %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'watching' %}watching{% else %}draft{% endif %}{% endmacro %}
 
-{% macro state_label(r) %}
-{%- if r.watchStatus == 'draft' %}
-{%- elif r.watchStatus in ('discarded', 'cancelled') %}<span class="badge text-bg-secondary">Discarded</span>
-{%- elif r.watchStatus == 'loggedoff' %}<span class="badge {{ 'text-bg-warning' if r.closeReason == 'notdeparted' else 'text-bg-success' }}">{{ 'Never departed' if r.closeReason == 'notdeparted' else 'Logged off' }}</span>
-{%- elif r.condition == 'overdue' %}<span class="badge text-bg-danger">OVERDUE</span>
-{%- endif %}
-{%- if r.watchStatus != 'draft' and r.verifyOutcome == 'conflict' %}<span class="badge text-bg-danger" title="{{ r.verifyBasis or '' }}">CONFLICT</span>{% endif %}
+{# Radio owns the status vocabulary; shared presentation only receives metadata. #}
+{% set STATES = {
+  'all': {'symbol': '📋', 'label': 'All', 'tone': 'secondary'},
+  'draft': {'symbol': '📝', 'label': 'Draft', 'tone': 'secondary'},
+  'watching': {'symbol': '👀', 'label': 'Logged on', 'tone': 'primary'},
+  'overdue': {'symbol': '🚨', 'label': 'Overdue', 'tone': 'danger'},
+  'closed': {'symbol': '✅', 'label': 'Closed', 'tone': 'secondary'},
+  'loggedoff': {'symbol': '✅', 'label': 'Logged off', 'tone': 'secondary'},
+  'notdeparted': {'symbol': '🏠', 'label': 'Never departed', 'tone': 'secondary'},
+  'discarded': {'symbol': '🗑️', 'label': 'Discarded', 'tone': 'secondary'},
+  'conflict': {'symbol': '⚠️', 'label': 'CONFLICT', 'tone': 'danger'}
+} %}
+{% set FILTERS = [('all', 'all', 'All'), ('draft', 'draft', 'Drafts'),
+                  ('loggedon', 'watching', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
+                  ('closed', 'closed', 'Closed')] %}
+
+{% macro state_label(r) -%}
+  {%- set key = 'discarded' if r.watchStatus in ('discarded', 'cancelled') else
+               ('notdeparted' if r.closeReason == 'notdeparted' else 'loggedoff') if r.watchStatus == 'loggedoff' else
+               'draft' if r.watchStatus == 'draft' else
+               'overdue' if r.condition == 'overdue' else 'watching' -%}
+  {%- set status = STATES[key] -%}
+  {{- records_ui.symbol(status.symbol, status.label, tone=status.tone) -}}
+  {%- if r.watchStatus != 'draft' and r.verifyOutcome == 'conflict' -%}
+    {{- records_ui.symbol(STATES.conflict.symbol, STATES.conflict.label, tone=STATES.conflict.tone, detail=r.verifyBasis or '') -}}
+  {%- endif -%}
 {%- endmacro %}
 
+{% macro identity_badges(r, reference) -%}
+<a class="text-decoration-none" href="/logon/{{ r.id }}">
+  {%- if r.memberNumber %}{{ records_ui.symbol('👤', 'Member number', r.memberNumber) }}{% endif -%}
+  {%- if r.vesselName %} {{ records_ui.symbol('🛥️', 'Vessel name', r.vesselName) }}{% endif -%}
+  {%- if not r.memberNumber and not r.vesselName %}Record {{ reference(r) }}{% endif -%}
+</a>
+{%- endmacro %}
+
+{# DAT-6: paper field order remains radio's; Quackit owns headers, cells and cards. #}
+{% set COLUMNS = [
+  {'key': 'number', 'label': 'No.', 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
+  {'key': 'day', 'label': 'Date', 'width': 'minmax(0,.9fr)'},
+  {'key': 'time', 'label': 'Time', 'width': 'minmax(0,.65fr)'},
+  {'key': 'identity', 'label': 'Member / Vessel', 'width': 'minmax(0,1.65fr)'},
+  {'key': 'rego', 'label': 'Rego', 'width': 'minmax(0,.95fr)'},
+  {'key': 'mobile', 'label': 'Mobile', 'width': 'minmax(0,1.1fr)'},
+  {'key': 'vessel', 'label': 'Vessel details', 'width': 'minmax(0,1.35fr)'},
+  {'key': 'pob', 'label': 'POB', 'width': 'minmax(0,.45fr)'},
+  {'key': 'departure', 'label': 'Departure', 'width': 'minmax(0,1.1fr)'},
+  {'key': 'destination', 'label': 'Going to', 'width': 'minmax(0,1.2fr)'},
+  {'key': 'returnDay', 'label': 'Return date', 'width': 'minmax(0,.9fr)'},
+  {'key': 'returnTime', 'label': 'Return time', 'width': 'minmax(0,.65fr)'},
+  {'key': 'trip', 'label': 'Trip ID No.', 'width': 'minmax(0,.9fr)'},
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}
+] %}
 {% macro record_list(rows, now, reference, current=None, empty='0 records') %}
-<div class="ro-paper-log">
-{% if rows %}
-  <div class="ro-paper-grid ro-paper-head" aria-hidden="true">
-    <span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>
-    <span>Mobile</span><span>Vessel details</span><span>POB</span><span>Departure</span>
-    <span>Going to</span><span>Return date</span><span>Time</span><span>Trip ID No.</span><span></span>
-  </div>
-{% endif %}
+{% set display = namespace(rows=[]) %}
 {% for r in rows %}
-  {% set who = r.memberNumber or r.vesselName or ('Record ' ~ reference(r)) %}
-  {% set vessel = vessel_summary(r, '') %}
-  {% set trip = r.tripRef or '' %}
-  <article class="dc-record-card ro-record-card ro-paper-grid ro-paper-row {{ state(r)|trim }}{% if r.id == current %} ro-current{% endif %}" data-record="{{ r.id }}">
-    <span class="dc-record-index ro-paper-num" data-l="No." title="Record {{ reference(r) }} of that day">{{ reference(r) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.callDayBox }}" data-l="Date" title="{{ r.callDayBox or '' }}">{{ cell(r.callDayBox) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.callTimeRaw }}" data-l="Time" title="{{ r.callTimeRaw or '' }}">{{ cell(r.callTimeRaw) }}</span>
-    <span class="ro-paper-who" data-l="Member / Vessel"><a class="ro-paper-link" href="/logon/{{ r.id }}" title="{{ who }}">{{ who }}</a>{{ state_label(r) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.registration }}" data-l="Rego" title="{{ r.registration or '' }}">{{ cell(r.registration) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.mobile }}" data-l="Mobile" title="{{ r.mobile or '' }}">{{ cell(r.mobile) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not vessel }}" data-l="Vessel details" title="{{ vessel }}">{{ vessel }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.pob }}" data-l="POB" title="{{ r.pob or '' }}">{{ cell(r.pob) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.departurePoint }}" data-l="Departure" title="{{ r.departurePoint or '' }}">{{ cell(r.departurePoint) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.destination }}" data-l="Going to" title="{{ r.destination or '' }}">{{ cell(r.destination) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.etaDayBox }}" data-l="Return date" title="{{ r.etaDayBox or '' }}">{{ cell(r.etaDayBox) }}</span>
-    <span class="ro-paper-value{{ ' ro-blank' if not r.etaRaw }}" data-l="Time" title="{{ r.etaRaw or '' }}">{{ cell(r.etaRaw) }}</span>
-    <span class="ro-paper-trip{{ ' ro-blank' if not trip }}" data-l="Trip ID No." title="{{ trip }}">{{ trip }}</span>
-    <span class="ro-paper-action"><a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open {{ who }}" aria-label="Open {{ who }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a></span>
-  </article>
-{% else %}<div class="dc-record-empty ro-zero">{{ empty }}</div>
+  {% set number %}<span class="dc-record-index">{{ reference(r) }}</span>{{ state_label(r) }}{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open record {{ reference(r) }}" aria-label="Open record {{ reference(r) }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set display.rows = display.rows + [{
+    'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''),
+    'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeRaw or '',
+              'identity': identity_badges(r, reference), 'rego': r.registration or '',
+              'mobile': r.mobile or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
+              'departure': r.departurePoint or '', 'destination': r.destination or '',
+              'returnDay': r.etaDayBox or '', 'returnTime': r.etaRaw or '',
+              'trip': r.tripRef or '', 'action': action}
+  }] %}
 {% endfor %}
-</div>
+{{ records_ui.record_grid(display.rows, COLUMNS, 'radioRecords', empty) }}
 {% endmacro %}
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}

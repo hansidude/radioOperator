@@ -2,6 +2,46 @@
 
 This is the authoritative handoff for the next radio log-on implementation pass.
 
+## Shared radio presentation — current pass (2026-09-13)
+
+The owner authorised the five items in `~/Downloads/todo.png`, explicitly requiring
+reuse of Quackit's My Times, edit-list and Lists patterns. Advanced column controls
+are marked **FUTURE** in that picture and remain a separate task.
+
+- [x] Extend the existing host `myMacro_record_view.html` / `record_views.css` with
+      `record_grid` and accessible `symbol` presentation. Radio supplies field order,
+      values and state metadata; host components own the responsive markup and styles.
+- [x] Use `myMacro_filters.html:search_controls`, as My Times and Lists already do.
+      Radio keeps its SQL / URL filters; no second client-side filtering engine.
+- [x] Show a status symbol after the daily number; show emoji + text in the status
+      selector. Distinguish draft, watching, overdue, logged off, never departed,
+      discarded and the independent conflict flag, with accessible names/tooltips.
+- [x] Show compact member-number and vessel-name badges; retain both identifying
+      values when present. Do not hide a known vessel name behind the member number.
+- [x] Replace copied standalone record/nav styles with the real shared files.
+- [x] Update the host DRY catalog with contracts, ownership and compatibility loading.
+- [x] Full `./verify`: 63 Quackit Python tests, four JS suites, 81 radio Python
+      tests and the host/MariaDB browser flow. Overflow checks cover 320–2560px;
+      visually reviewed 1920/900/390px screenshots in host `artifacts/verify/`.
+- [x] Personal schema inspected: `tripRef` exists in `LogOns` and `LogOns_history`,
+      and its index exists. The earlier missing-column report is stale; no migration needed.
+Publication and rollout follow Quackit `DEVELOPMENT.md`: radio first, host pointer on
+`feature/contexts` next, then personalDB `myUpdate`. The end-of-task report records the
+published revisions and actual rollout result. The personal smoke check does not
+create or delete fixture records.
+
+Corrections to historical notes below: initial red minimum highlighting is committed;
+unsaved-navigation and stale-version browser acceptance checks are already implemented;
+the entry form already has the five-row order and full-width wrapper. The new grid
+replaces the old 576–900px inner scrollbar with labelled cards. The older unchecked
+items describing these as unbuilt are superseded by this section. Personal data deletion
+is not required by this task or a `tripRef` migration.
+
+Still separate: advanced column presets/picker/grouping, the CAP-19 explicit-save spec
+conflict, consolidation of the client/server minimum rule, entry secondary-tab changes,
+and external alert delivery/operational policy. The saved form's generic server-error
+message also needs improvement; this presentation pass does not change save semantics.
+
 ## Procedure work authorised on 2026-09-13
 
 The owner approved fixing the procedures, the DRY catalog and the existing checks.

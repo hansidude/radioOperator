@@ -376,6 +376,9 @@ def mount(app, host, watch_every=30):
     `watch_every=0` leaves the checker off, which means nothing is watched unless a browser is
     open. That is a choice a host has to make deliberately, not a default."""
     app.config['RADIO_HOST'] = host
+    if host.base_template == 'radio/_base.html':
+        from .host import install_standalone_ui
+        install_standalone_ui(app)
     app.register_blueprint(bp)
     if watch_every:
         W.start(app, host, watch_every)
