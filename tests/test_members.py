@@ -316,6 +316,59 @@ class Members(unittest.TestCase):
         check = self.a.post('/api/logon/%d' % r.json['id'], json={'check': True, 'fields': {'vesselId': str(theirs['id'])}})
         self.assertEqual(check.status_code, 400)
 
+    # ---- the log on page's Member / Public vessel tab ----
+
+    def test_a_picked_member_or_public_vessel_gets_its_own_tab_on_the_log_on_page(self):
+        new = self.a.get('/logons/new').get_data(as_text=True)
+        self.assertIn('id="roWhoTab" hidden', new)                                  # nothing picked: no tab
+        self.assertIn('<div id="roWhoPanel" data-navbar-local></div>', new)
+        m = self.member()
+        self.vessel(m)
+        r = self.logon(memberNumber='m00001', registration='AB123Q')
+        page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
+        self.assertIn('id="roWhoTab"><span data-ro-who-label>👤 Member</span>', page)
+        self.assertIn('hx-get="/member/%d/panel" hx-trigger="load" hx-swap="innerHTML"' % m, page)
+        panel = self.a.get('/member/%d/panel' % m).get_data(as_text=True)
+        self.assertNotIn('<html', panel)                                            # content only, for swapping in
+        for tab in ('details', 'contacts', 'vessels', 'trailers', 'cars', 'history'):
+            self.assertIn('data-entity-tab="%s"' % tab, panel)                     # the member page's own tabs and panes
+            self.assertIn('id="ro-member-%s"' % tab, panel)
+        self.assertIn('id="radioMemberVessels"', panel)
+        self.assertIn('Sea Dog', panel)
+        self.assertIn('href="/member/%d/vessels/new"' % m, panel)
+        self.assertEqual(self.b.get('/member/%d/panel' % m).status_code, 403)
+        pub = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public',
+                                               'ownerPhone': '0411222333'}, headers={'Accept': 'application/json'}).json['id']
+        r = self.logon(registration='PUB01')
+        page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
+        self.assertIn('<span data-ro-who-label>🌐 Public vessel</span>', page)
+        self.assertIn('hx-get="/vessel/%d/panel"' % pub, page)
+        vpanel = self.a.get('/vessel/%d/panel' % pub).get_data(as_text=True)
+        self.assertIn('value="Alex Public"', vpanel)
+        self.assertIn('data-entity-tab="history"', vpanel)
+        own = M.children(self.db(), 'vessels', m)[0]
+        self.assertEqual(self.a.get('/vessel/%d/panel' % own['id']).status_code, 404)   # a member's vessel is on the member
+
+    def test_member_history_holds_every_change_they_hold(self):
+        from server.member_pages import member_history
+
+        class FakeHost:
+            def __init__(self):
+                self.asked = []
+            def history(self, cur, table, record_id, by='id_'):
+                self.asked.append((table, record_id, by))
+                return [{'id_': 1, 'time': '2026-09-14 10:0%d' % len(self.asked), 'changes': []}]
+        h = FakeHost()
+        events = member_history(None, h, 7)
+        self.assertEqual(h.asked, [('Members', 7, 'id_'), ('EmergencyContacts', 7, 'memberId'), ('Vessels', 7, 'memberId'),
+                                   ('Trailers', 7, 'memberId'), ('Cars', 7, 'memberId')])
+        self.assertEqual([e['scope'] for e in events], ['Car', 'Trailer', 'Vessel', 'Emergency contact', 'Details'])   # newest first
+
+        class NoHistory:
+            def history(self, *a, **k):
+                return None
+        self.assertIsNone(member_history(None, NoHistory(), 7))
+
 
 if __name__ == '__main__':
     unittest.main()

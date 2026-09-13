@@ -85,6 +85,11 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   The rego ties the log on to a vessel record when it names exactly one (the member's own vessels, else the
   public vessels). The log shows 👤 Member No. or 🌐 Public in the Member No. column; the log on page shows
   the member or public vessel it is tied to, linked. A number saved before members existed stays until changed.
+- Once a member or public vessel is picked (or the record has one), the log on page gets a **👤 Member** or
+  **🌐 Public vessel** tab beside Log on: that record's own page content (Details, the four lists, History),
+  loaded in place and fully usable. Picking someone else reloads it.
+- A member's **History** holds every change they hold: their details and each emergency contact, vessel, trailer
+  and car, each event marked with what it changed, filterable by that.
 - **Member or public user** is the first row of the log on form (2026-09-14). Member: Quackit's shared search
   picker finds the member, then one of their vessels (or No vessel, or New vessel for this member). Public user:
   a public vessel, or New public vessel. Picks fill Member No., the vessel boxes and an empty mobile, and link the
@@ -154,8 +159,6 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Members and public vessels cannot be removed (only a member's contacts, vessels, trailers and cars can).
       The browser check therefore leaves per run on port 80: one `Verify Member …` with vessels `VERIFY-…` and
       `NEWBOAT-…`, and public vessels `PUBLIC-…` and `NEWPUB-…`.
-- [ ] History tab covers the member's own details; changes to contacts, vessels, trailers and cars are in their
-      history tables but not shown.
 
 ### Clean-up
 

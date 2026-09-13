@@ -62,9 +62,10 @@ class Host:
         """The watch owner (§3.3) for records this user creates and sees: an opaque tag. One unit by default."""
         return ''
 
-    def history(self, cur, table, record_id):
-        """The change history of one row of the app's own `table`, as the host's history viewer events
-        (newest first), or None when this host keeps no history; the page then says so."""
+    def history(self, cur, table, record_id, by='id_'):
+        """The change history of the app's own `table` as the host's history viewer events (newest first), or
+        None when this host keeps no history; the page then says so. `by` is the history column matched against
+        `record_id`: 'id_' for one row, 'memberId' for every row a member holds (their contacts, vessels ...)."""
         return None
 
     def system_actor(self):

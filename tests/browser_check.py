@@ -145,13 +145,19 @@ def main(engine='chromium'):
             expect(page.locator('#radioMemberContacts .dc-record-grid-row')).to_contain_text('0499 888 777')
             page.locator('[data-entity-tab="details"]').click()
             page.locator('#member-email').fill('verify.changed@example.com')                  # one save, one history event
+            page.locator('#member-firstName').fill('Verified')                                # a member's own first name is a change
             page.locator('#ro-member-details button.btn-warning').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+#details$'))
             expect(page.locator('#member-email')).to_have_value('verify.changed@example.com')
             for tab in ('trailers', 'cars', 'history'):
                 page.locator('[data-entity-tab="%s"]' % tab).click()
                 expect(page.locator('#ro-member-%s' % tab)).to_be_visible()
-            expect(page.locator('#ro-member-history .dc-history')).to_contain_text('verify.changed@example.com')   # Members_history
+            member_history = page.locator('#ro-member-history .dc-history')
+            expect(member_history).to_contain_text('verify.changed@example.com')                  # Members_history
+            expect(member_history.locator('.dc-history-field', has_text='First name')).not_to_have_count(0)
+            expect(member_history.locator('.badge', has_text='Vessel')).not_to_have_count(0)       # and every vessel they hold
+            expect(member_history.locator('.badge', has_text='Emergency contact')).not_to_have_count(0)
+            expect(member_history).to_contain_text('white')                                       # the vessel's hull colour edit
             page.locator('[data-entity-tab="vessels"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-member-%s.png' % engine)), full_page=True)
             visit('/members?q=' + token)
@@ -192,6 +198,25 @@ def main(engine='chromium'):
                 expect(page.locator('#f-' + name)).to_have_value(value)
             expect(page.locator('#roWhoNow')).to_contain_text(member_no)
             expect(page.locator('#f-vesselId')).not_to_have_value('')
+            who_tab = page.locator('#roWhoTab')                                                   # the member's own page, in a tab
+            expect(who_tab).to_be_visible()
+            expect(who_tab).to_have_text(re.compile('Member'))
+            who_tab.click()
+            panel = page.locator('#roWhoPanel')
+            expect(panel.locator('#ro-member-details')).to_be_visible()
+            expect(panel.locator('#member-lastName')).to_have_value('Member ' + token)
+            panel.locator('[data-entity-tab="vessels"]').click()                                 # its tabs work, loaded in place
+            expect(panel.locator('#radioMemberVessels .dc-record-grid-row')).to_have_count(2)
+            panel.locator('#ro-member-vessels .dc-search-input').first.fill('second-')           # and its search
+            expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)
+            panel.locator('#ro-member-vessels .dc-search-reset').first.click()
+            panel.locator('[data-entity-tab="history"]').click()
+            expect(panel.locator('#ro-member-history .dc-history .badge', has_text='Vessel')).not_to_have_count(0)
+            expect(panel.locator('#ro-member-history [data-history-toolbar]')).to_be_visible()      # its controls stay in the tab
+            expect(page.locator('#appNavbarControls #roWhoPanel, #appNavbarControls [aria-label="Member history controls"]')).to_have_count(0)
+            page.screenshot(path=str(ARTIFACTS / ('radio-who-member-tab-%s.png' % engine)), full_page=True)
+            page.locator('[data-ro-tab="entry"]').click()
+            expect(page).to_have_url(re.compile('/logons/new(#.*)?$'))
             first_pick = page.locator('#f-vesselId').input_value()
             page.locator('#roPickMember').click()                                                 # a boat not on their record yet
             page.locator('#spInput').fill(token)
@@ -223,6 +248,10 @@ def main(engine='chromium'):
             expect(page.locator('#f-registration')).to_have_value('VESSEL-' + token)
             expect(page.locator('#f-vesselId')).to_have_value(str(public_vessel))
             expect(page.locator('#roWhoNow')).to_contain_text('Public')
+            expect(who_tab).to_have_text(re.compile('Public vessel'))
+            who_tab.click()
+            expect(panel.locator('#public-ownerName')).to_have_value('Verify Public ' + token)
+            page.locator('[data-ro-tab="entry"]').click()
             page.locator('#roPickPublic').click()                                                 # a public user seen for the first time
             page.locator('#spInput').fill('NEWPUB-' + token)
             page.locator('#spFilter [data-create]').click()
@@ -237,7 +266,7 @@ def main(engine='chromium'):
             expect(page.locator('#roNewPublicPanel')).to_be_hidden()
             expect(page.locator('#f-vesselName')).to_have_value('NEWPUB-' + token)
             expect(page.locator('#f-vesselId')).not_to_have_value(str(public_vessel))
-            expect(page).to_have_url(re.compile('/logons/new$'))                                  # never left the page
+            expect(page).to_have_url(re.compile('/logons/new(#[a-z]+)?$'))                       # never left the page
             page.screenshot(path=str(ARTIFACTS / ('radio-who-%s.png' % engine)), full_page=True)
             failing_search = re.compile(r'/api/logons/members')
             page.route(failing_search, lambda route: route.fulfill(status=500, body='verification failure'))

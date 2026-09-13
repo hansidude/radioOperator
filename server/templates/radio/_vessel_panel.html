@@ -1,0 +1,6 @@
+{# The log on page's Public vessel tab: the public vessel page's own content, loaded in place. #}
+{% import 'radio/_record_view.html' as views %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+<div class="ro-panel-tabs">{{ entity_nav.parent_link('/vessel/%d' % vessel.id, vessel.vesselName or vessel.registration, 'life-preserver') }}
+{{ entity_nav.tabs('vesselPanelTabs', 'Public vessel tabs', vessel_tabs, prefix='ro-vessel-') }}</div>
+{{ views.vessel_panes(vessel, history, kind, labels, failed) }}

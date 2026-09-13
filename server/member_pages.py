@@ -15,6 +15,25 @@ from .routes import _now, _open, _page, bp
 TABS = [('details', 'Details', 'person-vcard'), ('contacts', 'Emergency contacts', 'telephone-plus'),
         ('vessels', 'Vessels', 'life-preserver'), ('trailers', 'Trailers', 'truck-flatbed'),
         ('cars', 'Cars', 'car-front'), ('history', 'History', 'clock-history')]
+VESSEL_TABS = [('details', 'Details', 'life-preserver'), ('history', 'History', 'clock-history')]
+# What a member's History is made of: their own row, and every row of these tables they hold (history by memberId).
+HISTORY_SCOPES = (('Members', 'id_', 'Details'), ('EmergencyContacts', 'memberId', 'Emergency contact'),
+                  ('Vessels', 'memberId', 'Vessel'), ('Trailers', 'memberId', 'Trailer'), ('Cars', 'memberId', 'Car'))
+
+
+def member_history(cur, h, member_id):
+    """Every change a member holds, newest first: their details and each contact, vessel, trailer and car,
+    each event scoped to what it changed. None when the host keeps no history."""
+    events = []
+    for table, by, scope in HISTORY_SCOPES:
+        got = h.history(cur, table, member_id, by)
+        if got is None:
+            return None
+        for event in got:
+            event['scope'] = scope
+        events.extend(got)
+    events.sort(key=lambda e: (e.get('time') is not None, e.get('time') or 0, e.get('id_') or 0), reverse=True)
+    return events
 
 
 def _member(cur, h, member_id, lock=False):
@@ -55,12 +74,26 @@ def members_page():
 
 
 def _member_page(cur, h, member, failed=None, status=200):
+    ctx = _member_context(cur, h, member, failed)
+    cur.close()
+    return _page('member.html', creating=not member.get('id'), **ctx), status
+
+
+def _member_context(cur, h, member, failed=None):
     ctx = {'member': member, 'failed': failed or {}, 'kinds': M.KINDS, 'labels': M.LABELS, 'tabs': TABS}
     if member.get('id'):
         ctx['children'] = {kind: M.children(cur, kind, member['id']) for kind in M.CHILDREN}
-        ctx['history'] = h.history(cur, 'Members', member['id'])
+        ctx['history'] = member_history(cur, h, member['id'])
+    return ctx
+
+
+@bp.route('/member/<int:member_id>/panel')
+def member_panel(member_id):
+    """The member page's content on its own, for the log on page's Member tab (loaded in place by htmx)."""
+    h, (conn, cur) = _open()
+    ctx = _member_context(cur, h, _member(cur, h, member_id))
     cur.close()
-    return _page('member.html', creating=not member.get('id'), **ctx), status
+    return _page('_member_panel.html', **ctx)
 
 
 def _refused(e, form, values):
@@ -226,7 +259,22 @@ def _vessel_page(cur, h, vessel, failed=None, status=200):
     history = h.history(cur, 'Vessels', vessel['id']) if vessel.get('id') else None
     cur.close()
     return _page('vessel.html', creating=not vessel.get('id'), vessel=vessel, failed=failed or {}, history=history,
-                 kind=M.KINDS['public'], labels=M.LABELS), status
+                 kind=M.KINDS['public'], labels=M.LABELS, vessel_tabs=VESSEL_TABS), status
+
+
+@bp.route('/vessel/<int:vessel_id>/panel')
+def vessel_panel(vessel_id):
+    """A public vessel's page content on its own, for the log on page's Public vessel tab."""
+    h, (conn, cur) = _open()
+    vessel = M.get(cur, 'public', vessel_id)
+    if not vessel or vessel['memberId']:
+        abort(404)
+    if vessel['unit'] != h.unit():
+        abort(403)
+    history = h.history(cur, 'Vessels', vessel_id)
+    cur.close()
+    return _page('_vessel_panel.html', vessel=vessel, failed={}, history=history, kind=M.KINDS['public'],
+                 labels=M.LABELS, vessel_tabs=VESSEL_TABS)
 
 
 @bp.route('/vessels/new', methods=['GET', 'POST'])

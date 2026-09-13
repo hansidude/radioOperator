@@ -1,0 +1,6 @@
+{# The log on page's Member tab: the member page's own content, loaded in place (member_pages.member_panel). #}
+{% import 'radio/_record_view.html' as views %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+<div class="ro-panel-tabs">{{ entity_nav.parent_link('/member/%d' % member.id, member.memberNumber ~ ' ' ~ member.firstName ~ ' ' ~ member.lastName, 'person-vcard') }}
+{{ entity_nav.tabs('memberPanelTabs', 'Member tabs', tabs, prefix='ro-member-') }}</div>
+{{ views.member_panes(member, children, history, kinds, labels, failed) }}
