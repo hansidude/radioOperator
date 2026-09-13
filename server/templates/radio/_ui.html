@@ -4,7 +4,8 @@
 
 {% macro styles() %}
 <style>
-.ro-cond{font-size:.72rem;letter-spacing:.02em}
+.ro-status-now{font-size:1.05rem;font-weight:600}
+.ro-status-now .dc-record-badge{padding:.1rem .5rem}
 .ro-gaps{font-size:.82rem}
 .ro-gaps ol{display:flex;flex-wrap:wrap;gap:.3rem;padding:0;margin:.2rem 0 0;list-style:none}
 .ro-gaps button{font-size:.75rem;padding:.05rem .45rem}
@@ -91,14 +92,6 @@
 
 {% macro minutes(m) %}{% if m|abs < 60 %}{{ m|abs }} min{% elif m|abs < 1440 %}{{ (m|abs // 60) }} h {{ (m|abs % 60) }} min{% else %}{{ (m|abs // 1440) }} d {{ ((m|abs % 1440) // 60) }} h{% endif %}{% endmacro %}
 
-{% macro cond(r) %}
-{% if r.condition == 'overdue' %}<span class="badge text-bg-danger ro-cond">OVERDUE {{ minutes(r.minutes) }}</span>
-{% elif r.condition == 'approaching' %}<span class="badge text-bg-warning ro-cond">Due in {{ minutes(r.minutes) }}</span>
-{% elif r.condition == 'notwatched' %}<span class="badge text-bg-warning ro-cond">DRAFT</span>
-{% elif r.condition == 'nodeadline' %}<span class="badge text-bg-secondary ro-cond">No deadline</span>
-{% else %}<span class="badge border text-secondary ro-cond">Due in {{ minutes(r.minutes) }}</span>{% endif %}
-{% endmacro %}
-
 {# ACC-5: drafts are shown wherever the queue is, never mixed into it, oldest first. #}
 {# What the checker has raised, on the page whether or not the page was open when it happened.
    Acknowledging records attention only: it satisfies nothing and closes nothing (§2). #}
@@ -171,12 +164,22 @@
                   ('loggedon', 'loggedOn', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
                   ('closed', 'closed', 'Closed')] %}
 
+{# The STATES key a record is shown under, the same on the log and on its own page. #}
+{% macro state_key(r) -%}
+  {{- 'discarded' if r.watchStatus in ('discarded', 'cancelled') else
+      ('notdeparted' if r.closeReason == 'notdeparted' else 'loggedOff') if r.watchStatus == 'loggedOff' else
+      'draft' if r.watchStatus == 'draft' else
+      'overdue' if r.condition == 'overdue' else 'loggedOn' -}}
+{%- endmacro %}
+
+{# A log on's own page says its status plainly: the log's symbol and word, large. #}
+{% macro status_badge(r) -%}
+  {%- set status = STATES[state_key(r)] -%}
+  <span class="ro-status-now" data-status="{{ state_key(r) }}">{{ records_ui.symbol(status.symbol, status.label, value=status.label, tone=status.tone) }}</span>
+{%- endmacro %}
+
 {% macro state_label(r) -%}
-  {%- set key = 'discarded' if r.watchStatus in ('discarded', 'cancelled') else
-               ('notdeparted' if r.closeReason == 'notdeparted' else 'loggedOff') if r.watchStatus == 'loggedOff' else
-               'draft' if r.watchStatus == 'draft' else
-               'overdue' if r.condition == 'overdue' else 'loggedOn' -%}
-  {%- set status = STATES[key] -%}
+  {%- set status = STATES[state_key(r)] -%}
   {{- records_ui.symbol(status.symbol, status.label, tone=status.tone) -}}
   {%- if r.watchStatus != 'draft' and r.verifyOutcome == 'conflict' -%}
     {{- records_ui.symbol(STATES.conflict.symbol, STATES.conflict.label, tone=STATES.conflict.tone, detail=r.verifyBasis or '') -}}

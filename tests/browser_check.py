@@ -100,11 +100,9 @@ def main(engine='chromium'):
             page.locator('[data-now-for="callTime"]').click()           # a real click: sets now as 4-digit 24-hour
             expect(page.locator('#f-callTime')).to_have_value(re.compile(r'^([01][0-9]|2[0-3])[0-5][0-9]$'))
             page.locator('#f-callTime').fill(fields['callTime'])
-            page.locator('[data-ro-tab="contact"]').click()
-            expect(page.locator('#captureContact')).to_be_visible()
-            page.locator('[data-ro-tab="entry"]').click()
+            expect(page.locator('[data-ro-tab="contact"], [data-ro-tab="identity"], [data-ro-tab="record"]')).to_have_count(0)
             page.wait_for_timeout(400)  # detect unwanted debounced autosave
-            assert len(writes) == before, 'Typing or switching tabs wrote a record'
+            assert len(writes) == before, 'Typing wrote a record'
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
             expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
@@ -234,9 +232,8 @@ def main(engine='chromium'):
             expect(bottom.locator('[data-save-record]')).to_be_visible()                 # Save, Accept, Discard in one row
             expect(bottom.locator('input[name="reason"]')).to_be_visible()
             expect(bottom.get_by_role('button', name='Discard draft')).to_be_visible()
-            page.locator('[data-ro-tab="contact"]').click()
-            expect(page.locator('#ro-contact-pane .ro-primary-actions [data-save-record]')).to_be_visible()
-            page.locator('[data-ro-tab="entry"]').click()
+            expect(page.locator('.ro-status-now')).to_contain_text('📝')                       # its status, as on the log
+            expect(page.locator('.ro-status-now')).to_contain_text('Draft')
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-registration')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-callTime')).to_have_value('1400')
@@ -383,16 +380,20 @@ def main(engine='chromium'):
             assert abs(font() - base) < 0.3, 'Reset did not return to 100%'
             assert page.evaluate("Object.keys(localStorage).filter(k => k.indexOf('dc-record-size:') === 0).length") == 0
             visit('/logon/%s' % record)
-            page.locator('[data-ro-tab="identity"]').click()
-            page.locator('#findBox').fill(vessel)
-            expect(page.locator('#findHits')).to_contain_text(vessel)
+            page.locator('[data-ro-tab="history"]').click()                                    # a tab puts #history in the address
             page.locator('[data-ro-tab="entry"]').click()
             page.locator('#f-pob').fill(fields['pob'])                                          # the last required value
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
             assert '#' in page.url, 'The tab should be in the address, as it is after any tab click'
             with page.expect_navigation():                                                       # a real reload, not a hash jump
                 save()                                                                           # the save logs it on
-            expect(page.locator('#ro-entry-pane .ro-primary-actions')).to_contain_text('Logged on and watched')
+            expect(page.locator('.ro-status-now')).to_contain_text('👀')                          # the same symbol and word as the log
+            expect(page.locator('.ro-status-now')).to_contain_text('Logged on')
+            page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
+            tops = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().top))')
+            assert max(tops) - min(tops) < 12, 'Save, note and Log off are not on one line: %s' % tops
+            expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
+            expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
             watching = True
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
@@ -407,9 +408,10 @@ def main(engine='chromium'):
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
             expect(row.get_by_role('img', name='Logged off', exact=True)).to_be_visible()
             expect(row).to_have_css('background-color', 'rgba(0, 0, 0, 0.3)')              # closed: near-black
-            visit('/logon/%s#record' % record)
+            visit('/logon/%s' % record)
             expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
-            expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)
+            expect(page.locator('.ro-status-now')).to_contain_text('✅')
+            expect(page.locator('.ro-status-now')).to_contain_text('Logged off')
             # History: quackit's LogOns_history in the shared viewer, the whole life of this record.
             page.locator('[data-ro-tab="history"]').click()
             history = page.locator('#ro-history-pane .dc-history')

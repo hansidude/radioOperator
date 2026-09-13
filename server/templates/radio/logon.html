@@ -12,15 +12,11 @@
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
     {{ entity_nav.parent_link('/logons', brand, 'list-ul') }}
-    {% if not creating %}{{ ui.cond({'condition': condition, 'minutes': minutes, 'etaRaw': logon.etaRaw}) }}{% endif %}
+    {% if not creating %}{{ ui.status_badge(dict(logon, condition=condition)) }}{% endif %}
   </div>
   <div class="btn-group btn-group-sm ro-view-tabs" id="logonViewTabs" role="group" aria-label="Log on views">
     <button type="button" class="btn btn-outline-secondary active" data-ro-tab="entry" aria-controls="ro-entry-pane" aria-pressed="true"><i class="bi bi-pencil-square me-1"></i>Log on</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="contact" aria-controls="ro-contact-pane" aria-pressed="false"><i class="bi bi-telephone me-1"></i>Contact</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="vessel" aria-controls="ro-vessel-pane" aria-pressed="false"><i class="bi bi-water me-1"></i>Vessel</button>
-    {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-journal-text me-1"></i>Record</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="history" aria-controls="ro-history-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>History</button>{% endif %}
+    {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="history" aria-controls="ro-history-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>History</button>{% endif %}
   </div>
   {% if open %}{{ save_button('saveRecord', 'btn-sm') }}{% endif %}
   <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>
@@ -28,13 +24,6 @@
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-{% macro reopen_form() %}
-<form method="post" action="/logon/{{ logon.id }}/reopen" class="d-flex gap-1 mt-2" onsubmit="return confirm('Reopen: was this closure wrong?')">
-  <input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="version" value="{{ logon.version }}">
-  <input name="reason" class="form-control form-control-sm" style="max-width:22rem" placeholder="Reason: what was wrong with the closure" maxlength="255" required>
-  <button class="btn btn-outline-warning btn-sm text-nowrap"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button>
-</form>
-{% endmacro %}
 {% macro field(name, cols='col') %}
 {% set raw = box(logon, name) %}
 {% set needed = name in checked.red %}
@@ -67,46 +56,13 @@
     {% if clash %}<div class="text-danger mt-2">{{ clash.registration or clash.vesselName }} is already logged on as <a href="/logon/{{ clash.id }}">{{ reference(clash) }}</a>. One vessel has one log on.</div>{% endif %}
     <div class="ro-primary-actions">{{ save_button() }}<form method="post" action="/logon/{{ logon.id }}/discard" class="d-flex gap-2 align-items-center" onsubmit="return confirm('Discard: this was never a log on?')"><input type="hidden" name="back" value="/logons"><input name="reason" class="form-control" style="width:22rem;max-width:60vw" placeholder="Why this was never a log on" aria-label="Discard reason" maxlength="255" required><button class="btn btn-outline-danger text-nowrap"><i class="bi bi-trash me-1"></i>Discard draft</button></form></div>
     {% elif open %}
-    <div class="ro-primary-actions">{{ save_button() }}<strong>Logged on and watched</strong><select name="reason" form="logoffForm" class="form-select" style="width:auto">{% for key, label in close_reasons %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select><input id="logoffNote" name="note" form="logoffForm" class="form-control flex-grow-1" style="min-width:14rem" placeholder="Contact or evidence" maxlength="255"><button form="logoffForm" class="btn btn-success text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></div>
+    <div class="ro-primary-actions">{{ save_button() }}<input id="logoffNote" name="note" form="logoffForm" class="form-control" style="width:22rem;max-width:60vw" placeholder="Contact or evidence" aria-label="Log off note" maxlength="255"><button form="logoffForm" class="btn btn-success text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></div>
     <form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: end the watch on this log on?')"><input type="hidden" name="back" value="/logons"></form>
     {% endif %}
   </div>
 </section>
 
-<section id="ro-contact-pane" class="ro-workspace-pane d-none" data-ro-pane="contact">
-  <h2 class="ro-section-title">Contact and departure</h2>
-  <form id="captureContact" class="ro-form ro-detail-form" autocomplete="off" onsubmit="return false">
-    <div class="row g-3">{{ field('channel', 'col-12 col-md-4') }}{{ field('departureDay', 'col-12 col-md-4') }}{{ field('departureTime', 'col-12 col-md-4') }}</div>
-    <div class="row g-3">{{ field('radioChannel', 'col-12 col-md-3') }}{{ field('contactName', 'col-12 col-md-4') }}{{ field('contactNumber', 'col-12 col-md-3') }}{{ field('ais', 'col-12 col-md-2') }}</div>
-  </form>
-  {% if open %}<div class="ro-primary-actions">{{ save_button() }}</div>{% endif %}
-</section>
-
-<section id="ro-vessel-pane" class="ro-workspace-pane d-none" data-ro-pane="vessel">
-  <h2 class="ro-section-title">Other vessel information</h2>
-  <form id="captureVessel" class="ro-form ro-detail-form" autocomplete="off" onsubmit="return false">
-    <div class="row g-3">{{ field('vesselType', 'col-12 col-md-3') }}{{ field('vesselDetails', 'col-12 col-md-4') }}{{ field('notes', 'col-12 col-md-5') }}</div>
-  </form>
-  {% if open %}<div class="ro-primary-actions">{{ save_button() }}</div>{% endif %}
-</section>
-
-{% if not creating %}<section id="ro-identity-pane" class="ro-workspace-pane d-none" data-ro-pane="identity">
-  <h2 class="ro-section-title">Find and verify</h2>
-  {{ ui.find(logon.id) }}
-  <div class="mt-4">{{ ui.verification(verified) }}</div>
-  <section class="ro-gaps mt-3" aria-label="Still to ask"><strong>Still to ask</strong><ol id="gaps">{% for g in gaps %}<li><button type="button" class="btn btn-outline-secondary {{ g.cls }}" data-focus="{{ g.field }}"><span class="me-1">{{ g.cls }}</span>{{ g.label }}</button></li>{% else %}<li class="small text-success">Nothing left to ask.</li>{% endfor %}</ol></section>
-</section>
-
-<section id="ro-record-pane" class="ro-workspace-pane d-none" data-ro-pane="record">
-  <h2 class="ro-section-title">Record actions</h2>
-  {% if logon.watchStatus in ('discarded', 'cancelled') %}<div class="alert alert-warning">Discarded {{ ui.when(logon.discardedAt or logon.cancelledAt, now) }}: {{ logon.discardReason or logon.cancelReason }}. This was never a log on.</div>
-  {% elif not open %}<div class="alert alert-secondary">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}.</div>{% endif %}
-  {% if logon.watchStatus in ('discarded', 'cancelled') or not open %}{{ reopen_form() }}{% endif %}
-  {% if identifiers %}<div class="ro-idents mt-4"><strong>Heard</strong><ul class="mb-0">{% for i in identifiers %}<li class="{{ '' if i.isActive else 'old' }}">{{ labels[i.kind] }}: <code>{{ i.raw }}</code> <span class="text-secondary">{{ i.capturedAt|hhmm }} {{ i.source }}{% if not i.isActive %} superseded{% endif %}</span></li>{% endfor %}</ul></div>{% endif %}
-</section>
-{# Every change to this record, from quackit's generated LogOns_history, in the history viewer every
-   other quackit page uses. A host that keeps no history says so. #}
-<section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
+{% if not creating %}<section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges with context %}
   {% set history_symbols = {} %}{% for field, symbol in ui.FIELD_SYMBOLS.items() %}{% set _ = history_symbols.update({column(field): symbol}) %}{% endfor %}
@@ -114,7 +70,6 @@
   {{ dcFn_ShowHistoryChanges(history, dcKey_i='logon-history', dcTitle_i='Log on history', dcFieldLabelsDictionary_i=history_labels, dcSortControls_i=True, dcAdvancedSearch_i=True,
                              dcFieldSymbolsDictionary_i=history_symbols, dcValueLabelsDictionary_i={'watchStatus': status_words}) }}{% endif %}
 </section>
-{{ ui.find_script(logon.id) }}
 {% endif %}
 <script>
 (function () {

@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flask import Flask, g, session
+from server import identity as ID
 from server import logons as L
 from server.host import Host
 from server.routes import mount
@@ -128,14 +129,14 @@ class Pages(unittest.TestCase):
         self.assertIn('type="date" class="ro-native-picker" data-picker-target="callDay"', page)
         self.assertIn('data-now-for="callTime"', page)                 # the clock sets now: no browser time picker
         self.assertNotIn('type="time"', page)
-        self.assertIn('Still to ask', page)
+        self.assertNotIn('Still to ask', page)                        # the Identity tab is gone for now
         self.assertNotIn('This is a draft, not a log on', page)       # what stops acceptance is shown red, not written
         self.assertIn('id="f-callTime" class="form-control" data-field="callTime" value="09', page)   # 09:0n reads back as 090n
         for name in ('pob', 'departurePoint', 'destination', 'etaDay', 'eta', 'memberNumber', 'vesselName', 'registration'):
             self.assertIn('id="f-%s" class="form-control is-invalid"' % name, page)
         self.assertIn('id="f-mobile" class="form-control" data-field', page)              # heard, so not red
-        self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 4)         # navbar, beside Accept, Contact, Vessel
-        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-contact-pane"')]
+        self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 2)         # navbar and the bottom row
+        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-history-pane"')]
         self.assertIn('action="/logon/%d/discard"' % i, entry)          # discard sits on the Log on tab's bottom row
         self.assertEqual(page.count('/discard"'), 1)
         self.assertIn('<label for="f-vesselName">Vessel Name</label>', page)
@@ -183,11 +184,14 @@ class Pages(unittest.TestCase):
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
-        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-contact-pane"')]
+        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-history-pane"')]
         self.assertIn('data-ro-tab="entry"', page)
-        for tab in ('contact', 'vessel', 'identity', 'record'):
-            self.assertIn('data-ro-tab="%s"' % tab, page)
-            self.assertIn('id="ro-%s-pane" class="ro-workspace-pane d-none"' % tab, page)
+        self.assertIn('id="ro-history-pane" class="ro-workspace-pane d-none"', page)
+        for tab in ('contact', 'vessel', 'identity', 'record'):                   # set aside until they are done properly
+            self.assertNotIn('data-ro-tab="%s"' % tab, page)
+            self.assertNotIn('id="ro-%s-pane"' % tab, page)
+        self.assertIn('<span class="ro-status-now" data-status="draft">', page)     # the log's symbol and word, large
+        self.assertIn('>Draft</span>', page)
         self.assertNotIn('data-ro-tab="watch"', page)
         self.assertNotIn('id="ro-watch-pane"', page)
         self.assertEqual(entry.count('class="capture-row row g-3"'), 5)
@@ -366,7 +370,7 @@ class Pages(unittest.TestCase):
             self.field(i, name, value)
         self.assertFalse(self.save(i)['accepted'])                        # short of the mandatory set: still a draft
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('DRAFT', page)
+        self.assertIn('data-status="draft"', page)
         self.assertNotIn('NOT WATCHED', page)
         self.assertNotIn('ro-record-card overdue', page)                  # the return time passed hours ago
         listing = self.a.get('/logons').get_data(as_text=True)
@@ -383,8 +387,10 @@ class Pages(unittest.TestCase):
         saved = self.save(i)
         self.assertTrue(saved['accepted'])
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('Logged on and watched', page)
-        self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
+        self.assertNotIn('Logged on and watched', page)                   # no words and no reason dropdown
+        self.assertNotIn('name="reason" form="logoffForm"', page)
+        self.assertIn('data-status="overdue"', page)                      # overdue from the moment of acceptance
+        self.assertIn('>Overdue</span>', page)
         listing = self.a.get('/logons?f=1&status=overdue').get_data(as_text=True)
         self.assertIn('aria-label="Overdue"', listing)
         self.assertIn('data-record="%d"' % i, listing)
@@ -409,8 +415,8 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/logon/%d/discard' % d,
                                      data={'reason': 'hit New by mistake', 'back': '/logons'}).status_code, 302)
         page = self.a.get('/logon/%d' % d).get_data(as_text=True)
-        self.assertIn('This was never a log on', page)
-        self.assertIn('hit New by mistake', page)
+        self.assertIn('data-status="discarded"', page)
+        self.assertEqual(L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), d)['discardReason'], 'hit New by mistake')
         self.assertIn('Discarded', self.a.get('/logons?f=1&status=closed').get_data(as_text=True))
         self.assertEqual(self.a.post('/api/logon/%d' % d, json={'field': 'pob', 'value': '1'}).status_code, 400)
         i = self.accepted(rego='CD456R', member='9001')
@@ -460,8 +466,10 @@ class Pages(unittest.TestCase):
         form = page[page.index('<form id="capture"'):page.index('</form>')]
         self.assertIn('4471', form)
         self.assertNotIn('Facing Island', form)                                   # a past trip is not this trip
-        self.assertIn('does not corroborate', page)                               # IDV-1, said plainly
-        self.assertIn('Unverified', page)                                         # applied values prove nothing
+        cur = Connection(Path(self.tmp.name) / 'test.db').cursor()                    # IDV-1: the check says so plainly
+        got = ID.verify(cur, L.get(cur, second), L.identifiers(cur, second))           # (not on the page while Identity is set aside)
+        self.assertTrue([e for e in got['evidence'] if not e['independent']], got)     # applied, so it corroborates nothing
+        self.assertEqual(got['outcome'], 'unverified')                                # applied values prove nothing
         self.assertEqual(self.a.post('/logon/%d/apply' % second, json={'key': 'rego:NOPE'}).status_code, 400)
 
     def test_a_conflict_is_visible_on_the_record_and_the_queue(self):             # IDV-2, IDV-3, IDV-4
@@ -473,9 +481,6 @@ class Pages(unittest.TestCase):
         self.a.post('/api/logon/%d' % mixed, json={'field': 'registration', 'value': 'AB123Q'})
         r = self.a.post('/api/logon/%d' % mixed, json={'field': 'memberNumber', 'value': '8802'})
         self.assertEqual(r.status_code, 200)
-        page = self.a.get('/logon/%d' % mixed).get_data(as_text=True)
-        self.assertIn('CONFLICT', page)
-        self.assertIn('different boats or people', page)
         self.assertNotIn('CONFLICT', self.a.get('/logons?status=draft').get_data(as_text=True))  # draft rows are paper fields only
         for name, value in (('pob', '2'), ('departurePoint', 'Marina'), ('destination', 'Bay'),
                             ('etaDay', 'today'), ('eta', '2300')):

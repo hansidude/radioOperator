@@ -35,9 +35,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Log on form (`/logon/<id>`, `/logons/new`)
 
+- The page shows the record's status large, with the log's symbol and word (📝 Draft, 👀 Logged on,
+  🚨 Overdue, ✅ Logged off, 🏠 Never departed, 🗑️ Discarded). Tabs: Log on and History only.
 - Five paper rows on the Log on tab: Date | Time; Member No. | Vessel Name | Rego | Mobile;
   Length | Hull colour | Make | Model; POB | Departure | Going to; Return day | Time.
-  Contact, Vessel, Identity and Record tabs hold the rest.
 - Explicit save only: nothing is written until Save, one save is one update and one history event,
   a stale version is refused visibly (409), leaving with unsaved changes warns.
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every
@@ -106,14 +107,20 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 
 ### Clean-up
 
+- [ ] **Set aside on 2026-09-13, to be redone properly:** the log on page's Contact, Vessel, Identity and Record
+      tabs (owner: *"all these fields are shit"*). Out of sight until then: channel, departure, radio
+      channel, contact, AIS, vessel type/details/notes (values kept, not editable); Find and apply an
+      earlier trip; the identity check's evidence, including IDV-1's "applied, so it does not corroborate"
+      (still computed, shown nowhere); Still to ask; the Heard list; reopening a closed record (route kept,
+      no button); the log off reason (always "returned"). `_ui.html` find, find_script and verification
+      macros and the page route's gaps/identifiers/verified values are unused until then.
+
 - [ ] Remove `logons.rename_statuses` and `STATUS_RENAMES` once 8080 and every other database has been
       converted (the checker logs `renamed N stored statuses` when it converts any).
 
 - [ ] **`Identifiers` overlaps `LogOns_history`.** Every change to Member No., Rego, Mobile and Vessel
       Name is already in history; `Identifiers` adds the normalised copy the identity check matches
       earlier trips on. Owner, 2026-09-13: leave it for now; replacing it is a separate decision.
-- [ ] A closed log on shows the yellow DRAFT badge beside the RadioLogs button (`ui.cond` treats every
-      not-watched record as a draft). Seen on the History screenshot.
 - [ ] Logged on by / Entered by store the quackit user id (history shows `4`); the event's own person
       is named. Name them through `Host` if wanted.
 
