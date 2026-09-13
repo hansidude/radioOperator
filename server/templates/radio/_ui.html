@@ -390,6 +390,25 @@
 {% if remove %}<form id="{{ form }}-remove" method="post" action="{{ remove }}" onsubmit="return confirm('Remove this?')"><input type="hidden" name="version" value="{{ version }}"></form>{% endif %}
 {% endmacro %}
 
+{# A member's contacts, vessels, trailers or cars as record_grid rows: a column per field, the log's symbol
+   where the field has one, and an open button to the record's own page. #}
+{% set CHILD_SYMBOLS = {'vesselName': FIELD_SYMBOLS.vesselName, 'registration': FIELD_SYMBOLS.registration,
+                        'length': FIELD_SYMBOLS.length, 'hullColour': FIELD_SYMBOLS.hullColour, 'make': FIELD_SYMBOLS.make,
+                        'model': FIELD_SYMBOLS.model, 'phone': FIELD_SYMBOLS.mobile} %}
+{% macro member_children(member, kind, spec, labels, rows, key) %}
+{% set grid = namespace(columns=[], rows=[]) %}
+{% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': CHILD_SYMBOLS.get(f, ''),
+                                                               'width': 'minmax(0,1.3fr)' if loop.first else 'minmax(0,1fr)'}] %}{% endfor %}
+{% set grid.columns = grid.columns + [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
+{% for c in rows %}
+  {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/{{ c.id }}" title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set _ = cells.update({'action': action}) %}
+  {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells}] %}
+{% endfor %}
+{{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower) }}
+{% endmacro %}
+
 {# Quackit's navbar links from the log to the standing records, and back. #}
 {% macro records_links() %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}

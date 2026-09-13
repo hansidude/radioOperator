@@ -3,6 +3,7 @@
 {% import 'myMacro_record_view.html' as records_ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 {% from 'myMacro_filters.html' import search_controls %}
+{% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-people me-1"></i>Members{% endblock %}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
@@ -17,6 +18,7 @@
 <form id="roMemberFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Members filters" method="get" action="/members"
       hx-get="/members" hx-target="#roMemberRows" hx-select="#roMemberRows" hx-swap="outerHTML"
       hx-trigger="input from:#roMemberSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
+  {{ view_controls('roMemberView') }}
   {{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
 {% set display = namespace(rows=[]) %}
@@ -26,12 +28,12 @@
   {% set display.rows = display.rows + [{'id': m.id, 'cells': {'number': number, 'firstName': m.firstName, 'lastName': m.lastName, 'mobile': m.mobile or '', 'email': m.email or '',
                                                                 'vessels': m.vesselNames, 'action': action}}] %}
 {% endfor %}
-<div id="roMemberRows">{{ records_ui.record_grid(display.rows, [
+<div id="roMemberView"><div id="roMemberRows">{{ records_ui.record_grid(display.rows, [
   {'key': 'number', 'label': 'Member No.', 'symbol': ui.FIELD_SYMBOLS.memberNumber, 'width': 'minmax(6rem,.7fr)', 'kind': 'index'},
   {'key': 'firstName', 'label': 'First name', 'width': 'minmax(0,1fr)'},
   {'key': 'lastName', 'label': 'Last name', 'width': 'minmax(0,1fr)'},
   {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
   {'key': 'email', 'label': 'Email', 'width': 'minmax(0,1.3fr)'},
   {'key': 'vessels', 'label': 'Vessels', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.5fr)'},
-  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioMembers', '0 members') }}</div>
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioMembers', '0 members') }}</div></div>
 {% endblock %}

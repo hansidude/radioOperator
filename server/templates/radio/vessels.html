@@ -3,6 +3,7 @@
 {% import 'myMacro_record_view.html' as records_ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 {% from 'myMacro_filters.html' import search_controls %}
+{% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-life-preserver me-1"></i>Public vessels{% endblock %}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
@@ -16,6 +17,7 @@
 <form id="roVesselFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Public vessel filters" method="get" action="/vessels"
       hx-get="/vessels" hx-target="#roVesselRows" hx-select="#roVesselRows" hx-swap="outerHTML"
       hx-trigger="input from:#roVesselSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
+  {{ view_controls('roVesselView') }}
   {{ search_controls('roVesselSearch', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
 {% set display = namespace(rows=[]) %}
@@ -25,11 +27,11 @@
   {% set display.rows = display.rows + [{'id': v.id, 'cells': {'name': name, 'rego': v.registration or '', 'owner': v.ownerName or '',
                                                                 'phone': v.ownerPhone or '', 'details': ui.vessel_summary(v, ''), 'action': action}}] %}
 {% endfor %}
-<div id="roVesselRows">{{ records_ui.record_grid(display.rows, [
+<div id="roVesselView"><div id="roVesselRows">{{ records_ui.record_grid(display.rows, [
   {'key': 'name', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.3fr)', 'kind': 'index'},
   {'key': 'rego', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration, 'width': 'minmax(0,.9fr)'},
   {'key': 'owner', 'label': 'Owner', 'width': 'minmax(0,1.2fr)'},
   {'key': 'phone', 'label': 'Owner phone', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
   {'key': 'details', 'label': 'Vessel details', 'symbol': ui.FIELD_SYMBOLS.vesselDetails, 'width': 'minmax(0,1.4fr)'},
-  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioVessels', '0 public vessels') }}</div>
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioVessels', '0 public vessels') }}</div></div>
 {% endblock %}

@@ -102,25 +102,47 @@ def main(engine='chromium'):
             member_no = page.locator('#ro-member-details .ro-section-title').inner_text().split()[-1]
             assert re.match(r'^m[0-9]{5}$', member_no), 'Member number is not mXXXXX: %r' % member_no
             expect(page.locator('#member-mobile')).to_have_value('0412 345 678')
-            page.locator('[data-entity-tab="vessels"]').click()
-            expect(page.locator('#ro-member-vessels')).to_be_visible()
-            page.locator('#vessels-new-vesselName').fill(vessel)
-            page.locator('#vessels-new-registration').fill(token)
-            page.locator('#vessels-new-length').fill('six')                                  # not a number: red, on the same tab
-            page.locator('#ro-member-vessels form#vessels-new button.btn-warning').click()
-            expect(page.locator('#ro-member-vessels')).to_be_visible()
-            expect(page.locator('#vessels-new-length')).to_have_class(re.compile('is-invalid'))
-            page.locator('#vessels-new-length').fill('6')
-            page.locator('#ro-member-vessels form#vessels-new button.btn-warning').click()
+            # Contacts, vessels, trailers and cars: Quackit's shared record_grid rows, each opening its own page.
+            def add_on_tab(kind, values, refused=None):
+                page.locator('[data-entity-tab="%s"]' % kind).click()
+                expect(page.locator('#ro-member-%s .dc-record-toolbar [data-dc-record-view="cards"]' % kind)).to_be_visible()
+                page.locator('#ro-member-%s a[href$="/%s/new"]' % (kind, kind)).click()
+                page.wait_for_url(re.compile(r'/member/[0-9]+/%s/new$' % kind))
+                expect(page.locator('[placeholder]')).to_have_count(0)
+                for name, value in values.items():
+                    page.locator('#%s-new-%s' % (kind, name)).fill(value)
+                if refused:
+                    name, bad, good = refused
+                    page.locator('#%s-new-%s' % (kind, name)).fill(bad)
+                    page.locator('form#%s-new button.btn-warning' % kind).click()
+                    expect(page.locator('#%s-new-%s' % (kind, name))).to_have_class(re.compile('is-invalid'))
+                    page.locator('#%s-new-%s' % (kind, name)).fill(good)
+                page.locator('form#%s-new button.btn-warning' % kind).click()
+                page.wait_for_url(re.compile(r'/member/[0-9]+#%s$' % kind))
+                expect(page.locator('#ro-member-%s' % kind)).to_be_visible()                  # back on the tab it came from
+            add_on_tab('vessels', {'vesselName': vessel, 'registration': token}, refused=('length', 'six', '6'))
+            add_on_tab('vessels', {'vesselName': 'SECOND-' + token, 'registration': 'S2-' + token})
+            rows = page.locator('#radioMemberVessels .dc-record-grid-row')
+            expect(rows).to_have_count(2)
+            expect(page.locator('#radioMemberVessels .dc-record-grid-head')).to_contain_text('Vessel Name')
+            page.locator('#ro-member-vessels .dc-search-input').first.fill('second-')             # the shared row search
+            expect(rows.filter(has_text='SECOND-' + token)).to_be_visible()
+            expect(rows.filter(has_text='SECOND-' + token)).to_have_count(1)
+            expect(page.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)
+            page.locator('#ro-member-vessels .dc-search-reset').first.click()
+            expect(rows).to_have_count(2)
+            expect(rows.nth(0)).to_be_visible()
+            page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()                 # the shared view buttons
+            expect(page.locator('#radioMemberVesselsView')).to_have_class(re.compile(r'\bdc-record-cards\b'))
+            page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()
+            rows.nth(1).locator('a[title="Open vessel"]').click()                                 # a row opens its own page
+            page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/[0-9]+$'))
+            page.locator('input[name="hullColour"]').fill('white')
+            page.locator('form button.btn-warning').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+#vessels$'))
-            expect(page.locator('#ro-member-vessels')).to_be_visible()                       # back on the tab it was on
-            expect(page.locator('#ro-member-vessels input[name="vesselName"][value="%s"]' % vessel)).to_have_count(1)
-            page.locator('[data-entity-tab="contacts"]').click()
-            page.locator('#contacts-new-name').fill('Verify Contact ' + token)
-            page.locator('#contacts-new-phone').fill('0499888777')
-            page.locator('#ro-member-contacts form#contacts-new button.btn-warning').click()
-            page.wait_for_url(re.compile(r'/member/[0-9]+#contacts$'))
-            expect(page.locator('#ro-member-contacts input[name="name"][value="Verify Contact %s"]' % token)).to_have_count(1)
+            expect(rows.filter(has_text='SECOND-' + token)).to_contain_text('white')
+            add_on_tab('contacts', {'name': 'Verify Contact ' + token, 'phone': '0499888777'})
+            expect(page.locator('#radioMemberContacts .dc-record-grid-row')).to_contain_text('0499 888 777')
             page.locator('[data-entity-tab="details"]').click()
             page.locator('#member-email').fill('verify.changed@example.com')                  # one save, one history event
             page.locator('#ro-member-details button.btn-warning').click()

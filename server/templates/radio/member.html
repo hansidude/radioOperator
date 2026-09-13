@@ -1,6 +1,8 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
+{% import 'myMacro_record_view.html' as records_ui %}
+{% import 'myMacro_filters.html' as mf %}
 {% block body_wrap_class %}container-fluid{% endblock %}
 {% block page_title %}<i class="bi bi-person-vcard me-1"></i>{% if creating %}New member{% else %}Member {{ member.memberNumber }}{% endif %}{% endblock %}
 {% block navbar_buttons %}
@@ -20,14 +22,17 @@
   <p class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</p>
   {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version) }}
 </section>
+{# Contacts, vessels, trailers and cars: one row each through Quackit's shared record_grid, with its view
+   buttons (cards, paragraphs, text size) and the shared search over the rows. A row opens its own page. #}
 {% for kind in ('contacts', 'vessels', 'trailers', 'cars') %}
+{% set grid = 'radioMember' ~ kind|capitalize %}
 <section id="ro-member-{{ kind }}" class="ro-workspace-pane d-none">
-  {% for c in children[kind] %}
-  {{ ui.record_form('%s-%d' % (kind, c.id), '/member/%d/%s/%d#%s' % (member.id, kind, c.id, kind), kinds[kind].fields, labels, c, failed,
-                    version=c.version, remove='/member/%d/%s/%d/remove#%s' % (member.id, kind, c.id, kind)) }}
-  {% endfor %}
-  <p class="ro-section-title mt-3">Add {{ kinds[kind].one }}</p>
-  {{ ui.record_form(kind ~ '-new', '/member/%d/%s#%s' % (member.id, kind, kind), kinds[kind].fields, labels, {}, failed, submit='Add ' ~ kinds[kind].one) }}
+  <div class="dc-record-toolbar ro-toolbar">
+    <a class="btn btn-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/new"><i class="bi bi-plus-lg me-1"></i>Add {{ kinds[kind].one }}</a>
+    {{ records_ui.view_controls(grid ~ 'View') }}
+    {{ mf.render('member-' ~ member.id ~ '-' ~ kind, grid, row_selector='.dc-record-grid-row', show_logic=False) }}
+  </div>
+  <div id="{{ grid }}View">{{ ui.member_children(member, kind, kinds[kind], labels, children[kind], grid) }}</div>
 </section>
 {% endfor %}
 <section id="ro-member-history" class="ro-workspace-pane d-none">

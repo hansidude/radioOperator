@@ -80,7 +80,15 @@ class Members(unittest.TestCase):
         for tab in ('details', 'contacts', 'vessels', 'trailers', 'cars', 'history'):
             self.assertIn('data-entity-tab="%s"' % tab, page)                        # Quackit's shared tabs
             self.assertIn('id="ro-member-%s"' % tab, page)
-        self.assertIn('action="/member/%d/vessels#vessels"' % i, page)               # each form comes back to its tab
+        self.assertIn('href="/member/%d/vessels/new"' % i, page)                    # Add opens its own page
+        self.assertNotIn('<form id="vessels-new"', page)                            # no stack of forms on the tab
+        self.assertIn('id="radioMemberVessels" class="dc-record-view dc-record-grid"', page)   # Quackit's shared grid
+        self.assertIn('aria-controls="radioMemberVesselsView"', page)               # its view buttons
+        self.assertIn('id="mf-member-%d-vessels-i1"' % i, page)                     # and its row search
+        self.assertIn('>0 vessels</div>', page)
+        new = self.a.get('/member/%d/vessels/new' % i).get_data(as_text=True)
+        self.assertIn('<form id="vessels-new" method="post" action="/member/%d/vessels"' % i, new)
+        self.assertNotIn('placeholder=', new)
 
     def test_a_member_holds_many_of_each_and_removes_them_without_deleting(self):
         i = self.member()
@@ -101,9 +109,12 @@ class Members(unittest.TestCase):
             self.assertIn(text, page)
         self.assertIn('Sea Dog, CD456R', self.a.get('/members').get_data(as_text=True))
 
+        self.assertIn('href="/member/%d/cars/%d"' % (i, M.children(cur, 'cars', i)[0]['id']), page)   # each row opens its page
         car = M.children(cur, 'cars', i)[0]
+        self.assertIn('value="Hilux"', self.a.get('/member/%d/cars/%d' % (i, car['id'])).get_data(as_text=True))
         r = self.a.post('/member/%d/cars/%d' % (i, car['id']), data={'registration': 'CAR01', 'make': 'Ford', 'version': car['version']})
         self.assertEqual(r.status_code, 302)
+        self.assertTrue(r.location.endswith('/member/%d#cars' % i))                  # back to the tab it came from
         self.assertEqual(self.a.post('/member/%d/cars/%d' % (i, car['id']), data={'registration': 'CAR01', 'version': car['version']}).status_code, 409)
         self.assertEqual(self.a.post('/member/%d/cars/%d/remove' % (i, car['id']), data={'version': car['version'] + 1}).status_code, 302)
         cur = self.db()

@@ -1,9 +1,10 @@
 """
 The member and public vessel pages, on the same blueprint as the log.
 
-Plain forms: a save posts, a refusal renders the same page again with the values typed and the
-boxes that stopped it red (400), or with the reason when someone else saved first (409). Every form
-action carries its tab (`#vessels`), so the browser comes back to the tab it was on either way.
+A member's contacts, vessels, trailers and cars are listed on their tabs through Quackit's shared
+record_grid, and each opens on its own page, like a log on from the log. Plain forms: a save posts, a
+refusal renders the same page again with the values typed and the boxes that stopped it red (400), or
+with the reason when someone else saved first (409); a save goes back to the member on that tab.
 """
 from flask import abort, jsonify, make_response, redirect, request
 
@@ -100,6 +101,22 @@ def member_page(member_id):
     return redirect('/member/%d' % member_id)
 
 
+def _child_page(cur, h, member, kind, row, failed=None, status=200):
+    """One contact, vessel, trailer or car: its form, reached from its row on the member's tab (like a log
+    on from the log). `row` is None for a new one."""
+    cur.close()
+    return _page('member_record.html', member=member, kind=kind, spec=M.KINDS[kind], record=row or M.blank(kind),
+                 creating=row is None, failed=failed or {}, labels=M.LABELS), status
+
+
+@bp.route('/member/<int:member_id>/<kind>/new')
+def member_child_new(member_id, kind):
+    h, (conn, cur) = _open()
+    if kind not in M.CHILDREN:
+        abort(404)
+    return _child_page(cur, h, _member(cur, h, member_id), kind, None)
+
+
 @bp.route('/member/<int:member_id>/<kind>', methods=['POST'])
 def member_add(member_id, kind):
     """Add an emergency contact, vessel, trailer or car to a member."""
@@ -115,39 +132,41 @@ def member_add(member_id, kind):
         if _wants_json():
             cur.close()
             return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 400
-        return _member_page(cur, h, member, _refused(e, kind + '-new', values), 400)
+        return _child_page(cur, h, member, kind, None, _refused(e, kind + '-new', values), 400)
     conn.commit()
     if _wants_json() and kind == 'vessels':
         item = M.vessel_item(M.get(cur, 'vessels', child_id))
         cur.close()
         return jsonify({'id': child_id, 'item': item})
     cur.close()
-    return redirect('/member/%d' % member_id)
+    return redirect('/member/%d#%s' % (member_id, kind))
 
 
-def _child(cur, h, member_id, kind, child_id):
+def _child(cur, h, member_id, kind, child_id, lock=True):
     if kind not in M.CHILDREN:
         abort(404)
     member = _member(cur, h, member_id)
-    row = M.get(cur, kind, child_id, lock=True)
+    row = M.get(cur, kind, child_id, lock=lock)
     if not row or row['memberId'] != member['id']:
         abort(404)
     return member, row
 
 
-@bp.route('/member/<int:member_id>/<kind>/<int:child_id>', methods=['POST'])
+@bp.route('/member/<int:member_id>/<kind>/<int:child_id>', methods=['GET', 'POST'])
 def member_child_save(member_id, kind, child_id):
     h, (conn, cur) = _open()
-    member, row = _child(cur, h, member_id, kind, child_id)
+    member, row = _child(cur, h, member_id, kind, child_id, lock=request.method == 'POST')
+    if request.method == 'GET':
+        return _child_page(cur, h, member, kind, row)
     values = _values(kind)
     try:
         M.save(cur, kind, row, values, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
-        return _member_page(cur, h, member, _refused(e, '%s-%d' % (kind, child_id), values), 409 if isinstance(e, L.Stale) else 400)
+        return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), values), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
     cur.close()
-    return redirect('/member/%d' % member_id)
+    return redirect('/member/%d#%s' % (member_id, kind))
 
 
 @bp.route('/member/<int:member_id>/<kind>/<int:child_id>/remove', methods=['POST'])
@@ -158,10 +177,10 @@ def member_child_remove(member_id, kind, child_id):
         M.remove(cur, kind, row, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
-        return _member_page(cur, h, member, _refused(e, '%s-%d' % (kind, child_id), {}), 409 if isinstance(e, L.Stale) else 400)
+        return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), {}), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
     cur.close()
-    return redirect('/member/%d' % member_id)
+    return redirect('/member/%d#%s' % (member_id, kind))
 
 
 # ---------- what the log on's shared search picker asks (myMacro_search_picker.html) ----------
