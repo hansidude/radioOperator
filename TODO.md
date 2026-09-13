@@ -45,6 +45,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   editable pane. A draft's bottom row: Save · reason · Discard draft.
 - **Saving a complete draft logs it on** (spec v1.1 ACC-3): no Accept button. A save that leaves the
   mandatory set short keeps a draft; so does one refused because the vessel already has an open log on.
+- A log on cannot lose its mandatory set: a save that would empty or make unreadable POB, departure,
+  going to, the return day/time or the second ID is refused, nothing written, those boxes red (ACC-1, WAT-10).
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
 - Mobile: exactly 10 digits, saved and shown as `0412 345 678` (spaces while typing are fine); anything else
   is kept as typed and red. Search finds it with or without spaces.

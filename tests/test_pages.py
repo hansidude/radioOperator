@@ -401,6 +401,8 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.get('/api/logons/queue').json['loggedOn'][0]['condition'], 'overdue')
         self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 404)  # no separate accept action
         self.assertFalse(self.save(i)['accepted'])                        # saving a log on again changes nothing
+        refused = self.a.post('/api/logon/%d' % i, json={'fields': {'pob': ''}})
+        self.assertEqual((refused.status_code, refused.json['fields']), (400, ['pob']))   # a log on keeps its mandatory set
 
     def test_one_vessel_one_log_on(self):                                 # AC-53, ACC-6
         first = self.accepted()

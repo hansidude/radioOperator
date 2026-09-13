@@ -102,11 +102,13 @@ class Refused(Exception):
 
 
 class InvalidDraft(Refused):
-    """A draft save missing the unit's minimum identifying call details."""
+    """A save refused for what it leaves empty or unreadable, naming the boxes: a draft short of the
+    unit's minimum call details, or a logged-on record losing part of its mandatory set."""
 
-    def __init__(self, fields):
+    def __init__(self, fields, logged_on=False):
         self.fields = fields
-        super().__init__('A draft needs a valid date, time, and one of member number, vessel rego or mobile')
+        super().__init__('A log on keeps everything required: %s' % ', '.join(LABELS.get(f, f) for f in fields) if logged_on else
+                         'A draft needs a valid date, time, and one of member number, vessel rego or mobile')
 
 
 class Stale(Exception):
@@ -526,6 +528,10 @@ def _prepare_fields(row, values):
             required.append('callTime')
         if not any(after.get(field) for field in ('memberNumber', 'registration', 'mobile')):
             required.extend(('memberNumber', 'registration', 'mobile'))
+    elif row['watchStatus'] == 'loggedOn':
+        # A log on stays complete (ACC-1, WAT-10): no save may take away, or make unreadable, what
+        # the watch depends on. The boxes it would empty are named, and nothing is written.
+        required.extend(box for m in missing(after) for box in m['boxes'])
     return sets, after, sorted(set(invalid)), displays, required
 
 
@@ -556,7 +562,7 @@ def save_fields(cur, logon_id, values, user, now, version=None):
     row = _open_row(cur, logon_id, version)
     sets, after, invalid, displays, required = _prepare_fields(row, values)
     if required:
-        raise InvalidDraft(required)
+        raise InvalidDraft(required, logged_on=row['watchStatus'] == 'loggedOn')
     for field in IDENT_FIELDS:
         if field in values:
             _record_identifier(cur, logon_id, field, after.get(field), row.get(field), user, now)
@@ -735,6 +741,10 @@ def set_field(cur, logon_id, field, value, user, now, version=None):
         if field in IDENT_FIELDS:
             _record_identifier(cur, logon_id, field, value, row[field], user, now)
             sets.update(_verify_sets(cur, row, sets))
+    if row['watchStatus'] == 'loggedOn':            # the same rule for a single field (ACC-1, WAT-10)
+        short = [box for m in missing(dict(row, **sets)) for box in m['boxes']]
+        if short:
+            raise InvalidDraft(short, logged_on=True)
     out['version'] = _bump(cur, row, sets, user, now)
     out['gaps'] = gaps(dict(row, **sets))
     return out

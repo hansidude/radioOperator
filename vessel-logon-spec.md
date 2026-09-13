@@ -535,7 +535,9 @@ set is: **at least two of** member number, vessel name, vessel registration and 
 **and** persons on board, departure point, where the vessel is going, and a usable return
 day and time. Two identifiers rather than all four, because agreement between two independently
 supplied values is the unit's accuracy check (A.8, IDV-1). A usable return time, because without
-one there is nothing to count down and therefore nothing to accept.
+one there is nothing to count down and therefore nothing to accept. Once accepted, a save
+**shall not** empty or make unreadable any value of the mandatory set: the save is refused, nothing
+is written, and the values it would lose are named (WAT-10).
 *Rationale: this is the existing platform's mandatory set as observed (A.10) and the paper log's
 row (A.1), with the identity columns read the way the paper reads them: a couple of them, not all.*
 
@@ -1302,6 +1304,8 @@ revisions add identifiers; they do not renumber.
   §3.3 and its actions table, the ideal call, AC-50, AC-51 and AC-52 follow.
 - The logged-on state is named **Logged on** (stored `loggedOn`, logged off `loggedOff`), replacing
   Watching (`watching`, `loggedoff`). Existing records are converted.
+- ACC-1 states that a save on a log on cannot empty or make unreadable its mandatory set (it was
+  implied by §3.3 and WAT-10, and the implementation had allowed it).
 
 <a id="section-version-10-changes-from-09"></a>
 

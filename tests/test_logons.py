@@ -118,6 +118,23 @@ class LogOns(unittest.TestCase):
         self.assertFalse(clash['accepted'])                                # same vessel already out (ACC-6)
         self.assertEqual(L.get(self.cur, clash['id'])['watchStatus'], 'draft')
 
+    def test_a_log_on_cannot_lose_its_mandatory_set(self):              # ACC-1, WAT-10
+        i = self.accepted()
+        with self.assertRaises(L.InvalidDraft) as e:
+            L.save_fields(self.cur, i, {'pob': ''}, 'alice', T0)
+        self.assertEqual(e.exception.fields, ['pob'])
+        self.assertIn('POB', str(e.exception))
+        with self.assertRaises(L.InvalidDraft) as e:
+            L.save_fields(self.cur, i, {'eta': 'soon', 'registration': ''}, 'alice', T0)   # unreadable, and an ID short
+        self.assertEqual(set(e.exception.fields), {'eta', 'registration', 'mobile', 'vesselName'})
+        with self.assertRaises(L.InvalidDraft):
+            L.set_field(self.cur, i, 'destination', '', 'alice', T0)                      # the single-field path too
+        row = L.get(self.cur, i)
+        self.assertEqual((row['watchStatus'], row['pob'], row['destination']), ('loggedOn', '3', 'Facing Island'))
+        self.assertIn('pob', L.check_fields(row, {'pob': ''})['red'])                    # red on leaving the box
+        L.save_fields(self.cur, i, {'pob': '4', 'vesselName': 'Sea Dog'}, 'alice', T0)     # changing, not emptying, is fine
+        self.assertEqual(L.get(self.cur, i)['pob'], '4')
+
     def test_a_mobile_is_ten_digits_written_0412_345_678(self):
         self.assertEqual(L.written_mobile('0412345678'), ('0412 345 678', False))
         self.assertEqual(L.written_mobile(' 04 1234 5678 '), ('0412 345 678', False))  # spaces typed anywhere

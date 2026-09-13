@@ -404,6 +404,12 @@ def main(engine='chromium'):
             expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
             expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
             watching = True
+            page.locator('#f-pob').fill('')                                                     # a log on cannot lose POB
+            save(400)
+            expect(page.locator('#saveStatus')).to_have_text('Not saved')
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
+            page.reload()
+            expect(page.locator('#f-pob')).to_have_value(fields['pob'])                        # nothing was written
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
             expect(row.get_by_role('img', name='Logged on', exact=True)).to_be_visible()
