@@ -55,7 +55,7 @@ class Members(unittest.TestCase):
                                                          'version': '0'})
         self.assertEqual(noted.status_code, 302, noted.data)
         page = self.a.get('/member/%d' % first).get_data(as_text=True)
-        self.assertIn('<label for="member-notes">Notes</label>', page)
+        self.assertIn('<label for="member-notes"><span class="ro-field-symbol" aria-hidden="true">🗒️</span> Notes</label>', page)
         self.assertIn('>Prefers channel 16\nHas a PLB</textarea>', page)
         page = self.a.get('/members').get_data(as_text=True)
         self.assertIn('m00001', page)
@@ -74,7 +74,7 @@ class Members(unittest.TestCase):
         r = self.a.post('/members/new', data={'firstName': 'Jane', 'lastName': '', 'mobile': '04123456789', 'email': 'not-an-email', 'address': 'kept'})
         self.assertEqual(r.status_code, 400)
         page = r.get_data(as_text=True)
-        self.assertIn('<label for="member-mobile">Mobile Phone Number</label>', page)    # the log on's label and rule
+        self.assertIn('<label for="member-mobile"><span class="ro-field-symbol" aria-hidden="true">📱</span> Mobile Phone Number</label>', page)    # the log on's label and rule
         for name in ('lastName', 'mobile', 'email'):
             self.assertIn('id="member-%s" name="%s" class="form-control is-invalid"' % (name, name), page)
         self.assertIn('>kept</textarea>', page)                                     # what was typed stays
@@ -226,7 +226,7 @@ class Members(unittest.TestCase):
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
         self.assertIn('<span class="ro-who-badge" data-who="public">', page)
         self.assertIn('<span class="dc-record-badge-value">Blue Duck · PUB01</span>', page)
-        self.assertIn('<label for="f-notes">Notes</label>', page)
+        self.assertIn('<label for="f-notes"><span class="ro-field-symbol" aria-hidden="true">🗒️</span> Notes</label>', page)
         self.assertIn('Member No. heard: m09999 (no such member)</textarea>', page)
         again = self.a.post('/api/logon/%d' % row['id'], json={'fields': {'memberNumber': 'm09999',
                                                                           'notes': row['notes']}, 'version': row['version']})
@@ -459,7 +459,7 @@ class Members(unittest.TestCase):
         v = int(r.location.rsplit('/', 1)[1])
         page = self.a.get('/vessel/%d' % v).get_data(as_text=True)
         self.assertIn('>Keeps a spare radio\nUsually two aboard</textarea>', page)        # notes, a text box that grows
-        self.assertIn('<label for="public-notes">Notes</label>', page)
+        self.assertIn('<label for="public-notes"><span class="ro-field-symbol" aria-hidden="true">🗒️</span> Notes</label>', page)
         for tab in ('details', 'contacts', 'history'):
             self.assertIn('data-entity-tab="%s"' % tab, page)
         self.assertIn('id="radioVesselContacts" class="dc-record-view dc-record-grid"', page)   # the same list as a member's
@@ -487,6 +487,79 @@ class Members(unittest.TestCase):
         m = self.member()
         self.assertEqual(self.a.get('/member/%d/contacts/%d' % (m, contact['id'])).status_code, 404)   # not this member's
         self.assertEqual(self.b.get('/vessel/%d/contacts/new' % v).status_code, 403)
+
+    def test_one_search_finds_every_kind_of_radio_record(self):
+        m = self.member(notes='Keeps a spare EPIRB')
+        self.vessel(m, vesselName='Sea Dog', registration='AB123Q')
+        self.a.post('/member/%d/contacts' % m, data={'name': 'Sam Smith', 'relationship': 'Partner', 'phone': '0499888777'})
+        self.a.post('/member/%d/trailers' % m, data={'registration': 'TRL77', 'make': 'Dunbier'})
+        self.a.post('/member/%d/cars' % m, data={'registration': 'CAR77', 'make': 'Toyota'})
+        pub = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB77', 'ownerName': 'Alex Public',
+                                                'ownerPhone': '0411222333', 'notes': 'Yellow kayak rack'},
+                          headers={'Accept': 'application/json'}).json['id']
+        self.a.post('/vessel/%d/contacts' % pub, data={'name': 'Pat Public', 'phone': '0433444555'})
+        self.logon(registration='AB123Q', destination='Tangalooma', notes='Called from the ramp')
+        page = self.a.get('/radio/search').get_data(as_text=True)
+        self.assertIn('Type two or more characters', page)
+        self.assertIn('href="/radio/search"', self.a.get('/logons').get_data(as_text=True))          # on the RadioLogs navbar
+        found = lambda q: self.a.get('/radio/search?q=' + q).get_data(as_text=True)
+        self.assertIn('data-found="members"', found('EPIRB'))                                        # notes are searched
+        self.assertIn('data-found="vessels"', found('kayak'))
+        self.assertIn('data-found="logons"', found('ramp'))
+        everything = found('77')
+        for kind in ('trailers', 'cars', 'vessels'):
+            self.assertIn('data-found="%s"' % kind, everything)
+        self.assertIn('href="/member/%d/trailers/' % m, everything)                                  # each row opens its record
+        contacts = found('0499888777')                                                               # phone without spaces
+        self.assertIn('href="/member/%d/contacts/' % m, contacts)
+        self.assertIn('m00001 Jane Smith', contacts)                                                 # held by
+        self.assertIn('href="/vessel/%d/contacts/' % pub, found('Pat Public'))
+        self.assertIn('data-found="logons"', found('Tangalooma'))
+        self.assertIn('0 records match', found('zzzz-nothing'))
+        self.assertIn('0 records match', self.b.get('/radio/search?q=Jane').get_data(as_text=True))                    # own unit only
+
+    def test_the_vessel_and_mobile_pickers_bring_their_member_or_public_vessel(self):
+        m = self.member(mobile='0412000111')
+        self.vessel(m, vesselName='Sea Dog', registration='AB123Q')
+        self.a.post('/member/%d/contacts' % m, data={'name': 'Sam Smith', 'phone': '0499888777'})
+        pub = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333'},
+                          headers={'Accept': 'application/json'}).json['id']
+        self.a.post('/vessel/%d/contacts' % pub, data={'name': 'Pat Public', 'phone': '0433444555'})
+        boats = {i['primary']: i for i in self.a.get('/api/logons/all-vessels?q=').json['items']}
+        self.assertEqual(set(boats), {'Sea Dog', 'Blue Duck'})                                        # member's and public
+        self.assertEqual(boats['Sea Dog']['member']['memberNumber'], 'm00001')
+        self.assertIsNone(boats['Blue Duck']['member'])
+        numbers = lambda q: {i['secondary']: i for i in self.a.get('/api/logons/mobiles?q=' + q).json['items']}
+        self.assertEqual(list(numbers('0412 000')), ['Member m00001 Jane Smith'])
+        contact = numbers('0499888')['Sam Smith, emergency contact of m00001 Jane Smith']
+        self.assertEqual((contact['member']['id'], contact['phone']), (m, '0499 888 777'))
+        owner = numbers('0411222')['Alex, owner of public vessel Blue Duck']
+        self.assertEqual((owner['member'], owner['vessel']['id']), (None, pub))
+        public_contact = numbers('0433')['Pat Public, emergency contact of Blue Duck']
+        self.assertEqual(public_contact['vessel']['id'], pub)
+        self.assertEqual(self.a.get('/api/logons/mobiles?q=').json['items'], [])                    # no digits, nothing
+        page = self.a.get('/logons/new').get_data(as_text=True)
+        self.assertIn('id="roPickAnyVessel"', page)
+        self.assertIn('id="roPickMobile"', page)
+        self.assertIn('href="/radio/search" target="_blank"', page)                                   # Search in a new tab
+
+    def test_every_field_is_named_with_its_emoji(self):
+        m = self.member()
+        self.a.post('/member/%d/contacts' % m, data={'name': 'Sam Smith', 'relationship': 'Partner', 'phone': '0499888777'})
+        page = self.a.get('/member/%d' % m).get_data(as_text=True)
+        for name, emoji in (('firstName', '🪪'), ('mobile', '📱'), ('email', '✉️'), ('address', '🏠'), ('notes', '🗒️')):
+            self.assertIn('<label for="member-%s"><span class="ro-field-symbol" aria-hidden="true">%s</span>' % (name, emoji), page)
+        contact = self.a.get('/member/%d/contacts/new' % m).get_data(as_text=True)
+        for name, emoji in (('name', '🆘'), ('relationship', '🤝'), ('phone', '📱')):
+            self.assertIn('<label for="contacts-new-%s"><span class="ro-field-symbol" aria-hidden="true">%s</span>' % (name, emoji), contact)
+        boat = self.a.get('/member/%d/vessels/new' % m).get_data(as_text=True)
+        for name, emoji in (('hullColour', '🎨'), ('vesselType', '⛵'), ('make', '🏭'), ('model', '🏷️'), ('ais', '📡')):
+            self.assertIn('<span class="ro-field-symbol" aria-hidden="true">%s</span>' % emoji, boat)
+        self.assertIn('<span title="Relationship"><span class="dc-record-grid-symbol">🤝</span> Relationship</span>', page)   # list headings
+        logon = self.a.get('/logons/new').get_data(as_text=True)
+        self.assertIn('<label for="f-channel"><span class="ro-field-symbol" aria-hidden="true">📻</span> How they logged on</label>', logon)
+        self.assertIn('<label for="f-hullColour"><span class="ro-field-symbol" aria-hidden="true">🎨</span> Hull colour</label>', logon)
+        self.assertIn('<span title="Email"><span class="dc-record-grid-symbol">✉️</span> Email</span>', self.a.get('/members').get_data(as_text=True))
 
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history

@@ -302,6 +302,36 @@ def api_public_vessels():
     return jsonify({'items': items})
 
 
+@bp.route('/api/logons/all-vessels')
+def api_all_vessels():
+    """The log on's 🛥️ Vessel picker: every vessel, a member's or public."""
+    h, (conn, cur) = _open()
+    items = M.vessel_picks(cur, h.unit(), request.args.get('q'))
+    cur.close()
+    return jsonify({'items': items})
+
+
+@bp.route('/api/logons/mobiles')
+def api_mobiles():
+    """The log on's 📱 Mobile picker: members, public vessel owners and emergency contacts by phone."""
+    h, (conn, cur) = _open()
+    items = M.mobile_picks(cur, h.unit(), request.args.get('q'))
+    cur.close()
+    return jsonify({'items': items})
+
+
+@bp.route('/radio/search')
+def search_page():
+    """One box over every radio record: log ons, members, emergency contacts, vessels, trailers and cars."""
+    h, (conn, cur) = _open()
+    q = (request.args.get('q') or '').strip()
+    found = M.find(cur, h.unit(), q)
+    logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q) if len(q) >= 2 else []
+    cur.close()
+    return _list_response('search.html', search=q, found=found, logons=logons, kinds=M.KINDS, labels=M.LABELS,
+                          reference=L.reference)
+
+
 @bp.route('/logons/who')
 def who_badges():
     """The log on form's badges for a pick, drawn by the one macro the page itself uses (_ui.who_badges)."""

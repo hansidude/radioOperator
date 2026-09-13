@@ -1,0 +1,44 @@
+{% extends base_template %}
+{% import 'radio/_ui.html' as ui %}
+{% import 'myMacro_entity_nav.html' as entity_nav %}
+{% from 'myMacro_filters.html' import search_controls %}
+{% from 'myMacro_record_view.html' import view_controls %}
+{% block page_title %}<i class="bi bi-search me-1"></i>Search{% endblock %}
+{% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
+{% block navbar_buttons %}
+<div class="entity-nav" role="navigation" aria-label="Search">
+  <div class="entity-nav-links">{{ entity_nav.parent_link('/logons', brand, 'broadcast') }}</div>
+</div>
+{% endblock %}
+{% block body %}
+{{ ui.styles() }}
+{# One box over every radio record: log ons, members, emergency contacts, vessels, trailers and cars, in any field,
+   notes included. Each kind is the same list its own page shows, and each row opens its record. The server searches
+   (members.find, logons.records); typing swaps the results in, as on the log. #}
+<form id="roSearchForm" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Search controls" method="get" action="/radio/search"
+      hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-swap="outerHTML"
+      hx-trigger="input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
+  {{ view_controls('roFoundView') }}
+  {{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}) }}
+</form>
+<div id="roFoundView"><div id="roFound">
+{% if search|length < 2 %}
+  <div class="dc-record-empty">Type two or more characters: a name, number, rego, phone, email, place or anything in notes.</div>
+{% else %}
+  {% set total = logons|length + found.members|length + found.contacts|length + found.vessels|length + found.trailers|length + found.cars|length %}
+  {% if not total %}<div class="dc-record-empty ro-zero">0 records match “{{ search }}”</div>{% endif %}
+  {% if logons %}<p class="ro-section-title mt-3" data-found="logons">{{ ui.FIELD_SYMBOLS.tripRef }} Log ons <span class="text-secondary">{{ logons|length }}</span></p>
+  {{ ui.record_list(logons, now, reference) }}{% endif %}
+  {% if found.members %}<p class="ro-section-title mt-3" data-found="members">{{ ui.WHO.member.symbol }} Members <span class="text-secondary">{{ found.members|length }}</span></p>
+  {{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endif %}
+  {% if found.contacts %}<p class="ro-section-title mt-3" data-found="contacts">{{ ui.FIELD_SYMBOLS.name }} Emergency contacts <span class="text-secondary">{{ found.contacts|length }}</span></p>
+  {{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endif %}
+  {% if found.vessels %}<p class="ro-section-title mt-3" data-found="vessels">{{ ui.FIELD_SYMBOLS.vesselName }} Vessels <span class="text-secondary">{{ found.vessels|length }}</span></p>
+  {{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endif %}
+  {% if found.trailers %}<p class="ro-section-title mt-3" data-found="trailers">🚚 Trailers <span class="text-secondary">{{ found.trailers|length }}</span></p>
+  {{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endif %}
+  {% if found.cars %}<p class="ro-section-title mt-3" data-found="cars">🚗 Cars <span class="text-secondary">{{ found.cars|length }}</span></p>
+  {{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endif %}
+{% endif %}
+</div></div>
+{% endblock %}

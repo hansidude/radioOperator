@@ -90,6 +90,7 @@
 .ro-record-form{padding:.5rem 0 1rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-record-form label{display:block;font-size:1rem;font-weight:600;margin:0 0 .35rem}
 .ro-record-form .form-control{font-size:1.1rem;min-height:2.9rem}
+.ro-field-symbol{font-weight:400}
 .ro-who-badge{display:inline-flex;align-items:center;gap:.1rem;margin-right:.35rem}
 .ro-who-clear{padding:.05rem .35rem;color:var(--bs-danger)}
 .ro-primary-form .form-control[readonly]{background-color:var(--bs-secondary-bg)}
@@ -207,10 +208,20 @@
 
 {# DAT-6: paper field order remains radio's; Quackit owns headers, cells and cards. #}
 {# One symbol per field, taught in the log's headings and shown again in each log on's History. #}
-{% set FIELD_SYMBOLS = {'dayNumber': '#️⃣', 'callDay': '📅', 'callTime': '🕒', 'memberNumber': '👤', 'vesselName': '🛥️',
-                        'registration': '🔖', 'mobile': '📱', 'vesselDetails': '📏', 'length': '📏', 'hullColour': '📏',
-                        'make': '📏', 'model': '📏', 'pob': '👥', 'departurePoint': '⚓', 'destination': '🧭',
-                        'etaDay': '📆', 'eta': '⏰', 'tripRef': '🎫', 'watchStatus': '🚦'} %}
+{# One emoji per field, wherever the field is named: list headings and cards, form labels (field_label) and History
+   (owner, 2026-09-14). 📝 means Draft on the log, so Notes is 🗒️. #}
+{% set FIELD_SYMBOLS = {'dayNumber': '#️⃣', 'callDay': '📅', 'callTime': '🕒', 'channel': '📻', 'tripRef': '🎫', 'watchStatus': '🚦',
+                        'memberNumber': '👤', 'firstName': '🪪', 'lastName': '🪪', 'mobile': '📱', 'phone': '📱', 'email': '✉️',
+                        'address': '🏠', 'notes': '🗒️', 'name': '🆘', 'relationship': '🤝',
+                        'vesselName': '🛥️', 'registration': '🔖', 'vesselDetails': '📏', 'length': '📏', 'hullColour': '🎨',
+                        'colour': '🎨', 'vesselType': '⛵', 'make': '🏭', 'model': '🏷️', 'ais': '📡',
+                        'ownerName': '🧑', 'ownerPhone': '📱', 'ownerEmail': '✉️',
+                        'pob': '👥', 'departurePoint': '⚓', 'destination': '🧭', 'etaDay': '📆', 'eta': '⏰'} %}
+
+{# A field's label on top of its box, with the field's emoji before the words. #}
+{% macro field_label(for_id, name, label) -%}
+<label for="{{ for_id }}">{% if FIELD_SYMBOLS.get(name) %}<span class="ro-field-symbol" aria-hidden="true">{{ FIELD_SYMBOLS[name] }}</span> {% endif %}{{ label }}</label>
+{%- endmacro %}
 {% set COLUMNS = [
   {'key': 'number', 'label': 'No.', 'symbol': FIELD_SYMBOLS.dayNumber, 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
   {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay, 'width': 'minmax(0,1.15fr)'},
@@ -369,7 +380,7 @@
 {% set words = [vessel.vesselName or '', vessel.registration or '']|select|join(' · ') %}
 <span class="ro-who-badge" data-who="vessel">{{ records_ui.symbol(FIELD_SYMBOLS.vesselName, 'Vessel', value=words) }}{% if open %}<button type="button" class="btn btn-sm ro-who-clear" data-ro-clear="vessel" title="Remove the vessel" aria-label="Remove the vessel"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}</span>
 {%- elif member and open -%}
-<button type="button" class="btn btn-outline-secondary btn-sm" data-ro-pick-vessel>{{ FIELD_SYMBOLS.vesselName }} Vessel</button>
+<button type="button" class="btn btn-outline-secondary btn-sm" data-ro-pick-vessel>{{ FIELD_SYMBOLS.vesselName }} Pick their vessel</button>
 {%- endif -%}
 {%- endmacro %}
 
@@ -381,7 +392,7 @@
 {%- set mine = failed.get('form') == form -%}
 {%- set shown = failed['values'].get(name, '') if mine else (value if value is not none else '') -%}
 {%- set red = mine and name in failed.red -%}
-<div class="{{ cols }}"><label for="{{ form }}-{{ name }}">{{ label }}</label>
+<div class="{{ cols }}">{{ field_label(form ~ '-' ~ name, name, label) }}
   {%- if name in ('address', 'notes') %}<textarea id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" rows="3" data-auto-grow{% if red %} aria-invalid="true"{% endif %}>{{ shown }}</textarea>
   {%- else %}<input id="{{ form }}-{{ name }}" name="{{ name }}" class="form-control{% if red %} is-invalid{% endif %}" value="{{ shown }}"{% if name in ('email', 'ownerEmail') %} type="email"{% elif name in ('mobile', 'phone', 'ownerPhone') %} type="tel" inputmode="numeric"{% endif %}{% if red %} aria-invalid="true"{% endif %}>{% endif %}
 </div>
@@ -408,21 +419,68 @@
 
 {# A member's contacts, vessels, trailers or cars as record_grid rows: a column per field, the log's symbol
    where the field has one, and an open button to the record's own page. #}
-{% set CHILD_SYMBOLS = {'vesselName': FIELD_SYMBOLS.vesselName, 'registration': FIELD_SYMBOLS.registration,
-                        'length': FIELD_SYMBOLS.length, 'hullColour': FIELD_SYMBOLS.hullColour, 'make': FIELD_SYMBOLS.make,
-                        'model': FIELD_SYMBOLS.model, 'phone': FIELD_SYMBOLS.mobile} %}
-{% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False) %}
+{# holders: rows from different members / public vessels (the Search page): a Held by column, and each row's own url. #}
+{% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False, holders=False) %}
 {% set grid = namespace(columns=[], rows=[]) %}
-{% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': CHILD_SYMBOLS.get(f, ''),
+{% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, ''),
                                                                'width': 'minmax(0,1.3fr)' if loop.first else 'minmax(0,1fr)'}] %}{% endfor %}
+{% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'width': 'minmax(0,1.3fr)'}] %}{% endif %}
 {% set grid.columns = grid.columns + [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
-  {% set action %}<a class="btn btn-outline-primary btn-sm" href="{{ owner_url }}/{{ kind }}/{{ c.id }}"{% if in_place %} hx-get="{{ owner_url }}/{{ kind }}/{{ c.id }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% if holders %}{% set _ = cells.update({'holder': holder_badge(c.holder)}) %}{% endif %}
+  {% set url = c.url if holders else owner_url ~ '/' ~ kind ~ '/' ~ c.id %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="{{ url }}"{% if in_place %} hx-get="{{ url }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
   {% set _ = cells.update({'action': action}) %}
   {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells}] %}
 {% endfor %}
 {{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower) }}
+{% endmacro %}
+
+{# Who holds a record found on the Search page: 👤 a member or 🌐 a public vessel. #}
+{% macro holder_badge(holder) -%}
+{%- if holder.type == 'member' -%}{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=holder.name) }}
+{%- else -%}{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value=holder.name) }}{%- endif -%}
+{%- endmacro %}
+
+{# Members as the Members page lists them; the Search page shows the same rows. #}
+{% macro members_grid(members, key, empty='0 members') %}
+{% set display = namespace(rows=[]) %}
+{% for m in members %}
+  {% set number %}<span class="dc-record-index">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=m.memberNumber) }}</span>{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ m.id }}" title="Open member {{ m.memberNumber }}" aria-label="Open member {{ m.memberNumber }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set display.rows = display.rows + [{'id': m.id, 'cells': {'number': number, 'firstName': m.firstName, 'lastName': m.lastName, 'mobile': m.mobile or '',
+                                                                'email': m.email or '', 'vessels': m.vesselNames, 'action': action}}] %}
+{% endfor %}
+{{ records_ui.record_grid(display.rows, [
+  {'key': 'number', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'width': 'minmax(6rem,.7fr)', 'kind': 'index'},
+  {'key': 'firstName', 'label': 'First name', 'symbol': FIELD_SYMBOLS.firstName, 'width': 'minmax(0,1fr)'},
+  {'key': 'lastName', 'label': 'Last name', 'symbol': FIELD_SYMBOLS.lastName, 'width': 'minmax(0,1fr)'},
+  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
+  {'key': 'email', 'label': 'Email', 'symbol': FIELD_SYMBOLS.email, 'width': 'minmax(0,1.3fr)'},
+  {'key': 'vessels', 'label': 'Vessels', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.5fr)'},
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], key, empty) }}
+{% endmacro %}
+
+{# Vessels, a member's or public, with who holds them: the Public vessels page and the Search page. A member's vessel
+   opens on its member, a public vessel on its own page. #}
+{% macro vessels_grid(vessels, key, empty='0 vessels') %}
+{% set display = namespace(rows=[]) %}
+{% for v in vessels %}
+  {% set name %}<span class="dc-record-index">{{ v.vesselName or '' }}</span>{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="{{ v.url }}" title="Open vessel {{ v.vesselName or v.registration }}" aria-label="Open vessel {{ v.vesselName or v.registration }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set display.rows = display.rows + [{'id': v.id, 'cells': {'name': name, 'rego': v.registration or '', 'holder': holder_badge(v.holder),
+                                                                'owner': v.ownerName or '', 'phone': v.ownerPhone or '',
+                                                                'details': vessel_summary(v, ''), 'action': action}}] %}
+{% endfor %}
+{{ records_ui.record_grid(display.rows, [
+  {'key': 'name', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.3fr)', 'kind': 'index'},
+  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration, 'width': 'minmax(0,.9fr)'},
+  {'key': 'holder', 'label': 'Held by', 'width': 'minmax(0,1.3fr)'},
+  {'key': 'owner', 'label': 'Owner', 'symbol': FIELD_SYMBOLS.ownerName, 'width': 'minmax(0,1.1fr)'},
+  {'key': 'phone', 'label': 'Owner phone', 'symbol': FIELD_SYMBOLS.ownerPhone, 'width': 'minmax(0,1fr)'},
+  {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails, 'width': 'minmax(0,1.4fr)'},
+  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], key, empty) }}
 {% endmacro %}
 
 {# The form for one of those records: add (creating) or edit with Remove. in_place saves without leaving the page. #}
@@ -440,4 +498,5 @@
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 {{ entity_nav.page_link('/members', 'Members', 'people') }}
 {{ entity_nav.page_link('/vessels', 'Public vessels', 'life-preserver') }}
+{{ entity_nav.page_link('/radio/search', 'Search', 'search') }}
 {% endmacro %}

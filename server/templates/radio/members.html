@@ -21,19 +21,5 @@
   {{ view_controls('roMemberView') }}
   {{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
-{% set display = namespace(rows=[]) %}
-{% for m in members %}
-  {% set number %}<span class="dc-record-index">{{ records_ui.symbol(ui.WHO.member.symbol, ui.WHO.member.label, value=m.memberNumber) }}</span>{% endset %}
-  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ m.id }}" title="Open member {{ m.memberNumber }}" aria-label="Open member {{ m.memberNumber }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
-  {% set display.rows = display.rows + [{'id': m.id, 'cells': {'number': number, 'firstName': m.firstName, 'lastName': m.lastName, 'mobile': m.mobile or '', 'email': m.email or '',
-                                                                'vessels': m.vesselNames, 'action': action}}] %}
-{% endfor %}
-<div id="roMemberView"><div id="roMemberRows">{{ records_ui.record_grid(display.rows, [
-  {'key': 'number', 'label': 'Member No.', 'symbol': ui.FIELD_SYMBOLS.memberNumber, 'width': 'minmax(6rem,.7fr)', 'kind': 'index'},
-  {'key': 'firstName', 'label': 'First name', 'width': 'minmax(0,1fr)'},
-  {'key': 'lastName', 'label': 'Last name', 'width': 'minmax(0,1fr)'},
-  {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
-  {'key': 'email', 'label': 'Email', 'width': 'minmax(0,1.3fr)'},
-  {'key': 'vessels', 'label': 'Vessels', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.5fr)'},
-  {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], 'radioMembers', '0 members') }}</div></div>
+<div id="roMemberView"><div id="roMemberRows">{{ ui.members_grid(members, 'radioMembers') }}</div></div>
 {% endblock %}

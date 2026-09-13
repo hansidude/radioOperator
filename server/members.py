@@ -119,8 +119,120 @@ def members(cur, unit, search=None):
 
 
 def public_vessels(cur, unit, search=None):
-    cur.execute('SELECT * FROM Vessels WHERE unit = %s AND isActive = 1 AND memberId IS NULL ORDER BY vesselName, registration', (unit,))
-    return _search(cur.fetchall() or [], search, VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'))
+    rows = _vessels(cur, unit, {}, public_only=True)
+    return _search(rows, search, VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'))
+
+
+# ---------- one search over every radio record (the Search page and the log on's Vessel and Mobile pickers) ----------
+
+def _holder(member=None, vessel=None):
+    """Who holds a record, as the pages name it and link to it."""
+    if member:
+        return {'type': 'member', 'id': member['id'], 'url': '/member/%d' % member['id'],
+                'name': '%s %s %s' % (member['memberNumber'], member['firstName'], member['lastName'])}
+    return {'type': 'vessel', 'id': vessel['id'], 'url': '/vessel/%d' % vessel['id'],
+            'name': vessel.get('vesselName') or vessel.get('registration')}
+
+
+def _vessels(cur, unit, by_member, public_only=False):
+    """This unit's vessels, each with its holder and the page it opens on: a member's vessel on its member."""
+    cur.execute('SELECT * FROM Vessels WHERE unit = %s AND isActive = 1' + (' AND memberId IS NULL' if public_only else '') +
+                ' ORDER BY vesselName, registration', (unit,))
+    rows = []
+    for v in cur.fetchall() or []:
+        member = by_member.get(v['memberId']) if v['memberId'] else None
+        if v['memberId'] and not member:
+            continue
+        v['holder'] = _holder(member=member) if member else {'type': 'vessel', 'id': v['id'], 'url': '/vessel/%d' % v['id'],
+                                                             'name': v.get('ownerName') or 'Public'}
+        v['url'] = '/member/%d/vessels/%d' % (member['id'], v['id']) if member else '/vessel/%d' % v['id']
+        rows.append(v)
+    return rows
+
+
+def _held(cur, kind, by_member, by_vessel):
+    """Every active contact, trailer or car held by this unit's members (or, for contacts, public vessels)."""
+    cur.execute('SELECT * FROM %s WHERE isActive = 1 ORDER BY id' % KINDS[kind]['table'])
+    rows = []
+    for r in cur.fetchall() or []:
+        member = by_member.get(r.get('memberId'))
+        vessel = by_vessel.get(r.get('vesselId')) if 'vesselId' in r else None
+        if not (member or (vessel and not vessel['memberId'])):
+            continue
+        r['holder'] = _holder(member=member) if member else _holder(vessel=vessel)
+        r['url'] = '%s/%s/%d' % (r['holder']['url'], kind, r['id'])
+        rows.append(r)
+    return rows
+
+
+SEARCH = {'members': ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'address', 'notes', 'vesselNames'),
+          'contacts': ('name', 'relationship', 'phone', 'email'),
+          'vessels': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail', 'notes'),
+          'trailers': ('registration', 'make', 'model', 'colour'),
+          'cars': ('registration', 'make', 'model', 'colour')}
+
+
+def find(cur, unit, q):
+    """Every member, emergency contact, vessel, trailer and car of this unit matching `q` in any of its fields
+    (SEARCH, notes included) or its holder's name: {kind: rows}, each row with its holder and url. Log ons are
+    found by logons.records. Fewer than two characters finds nothing."""
+    q = (q or '').strip()
+    if len(q) < 2:
+        return {kind: [] for kind in SEARCH}
+    everyone = members(cur, unit)
+    by_member = {m['id']: m for m in everyone}
+    vessels = _vessels(cur, unit, by_member)
+    by_vessel = {v['id']: v for v in vessels}
+    holder_name = lambda r: r['holder']['name']
+    return {'members': _search(everyone, q, SEARCH['members']),
+            'contacts': _search(_held(cur, 'contacts', by_member, by_vessel), q, SEARCH['contacts'], extra=holder_name),
+            'vessels': _search(vessels, q, SEARCH['vessels'], extra=holder_name),
+            'trailers': _search(_held(cur, 'trailers', by_member, by_vessel), q, SEARCH['trailers'], extra=holder_name),
+            'cars': _search(_held(cur, 'cars', by_member, by_vessel), q, SEARCH['cars'], extra=holder_name)}
+
+
+def vessel_picks(cur, unit, q):
+    """Every vessel, a member's or public, for the log on's 🛥️ Vessel picker: a member's vessel brings its member."""
+    everyone = members(cur, unit)
+    by_member = {m['id']: m for m in everyone}
+    out = []
+    for v in _search(_vessels(cur, unit, by_member), q, SEARCH['vessels'], extra=lambda r: r['holder']['name']):
+        item = vessel_item(v)
+        member = by_member.get(v['memberId'])
+        item['member'] = member_item(member) if member else None
+        item['meta'] = v['holder']['name'] if member else 'Public'
+        out.append(item)
+    return out
+
+
+def mobile_picks(cur, unit, q):
+    """The log on's 📱 Mobile picker: members' mobiles, public vessel owners' phones and emergency contacts' phones
+    matching the digits typed. Each says whose number it is and brings the member or public vessel it belongs to."""
+    digits = re.sub(r'\D', '', q or '')
+    everyone = members(cur, unit)
+    by_member = {m['id']: m for m in everyone}
+    vessels = _vessels(cur, unit, by_member)
+    by_vessel = {v['id']: v for v in vessels}
+    matches = lambda number: bool(digits) and digits in re.sub(r'\D', '', number or '')
+    out = []
+    for m in everyone:
+        if matches(m.get('mobile')):
+            out.append({'id': 'member-%d' % m['id'], 'primary': m['mobile'], 'secondary': 'Member %s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
+                        'phone': m['mobile'], 'member': member_item(m), 'vessel': None})
+    for v in vessels:
+        if not v['memberId'] and matches(v.get('ownerPhone')):
+            out.append({'id': 'owner-%d' % v['id'], 'primary': v['ownerPhone'],
+                        'secondary': '%s, owner of public vessel %s' % (v.get('ownerName') or 'Owner', v.get('vesselName') or v.get('registration')),
+                        'phone': v['ownerPhone'], 'member': None, 'vessel': vessel_item(v)})
+    for c in _held(cur, 'contacts', by_member, by_vessel):
+        if matches(c.get('phone')):
+            member = by_member.get(c.get('memberId'))
+            vessel = by_vessel.get(c.get('vesselId'))
+            out.append({'id': 'contact-%d' % c['id'], 'primary': c['phone'],
+                        'secondary': '%s, emergency contact of %s' % (c['name'], c['holder']['name']),
+                        'phone': c['phone'], 'member': member_item(member) if member else None,
+                        'vessel': None if member else vessel_item(vessel)})
+    return out
 
 
 def _search(rows, search, fields, extra=None):

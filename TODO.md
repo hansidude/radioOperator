@@ -108,6 +108,14 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   form save (`logons._record_values`). Corrections are made on the Member / Public vessel tab, which saves in place
   (records open inside it) and refreshes the boxes and badges.
 - **How they logged on** (Radio / Phone / In person) is in the first row, beside Date and Time.
+- The "Member or public user" row also has **🛥️ Vessel** (every vessel, a member's or public: a member's vessel brings its
+  member), **📱 Mobile** (members' mobiles, public vessel owners' phones and emergency contacts' phones; picks the member or
+  public vessel the number belongs to and fills an empty Mobile) and **🔎 Search** (the Search page in a new tab).
+- **🔎 Search** page (`/radio/search`, on the RadioLogs navbar): one box over log ons, members, emergency contacts,
+  vessels, trailers and cars, in any field including notes, grouped by kind as each kind's own list; rows open their
+  record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
+- Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
+  one map, `_ui.FIELD_SYMBOLS`.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
   8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's

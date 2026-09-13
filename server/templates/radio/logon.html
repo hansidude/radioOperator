@@ -34,7 +34,7 @@
 {% set raw = box(logon, name) %}
 {% set needed = name in checked.red %}
 {% set hint = name in checked.orange %}
-<div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
+<div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}">{{ ui.field_label('f-' ~ name, name, labels[name]) }}
   {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="3" data-auto-grow data-field="{{ name }}"{% if open and not draft %} name="notes" form="logoffForm"{% endif %} {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ channel_labels[c] }}</option>{% endfor %}</select>
   {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% elif hint %} ro-hint{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %}{% if name == 'memberNumber' or (pick_locked and name in record_boxes) %} readonly title="From the record: pick or remove it above; correct it on the Member or Public vessel tab"{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
@@ -51,7 +51,10 @@
       <label>Member or public user</label>
       <span class="ro-who-now" id="roWhoNow">{{ ui.who_badges(member, vessel if pick_locked else None, open) }}</span>
       {% if open %}<button type="button" class="btn btn-outline-primary" id="roPickMember">{{ ui.WHO.member.symbol }} Member</button>
-      <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>{% endif %}
+      <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>
+      <button type="button" class="btn btn-outline-primary" id="roPickAnyVessel">{{ ui.FIELD_SYMBOLS.vesselName }} Vessel</button>
+      <button type="button" class="btn btn-outline-primary" id="roPickMobile">{{ ui.FIELD_SYMBOLS.mobile }} Mobile</button>{% endif %}
+      <a class="btn btn-outline-secondary" id="roOpenSearch" href="/radio/search" target="_blank" rel="noopener" title="Search every radio record in a new tab"><i class="bi bi-search me-1"></i>Search</a>
     </div>
     {% if open %}
     <section class="ro-new-record" id="roNewVesselPanel" hidden>
@@ -435,6 +438,28 @@
           } } }
       ],
       onConfirm: function (id, picks) { chosen(picks.member.item, picks.vessel && picks.vessel.item); }
+    });
+  });
+  // 🛥️ Vessel: every vessel, a member's or public. A member's vessel brings its member; a public one is a public user.
+  var pickAnyVessel = document.getElementById('roPickAnyVessel'), pickMobile = document.getElementById('roPickMobile');
+  if (pickAnyVessel) pickAnyVessel.addEventListener('click', function () {
+    SearchPicker.open({
+      title: 'Vessel',
+      stages: [{ key: 'vessel', endpoint: '/api/logons/all-vessels', label: 'Vessel: name, rego, owner or member' }],
+      onConfirm: function (id, picks) { chosen(picks.vessel.item.member, picks.vessel.item); }
+    });
+  });
+  // 📱 Mobile: a member's mobile, a public vessel owner's phone or an emergency contact's phone. The number picked is
+  // the caller's (into an empty Mobile box); the member or public vessel it belongs to is picked with it.
+  if (pickMobile) pickMobile.addEventListener('click', function () {
+    SearchPicker.open({
+      title: 'Mobile',
+      stages: [{ key: 'mobile', endpoint: '/api/logons/mobiles', label: 'Mobile: a member, an owner or an emergency contact' }],
+      onConfirm: function (id, picks) {
+        var item = picks.mobile.item;
+        if (!box('mobile').value.trim()) put('mobile', item.phone);
+        chosen(item.member, item.member ? null : item.vessel);
+      }
     });
   });
   if (pickPublic) pickPublic.addEventListener('click', function () {

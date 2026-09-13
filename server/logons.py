@@ -324,7 +324,8 @@ STATUS_WHERE = {
 }
 # What Find searches. The trip reference and the day number are how an operator refers to a record
 # out loud, so both have to be findable alongside the vessel's identifying values.
-SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination')
+SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination',
+                 'departurePoint', 'notes')
 
 
 SORTS = ('newest', 'oldest', 'due')

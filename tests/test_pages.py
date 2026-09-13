@@ -142,7 +142,7 @@ class Pages(unittest.TestCase):
         entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-history-pane"')]
         self.assertIn('action="/logon/%d/discard"' % i, entry)          # discard sits on the Log on tab's bottom row
         self.assertEqual(page.count('/discard"'), 1)
-        self.assertIn('<label for="f-vesselName">Vessel Name</label>', page)
+        self.assertIn('<label for="f-vesselName"><span class="ro-field-symbol" aria-hidden="true">🛥️</span> Vessel Name</label>', page)
         self.assertNotIn('function minimum', page)                   # the rule lives on the server only
         # leaving a box asks the server which boxes are red; nothing is written
         red = self.a.post('/api/logon/%d' % i, json={'check': True, 'fields': {
@@ -394,7 +394,7 @@ class Pages(unittest.TestCase):
         self.assertNotIn('Logged on and watched', page)                   # no words and no reason dropdown
         self.assertNotIn('name="reason" form="logoffForm"', page)
         self.assertNotIn('placeholder=', page)
-        self.assertIn('<label for="f-notes">Notes</label>\n  <textarea id="f-notes" class="form-control" rows="3" data-auto-grow data-field="notes" name="notes" form="logoffForm"', page)
+        self.assertIn('<label for="f-notes"><span class="ro-field-symbol" aria-hidden="true">🗒️</span> Notes</label>\n  <textarea id="f-notes" class="form-control" rows="3" data-auto-grow data-field="notes" name="notes" form="logoffForm"', page)
         capture = page[page.index('<form id="capture"'):page.index('</form>', page.index('<form id="capture"'))]
         self.assertEqual(capture.count('<textarea'), 1)                      # one notes box: Log off carries it
         self.assertNotIn('logoffNote', page)

@@ -310,6 +310,20 @@ def main(engine='chromium'):
             expect(page.locator('#f-vesselId')).not_to_have_value(str(public_vessel))
             expect(page).to_have_url(re.compile('/logons/new(#[a-z]+)?$'))                       # never left the page
             page.screenshot(path=str(ARTIFACTS / ('radio-who-%s.png' % engine)), full_page=True)
+            page.locator('#roPickAnyVessel').click()                                               # 🛥️ Vessel: any vessel
+            expect(page.locator('#spLabel')).to_have_text('Vessel: name, rego, owner or member')
+            page.locator('#spInput').fill(vessel)
+            pick(vessel)
+            expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # a member's vessel brings its member
+            expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
+            page.locator('#roWhoNow [data-ro-clear="member"]').click()
+            page.locator('#roPickMobile').click()                                                  # 📱 Mobile: an emergency contact's phone
+            page.locator('#spInput').fill('0499888777')
+            pick('Verify Contact ' + token)
+            expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # brings the member it belongs to
+            expect(page.locator('#roWhoNow [data-ro-pick-vessel]')).to_be_visible()
+            expect(page.locator('#roOpenSearch')).to_have_attribute('target', '_blank')          # 🔎 Search opens in a new tab
+            expect(page.locator('label[for="f-hullColour"]')).to_have_text('🎨 Hull colour')         # every field with its emoji
             failing_search = re.compile(r'/api/logons/members')
             page.route(failing_search, lambda route: route.fulfill(status=500, body='verification failure'))
             page.locator('#roPickMember').click()
@@ -317,6 +331,17 @@ def main(engine='chromium'):
             page.unroute(failing_search)
             page.keyboard.press('Escape')
             expect(page.locator('#searchPicker')).to_be_hidden()
+            visit('/logons')
+            page.locator('.navbar a[href="/radio/search"]').first.click()                          # the Search page, from the log
+            page.wait_for_url(re.compile('/radio/search$'))
+            with page.expect_response(lambda r: '/radio/search?' in r.url):
+                page.locator('#roFindAll').fill(token)
+            for kind in ('members', 'contacts', 'vessels'):
+                expect(page.locator('#roFound [data-found="%s"]' % kind)).to_be_visible()
+            expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Contact ' + token)).to_contain_text(member_no)   # held by
+            expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Public Contact ' + token)).to_contain_text('PUBLIC-' + token)
+            page.locator('#radioFoundMembers a[title^="Open member"]').first.click()               # a row opens its record
+            page.wait_for_url(re.compile(r'/member/[0-9]+$'))
             visit('/logons')
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
@@ -664,7 +689,7 @@ def main(engine='chromium'):
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
             expect(page.locator('#capture textarea')).to_have_count(1)                            # one notes box on the log on
             expect(page.locator('#logoffNote')).to_have_count(0)
-            expect(page.locator('label[for="f-notes"]')).to_have_text('Notes')
+            expect(page.locator('label[for="f-notes"]')).to_have_text('🗒️ Notes')
             note_height = lambda: page.locator('#f-notes').evaluate('el => el.getBoundingClientRect().height')
             three = note_height()
             assert three >= 3 * 20, 'The Note box is not three lines tall: %spx' % three
