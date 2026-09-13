@@ -165,6 +165,7 @@
     dirty = true;
     el.classList.remove('is-invalid');
     el.setAttribute('aria-invalid', 'false');
+    if (draft) mark(minimum());         // the draft minimum is shown as it is typed, not only on Save
     setStatus('Unsaved changes', 'text-secondary');
   }
   document.addEventListener('click', function (ev) {
@@ -227,6 +228,7 @@
     });
   });
   if (saveButton) saveButton.addEventListener('click', save);
+  if (open && draft) mark(minimum());   // and from the moment the form opens
   window.addEventListener('beforeunload', function (ev) {
     if (!dirty) return;
     ev.preventDefault(); ev.returnValue = '';

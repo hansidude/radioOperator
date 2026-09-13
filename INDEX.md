@@ -52,6 +52,10 @@ situations that are not ideal. New REC-9 numbers records from one each day.
 
 ## Updating the documents
 
+This section is specification publishing only. For app development and testing,
+follow the host Quackit's `DEVELOPMENT.md`; never use the rendering venv as a test
+environment or as evidence that Quackit integration passed.
+
 Keep a linked table of contents at the start of the Markdown and PDF. Update the Markdown
 source, then regenerate the PDF and verify that contents links, tables and all figures render.
 The renderer refreshes explicit heading anchors and the Markdown contents automatically.

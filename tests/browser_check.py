@@ -1,138 +1,157 @@
-"""A real browser against a running site: the checks the server tests cannot make.
-
-Form nesting, autosave races and keyboard flow are invisible to a test client that posts
-straight to an endpoint. Two defects got through that way, so this drives Chromium instead.
-
-    pip install playwright && playwright install chromium
-    RADIO_URL=http://localhost:8091 python3 tests/browser_check.py          # standalone, no login
-    RADIO_URL=http://localhost:8080 RADIO_USER=x RADIO_PASS=y python3 tests/browser_check.py
+"""Radio acceptance checks through Quackit. Run quackit's ./verify radio.
+Creates a uniquely named sample record and closes/discards it, retaining history.
 """
+from datetime import date, timedelta
 import os
-import sys
+from pathlib import Path
+import re
+from uuid import uuid4
+from playwright.sync_api import sync_playwright, expect
 
-from playwright.sync_api import sync_playwright
-
-URL = os.environ.get('RADIO_URL', 'http://localhost:8091').rstrip('/')
-USER, PASS = os.environ.get('RADIO_USER'), os.environ.get('RADIO_PASS')
-FIELDS = [('callDay', '2026-09-12'), ('callTime', '13:45'), ('memberNumber', '4471'), ('vesselName', 'BROWSER CHECK'),
-          ('registration', 'AB123Q'), ('mobile', '0412 345 678'), ('length', '6'), ('hullColour', 'white'),
-          ('make', 'Quintrex'), ('model', '610'), ('pob', '2'), ('departurePoint', 'Marina'),
-          ('destination', 'Facing Island'), ('etaDay', '2026-09-13'), ('eta', '07:00')]
-fails = []
-
-
-def check(name, ok, detail=''):
-    print(('  PASS  ' if ok else '  FAIL  ') + name + (' — ' + str(detail) if detail else ''))
-    if not ok:
-        fails.append(name)
+URL = os.environ.get('RADIO_URL', 'http://localhost:80').rstrip('/')
+if URL not in ('http://localhost:80', 'http://host.docker.internal:80'):
+    raise SystemExit('Use quackit/verify radio; only the port 80 dev stack is supported.')
+ARTIFACTS = Path('/artifacts')
 
 
 def main():
+    token = uuid4().hex[:10].upper()
+    vessel = 'VERIFY-' + token
+    today = date.today().isoformat()
+    fields = dict(callDay=today, callTime='13:45', memberNumber=token,
+                  vesselName=vessel, registration=token, mobile='0412345678',
+                  length='6', hullColour='white', make='Quintrex', model='610',
+                  pob='2', departurePoint='Marina', destination='Verification bay',
+                  etaDay=(date.today() + timedelta(days=1)).isoformat(), eta='17:00')
+    record = None
+    watching = closed = False
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
-        page = browser.new_page()
-        page.on('dialog', lambda d: d.accept())
-        errors = []
-        page.on('pageerror', lambda e: errors.append(str(e)))
-        if USER:
+        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+        context.tracing.start(screenshots=True, snapshots=True, sources=True)
+        page = context.new_page()
+        errors, writes = [], []
+        context.on('page', lambda p: p.on('pageerror', lambda e: errors.append(e.stack)))
+        page.on('pageerror', lambda e: errors.append(e.stack))
+        page.on('request', lambda r: writes.append(r.url) if r.method == 'POST' and '/logon' in r.url else None)
+
+        def visit(path):
+            response = page.goto(URL + path)
+            assert response and response.status == 200, 'GET %s: HTTP %s' % (path, response.status if response else 'none')
+            assert '/login' not in page.url, 'Sample login failed'
+
+        def save(status=200):
+            with page.expect_response(lambda r: r.request.method == 'POST' and '/logon' in r.url) as pending:
+                page.locator('#saveRecord').click()
+            response = pending.value
+            assert response.status == status, 'Save HTTP %s: %s' % (response.status, response.text()[:1000])
+            if status == 200:
+                expect(page.locator('#saveStatus')).to_have_text('Saved')
+            return response.json()
+
+        try:
             page.goto(URL + '/login')
-            page.fill('input[name=username]', USER)
-            page.fill('input[name=password]', PASS)
-            page.click('button[type=submit], input[type=submit]')
-            page.wait_for_load_state()
-        page.goto(URL + '/logons')
-        page.wait_for_timeout(300)
-        del errors[:]        # a host's own pages are not this app's business; judge only its pages
-        page.click('button:has-text("New log on")')
-        page.wait_for_load_state()
-        record = page.url.rsplit('/', 1)[-1]
-        print('record #%s at %s' % (record, page.url))
-
-        check('a new record starts as a draft, not a log on',
-              'This is a draft, not a log on' in page.content())
-        check('the draft status is clear without watch jargon',
-              'DRAFT' in page.content() and 'NOT WATCHED' not in page.content())
-        check('the main view is the five operator rows', page.locator('#ro-entry-pane .capture-row').count() == 5)
-        check('the log on does not duplicate the watch queue',
-              page.locator('[data-ro-tab="watch"], #ro-watch-pane, #queuePane').count() == 0)
-        size = float(page.locator('#f-callDay').evaluate("el => parseFloat(getComputedStyle(el).fontSize)"))
-        check('the main entry text is large', size >= 18, '%spx' % size)
-        check('date and time pickers are available',
-              page.locator('[data-picker-target="callDay"][type="date"]').count() == 1
-              and page.locator('[data-picker-target="callTime"][type="time"]').count() == 1)
-        page.locator('[data-picker-target="callDay"]').evaluate(
-            "(el) => { el.value = '2026-09-12'; el.dispatchEvent(new Event('change', {bubbles: true})); }")
-        page.locator('[data-picker-target="callTime"]').evaluate(
-            "(el) => { el.value = '13:45'; el.dispatchEvent(new Event('change', {bubbles: true})); }")
-        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
-        check('picker selections enter and save the date and time',
-              '/' in page.input_value('#f-callDay') and page.input_value('#f-callTime') == '13:45')
-        check('the radio page uses cards and no tables', page.locator('table').count() == 0)
-        page.click('[data-ro-tab="contact"]')
-        check('supporting details have a focused tab', page.locator('#captureContact').is_visible())
-        page.click('[data-ro-tab="entry"]')
-
-        # type the way an operator does: every field, one after another, without waiting
-        for field, value in FIELDS:
-            page.fill('#f-' + field, value)
-            page.dispatch_event('#f-' + field, 'change')
-        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
-        status = page.text_content('#saveStatus').strip()
-        check('every field saved with no race', status.startswith('Saved'), status)
-        check('the day box shows a date', '/' in page.input_value('#f-etaDay'),
-              page.input_value('#f-etaDay'))
-        check('valid dates and times are not marked invalid', page.locator('#ro-entry-pane .is-invalid').count() == 0)
-        page.fill('#f-eta', '25:70')
-        page.dispatch_event('#f-eta', 'change')
-        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
-        check('a malformed time is marked only on its field',
-              page.locator('#f-eta.is-invalid').count() == 1
-              and page.locator('#ro-entry-pane .ro-basis, #ro-entry-pane .ro-warn').count() == 0)
-        page.fill('#f-eta', '07:00')
-        page.dispatch_event('#f-eta', 'change')
-        page.wait_for_function("document.getElementById('saveStatus').textContent.indexOf('Saving') < 0", timeout=15000)
-        check('correcting the time removes the invalid state', page.locator('#f-eta.is-invalid').count() == 0)
-
-        page.reload()
-        stored = {f: page.input_value('#f-' + f) for f, _ in FIELDS}
-        check('every value survived the reload', all(stored[f] for f, _ in FIELDS),
-              [f for f, _ in FIELDS if not stored[f]])
-        page.goto(URL + '/logons#drafts')
-        check('the drafts list shows this record, not the queue',
-              page.locator('[data-draft="%s"]' % record).count() == 1
-              and page.locator('[data-id="%s"]' % record).count() == 0)
-
-        # section 7 through the real page: a host may own the bare /api/search, so this must not 404
-        page.goto(URL + '/logon/' + record)
-        page.click('[data-ro-tab="identity"]')
-        page.fill('#findBox', 'BROWSER')
-        page.wait_for_selector('#findHits .ro-search-card', timeout=8000)
-        rows = page.locator('#findHits .ro-search-card').all_inner_texts()
-        check('the search box returns something', rows and 'Nothing matches' not in rows[0], rows[:2])
-        check('and the verification panel is on the page', page.locator('.ro-verify').count() == 1)
-
-        page.reload()
-        check('the gate now says everything needed is here',
-              'Everything needed is here' in page.content())
-        page.click('[data-ro-tab="entry"]')
-        page.click('button:has-text("Accept the log on")')
-        page.wait_for_load_state()
-        check('acceptance is shown on the log on', 'Logged on and watched' in page.content())
-        page.goto(URL + '/logons#loggedon')
-        check('accepting puts it on the watch queue', page.locator('[data-id="%s"]' % record).count() == 1)
-        check('and it is no longer a draft', page.locator('[data-draft="%s"]' % record).count() == 0)
-
-        page.goto(URL + '/logon/' + record)
-        page.fill('#logoffNote', 'browser check')
-        page.click('button:has-text("Log off")')
-        page.wait_for_load_state()
-        check('log off leaves the open queue', page.locator('[data-id="%s"]' % record).count() == 0)
-        check('and appears as logged off', 'browser check' in page.content())
-        check('no javascript errors on the log on pages', not errors, errors)
-        browser.close()
-    print(('FAILED: ' + ', '.join(fails)) if fails else 'all passed')
-    return 1 if fails else 0
+            page.locator('input[name=username]').fill(os.environ.get('RADIO_USER', 'test'))
+            page.locator('input[name=password]').fill(os.environ.get('RADIO_PASS', 'test'))
+            page.locator('button[type=submit], input[type=submit]').first.click()
+            visit('/logons')
+            expect(page.locator('.navbar')).to_be_visible()
+            page.locator('a[href="/logons/new"]').click()
+            expect(page.locator('#saveStatus')).to_have_text('Not saved')
+            expect(page.locator('#ro-entry-pane .capture-row')).to_have_count(5)
+            expect(page.locator('form form')).to_have_count(0)
+            expect(page.locator('#f-callTime')).to_have_value('')
+            expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
+            before = len(writes)
+            page.locator('#saveRecord').click()
+            expect(page.locator('#saveStatus')).to_have_text('Not saved')
+            assert len(writes) == before, 'Invalid minimum attempted a write'
+            for name, value in fields.items():
+                page.locator('#f-' + name).fill(value)
+            for name in ('callDay', 'callTime'):
+                page.locator('[data-picker-target="%s"]' % name).evaluate(
+                    '(el, value) => {el.value=value; el.dispatchEvent(new Event("change", {bubbles:true}));}', fields[name])
+            page.locator('[data-ro-tab="contact"]').click()
+            expect(page.locator('#captureContact')).to_be_visible()
+            page.locator('[data-ro-tab="entry"]').click()
+            page.wait_for_timeout(400)  # detect unwanted debounced autosave
+            assert len(writes) == before, 'Typing or switching tabs wrote a record'
+            expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
+            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(0)
+            dialogs = []
+            def dismiss_leave(dialog):
+                dialogs.append(dialog.type)
+                dialog.dismiss()
+            page.once('dialog', dismiss_leave)
+            with page.expect_event('dialog'):
+                page.locator('.entity-nav-links a[href="/logons"]').click(no_wait_after=True)
+            expect(page.locator('#f-vesselName')).to_have_value(vessel)
+            assert dialogs == ['beforeunload'], 'Unsaved changes did not warn'
+            page.on('dialog', lambda dialog: dialog.accept())
+            record = save()['id']
+            page.wait_for_url(re.compile('/logon/%s(?:#.*)?$' % record))
+            assert len(writes) == before + 1, 'First Save was not one batched write'
+            for name, value in fields.items():
+                if name not in ('callDay', 'etaDay'):
+                    expect(page.locator('#f-' + name)).to_have_value(value)
+            # Second operator saves first; stale browser must fail visibly.
+            other = context.new_page()
+            other.on('dialog', lambda dialog: dialog.accept())
+            other.goto(URL + '/logon/%s' % record)
+            other.locator('#f-destination').fill('Saved by second operator')
+            with other.expect_response(lambda r: '/api/logon/' in r.url) as pending:
+                other.locator('#saveRecord').click()
+            assert pending.value.status == 200, pending.value.text()
+            expect(other.locator('#saveStatus')).to_have_text('Saved')
+            other.close()
+            page.locator('#f-destination').fill('Stale overwrite')
+            save(409)
+            expect(page.locator('#stale')).to_be_visible()
+            page.reload()
+            expect(page.locator('#f-destination')).to_have_value('Saved by second operator')
+            visit('/logons?status=draft&day=' + today + '&q=' + vessel)
+            expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
+            for width in (1920, 900, 390):
+                page.set_viewport_size({'width': width, 'height': 1080})
+                expect(page.locator('table')).to_have_count(0)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Overflow at %spx' % width
+                page.screenshot(path=str(ARTIFACTS / ('radio-list-%s.png' % width)), full_page=True)
+            page.set_viewport_size({'width': 1920, 'height': 1080})
+            visit('/logon/%s' % record)
+            page.locator('[data-ro-tab="identity"]').click()
+            page.locator('#findBox').fill(vessel)
+            expect(page.locator('#findHits')).to_contain_text(vessel)
+            page.locator('[data-ro-tab="entry"]').click()
+            page.locator('form[action="/logon/%s/accept"] button' % record).click()
+            expect(page.locator('.ro-primary-actions')).to_contain_text('Logged on and watched')
+            watching = True
+            visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
+            expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
+            visit('/logon/%s' % record)
+            page.locator('#logoffNote').fill('Verification complete ' + token)
+            page.locator('button[form="logoffForm"]').click()
+            page.wait_for_url(re.compile('/logons$'))
+            closed = True
+            visit('/logons?status=closed&day=' + today + '&q=' + vessel)
+            expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
+            visit('/logon/%s#record' % record)
+            expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
+            expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)
+            assert not errors, '\n'.join(errors)
+            print('PASS: explicit save, persistence, stale conflict, navigation, search, layouts, accept/logoff; fixture %s' % record)
+        except Exception:
+            page.screenshot(path=str(ARTIFACTS / 'radio-failure.png'), full_page=True)
+            raise
+        finally:
+            if record and not closed:
+                action = 'logoff' if watching else 'discard'
+                response = context.request.post(URL + '/logon/%s/%s' % (record, action),
+                                                form={'reason': 'other' if watching else 'Verification cleanup', 'note': vessel})
+                if not response.ok:
+                    print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (record, response.status))
+            context.tracing.stop(path=str(ARTIFACTS / 'radio-trace.zip'))
+            browser.close()
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()

@@ -1,5 +1,6 @@
-# The log on app on its own: MariaDB + the app on port 8091, on quackit's Python/Flask versions. Run from the repo root:
-#   docker compose -f standalone/docker-compose.yml up --build
+# Legacy standalone compatibility configuration, retained for existing deployments.
+# Development and acceptance checks follow the host Quackit's DEVELOPMENT.md.
+# Do not use this as an alternative to the Quackit port 80 verification path.
 name: radio-logon
 services:
   web:

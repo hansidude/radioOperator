@@ -2,6 +2,177 @@
 
 This is the authoritative handoff for the next radio log-on implementation pass.
 
+## Procedure work authorised on 2026-09-13
+
+The owner approved fixing the procedures, the DRY catalog and the existing checks.
+Quackit's `DRY-CATALOG.md` now owns the reuse guide, and `DEVELOPMENT.md` owns the
+single development/testing/rollout path. Read both before work. Develop in the
+`quackit/radio/` submodule that Docker builds. Use the host's verification entry
+point; no personalDB test targets, borrowed venvs or scratch standalone servers.
+
+- [x] Create the host catalog covering UI, backend helpers, integration and procedures.
+- [x] Add host/submodule agent instructions linking to the authoritative documents.
+- [x] Add one Docker verification entry point and pinned browser/DOM dependencies.
+- [x] Repair the dated standalone fixture and rewrite the existing browser check for
+      explicit save, real host integration, stale-edit rejection and responsive views.
+- [x] `./verify` passed on 2026-09-13: 63 Quackit Python tests, four JavaScript
+      suites, 78 radio Python tests, and the browser flow through port 80 / MariaDB.
+      Browser evidence: host `artifacts/verify/` (1920/900/390px screenshots and trace).
+      The browser check also exposed two login-page errors in optional authenticated
+      navigation; the existing initialisers now skip controls absent on that page.
+- [ ] Consolidate the UI duplicates listed in the catalog as the next UI task; the
+      catalog documents current ownership and gaps, it does not claim extraction is done.
+
+The remaining UI/operational decisions below stay open. Historical verification
+notes describe earlier snapshots; they are not alternative procedures or current
+test results. The procedure authorisation supersedes C1, E1 and F1 below.
+
+## Open work and decisions (2026-09-13)
+
+Everything raised on 2026-09-13, with the owner's concerns in their own words and every question
+still waiting for an answer. UI decisions remain open unless marked resolved below;
+routine implementation within the approved procedure work does not need another go.
+
+### A. New log on would not save on :8080, and nothing said why
+
+Concern: *"it doesnt let me save. like - why? which field is it not happy about? i thought there was
+supposed to be red highlighting on field if there is an issue? not user friendly at all."*
+(screenshot `~/Downloads/260913_092039.png`)
+
+Found: no field was wrong. The :8080 container logged `pymysql.err.OperationalError: (1054,
+"Unknown column 'tripRef' in 'SELECT'")` from `logons.py:352 _next_trip_ref`. The personal database
+has not had the `tripRef` migration (see **Still to do** at the bottom). The same values saved with a
+200 on the same code against SQLite.
+
+Why the page gave no clue: `logon.html:190-193` turns a non-JSON error (a 500) into `{}` and marks
+no fields, so the only sign is a red "Not saved". That is a silent fallback.
+
+- [ ] **Decision A1.** Show the server's reason beside "Not saved" when a save fails for a reason
+      that is not a field (e.g. "Save failed: server error, see logs")?
+      1. Yes
+      2. No
+- [ ] **Decision A2.** The personal DB migration, following Quackit's DEVELOPMENT.md.
+      This unblocks saving there. The previously proposed personal-record wipe is a separate,
+      irreversible operation; a missing column does not itself require deleting records.
+      1. Owner runs it
+      2. Claude runs it
+      3. Later
+
+### B. Live red highlighting on the draft minimum -- built, not rolled out
+
+Asked for: *"highlight which field is bad. even before i hit save"*. Chosen: red from the moment the
+form opens (not only after typing starts).
+
+Built (uncommitted, `server/templates/radio/logon.html`, +2 lines): `mark(minimum())` now also runs
+when a draft form opens and on every input, so call day, call time and member no. / rego / mobile go
+red while missing and clear as they are typed. Vessel name alone does not clear them (the server
+minimum).
+
+Earlier standalone verification in Chromium: blank form marks exactly those
+four; each clears correctly, including via the date picker; the screenshot's values show no red and
+save; a saved draft opens with nothing red; no JS errors. The current host verification
+now runs through Quackit's own layout and rebuilt Docker image, including initial
+call-time highlighting, clearing the minimum errors and saving successfully.
+
+- [ ] **Decision B1.** Roll out:
+      1. Verify the working submodule through Quackit's documented command, then publish the
+         tested radio commit and host pointer; personal rollout is a separate requested step
+      2. Leave uncommitted for now
+- [ ] Check on :80 after rollout: Log on -> New log on; call time and the three identity fields are
+      red before typing.
+- [ ] Small: on the identity fields the `.mandatory .form-control{background:...}` rule
+      (`_ui.html:13,87`) hides Bootstrap's invalid icon, so they show a red border only. Call time
+      shows border + icon. Left as is.
+- [ ] Duplication: client `minimum()` (`logon.html:154-163`) repeats the server rule
+      (`logons.py:440-447`). Needs one source of truth.
+
+### C. DRY catalog -- first thing, before any more UI
+
+Concern: *"i want to reuse the quackit stuff - link to the macros, etc. somewhat smartly. i dont want
+you to reinvent fucking everything. because then its different right... dry is king. no one off
+things. because later. it is not modular and everything starts looking like everything. even this
+smart table to card view. this should be dry. and live on quackit. so can be reused at some stage. we
+need a dry catalog library... first thing is always to check the dry catalog library!"*
+
+Resolved C1: broad host catalog, including procedures, not just the logons list.
+Created `quackit/DRY-CATALOG.md`. It identifies preferred owners, symbols/inputs,
+dependencies, consumers, verification and unresolved duplicates. Complete signatures
+remain in source so the catalog does not become a second implementation contract.
+
+The catalog's duplication list is authoritative; consolidate those owners during the
+UI work instead of copying that backlog here. Catalog completeness does not imply
+that the listed duplicates have already been removed.
+
+### D. Logons list: status symbols, smart columns, column selector, split Vessel Details
+
+Asked for, in the owner's words:
+
+- *"i want each row to have a status symbol emoji, and the drop down, will have emoji and name - so
+  after a while - the operators can tell just by looking at the symbol (i.e. the rows will not have
+  the status name - just the symbol). which is showed after the No."*
+- *"i also want the column widths to be smart. like. i dont want to waste horizontal space. like i
+  want it to be smart how it resizes the columns."*
+- *"i want an really clever column selector."*
+- *"i dont like the Vessel Details column. like. this should be like lots of different columns - if
+  it is condensed of these columns. is ok. but needs to be done thoughtfully."*
+- *"quackit has existing search/filtering/emoji stuff right? like on myTimes, or editList, etc. this
+  is very standard functionality"*
+
+Current state: status is a text badge after the member/vessel link (`_ui.html` `state_label`); the
+dropdown is text only (`logons.html:23`); the grid has fixed `fr` widths
+(`_ui.html:36`); `Vessel details` is one cell built by `vessel_summary` (length · hull colour · make ·
+model · other, `_ui.html:248-251`).
+
+Existing quackit pieces to reuse (not copy):
+
+| Need | Quackit piece | Covers it? |
+|---|---|---|
+| Emoji-only on the row, emoji + name in the dropdown | Context emoji: dropdown `myMacro_listitems.html:553`, `myMacro_times.html:174`; emoji-only inline `myMacro_listitems.html:174-176, 638`; show/hide names toggle `myMacro_times.html:940` | Yes as a pattern, but contexts only -- needs generalising into a status macro |
+| Search / filter | `myMacro_filters.html` `search_controls` | Shared presentation yes; radio filters in SQL via URL state. Do not add a second DOM filtering engine |
+| Column show/hide | myTimes "Hide: Hub/Prog/Act" `myTimes.html:413-435`, saved in localStorage at `myMacro_times.html:1906-1913` | Closest; hides card types, not columns |
+| Resize / hide / collapse columns | Tabulator 6.2 in `static/vendor/`, used by `datasets/dataset_edit.html:9-10, 94` | Has it all, but a different look |
+| Table on wide screens, cards when narrow | none on quackit; radio's own grid `_ui.html:32-52, 107-123` | No -- move it to quackit |
+| Compact rows | the two compact toggles in C | Yes, duplicated |
+
+- [ ] **Decision D1.** UI work after the approved procedure/catalog work:
+      1. Shared status-symbol macro (context-emoji presentation generalised) -> shared table/card
+         list macro with smart widths and a column picker, on quackit -> radio's logons page uses
+         both, Vessel Details split into Length, Hull colour, Make, Model, Other
+      2. Review the completed catalog before authorising the remaining UI changes
+- [ ] **Decision D2.** Column picker basis:
+      1. Extend radio's grid into a shared quackit macro (keeps the card-based markup this TODO requires)
+      2. Build on the Tabulator quackit already ships
+- [ ] **Decision D3.** The emoji per status. Statuses the list shows today: Draft, Logged on (watching),
+      Overdue, Logged off, Never departed, Discarded, plus the CONFLICT flag. Red stays reserved for a
+      real abnormal record (see **Responsive record layout**).
+- [ ] **Decision D4.** How the split vessel columns condense when space is short (e.g. one "Vessel"
+      column showing `6m · white · Quintrex 610` until there is room for each), and which columns
+      the picker shows by default.
+- [ ] Define "smart" widths concretely before building: e.g. each column sized to its content up to a
+      cap, blank columns shrink, long text truncates with the full value on hover.
+
+### E. The radio/quackit boundary
+
+Concern: *"it should use the macros/code. i think it was trying to say - dont tie into the existing
+tables directly."*
+
+Done: `CLAUDE.md` now says data goes through `Host` and never straight into quackit's tables or
+session; UI uses quackit's shared macros via the DRY catalog.
+
+- [x] E1: README and instructions now distinguish data independence from shared UI.
+- [ ] E2: retain standalone compatibility for now; before new shared UI dependencies,
+      make its loader consume the same shared files. Do not copy macros/CSS or expand
+      standalone into another development/test target. Dropping support is not part of
+      the approved procedure changes.
+
+### F. Stale or broken things found along the way
+
+- [x] `tests/test_standalone.py`: select the fixed fixture date instead of today's list.
+      The old failure was reproduced in Quackit's Python 3.9 container.
+- [x] F1: update `tests/browser_check.py` in place for explicit save and current selectors.
+      The host verification entry point runs it with fixed Docker dependencies and
+      the port 80 sample account. It rejects personal/standalone target URLs.
+
 ## Next task: one unified radio log list
 
 Status: **done** (2026-09-12). One `records()` query in `server/logons.py`, one `record_list`
@@ -74,7 +245,7 @@ property and filter, not a reason to maintain separate renderers.
   `/home/hansi/Downloads/260912_radio_drafts_after.png`
 
 Do not copy the Quackit implementation into radio-specific code. Extend or consume
-the established pattern while keeping `server/` independent of the Quackit host.
+the shared UI implementation while keeping radio data access behind `Host`.
 
 ## New log-on entry
 
@@ -116,12 +287,12 @@ operator saves, and a save that fails the minimum writes nothing.
 - One Save action must batch all changed fields into one insert/update and create at
   most one corresponding LogOns history event.
 - A failed validation must create or update nothing.
-- Warn before leaving a form with unsaved changes. **(not verified -- no browser check yet)**
+- Warn before leaving a form with unsaved changes. The maintained browser check now covers this.
 - After its first successful save, the draft receives its daily sequence number and
   appears in the unified list.
 - Later saves must use optimistic version checking once per batch. A stale version
-  must fail visibly; do not silently overwrite or fall back. **(unit-tested: a stale version
-  returns 409; not exercised through the browser)**
+  must fail visibly; do not silently overwrite or fall back. The maintained browser check
+  now exercises two operators and the visible 409 rejection.
 - Accept/Log on remains a separate deliberate action. It cannot silently save and
   accept incomplete or unsaved changes.
 

@@ -23,7 +23,7 @@ class Standalone(unittest.TestCase):
             self.assertEqual(c.get('/logon/%d' % i).status_code, 200)
             self.assertEqual(c.post('/api/logon/%d' % i, json={'field': 'destination', 'value': 'Moreton'}).status_code, 200)
             again = create_app('sqlite:///' + str(Path(tmp) / 'radio.sqlite')).test_client()   # the schema is IF NOT EXISTS
-            self.assertIn('Moreton', again.get('/logons').get_data(as_text=True))
+            self.assertIn('Moreton', again.get('/logons?day=2026-09-12').get_data(as_text=True))
 
 
 if __name__ == '__main__':

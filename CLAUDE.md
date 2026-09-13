@@ -1,5 +1,14 @@
 # House Rules — working on my codebase
 
+## Authoritative workflow (2026-09-13)
+
+Read the host Quackit's `DRY-CATALOG.md` and follow `DEVELOPMENT.md`; in the mounted
+checkout these are `../DRY-CATALOG.md` and `../DEVELOPMENT.md`. Radio development
+happens in Quackit's `radio/` submodule. These documents own the environment,
+verification and rollout procedure; do not maintain alternatives here.
+User authorisation covers routine steps within the requested task; the plan/approval
+rules below do not require repeated permission for that same work.
+
 Follow every rule below. At the end of each task, paste the **End-of-task report**
 (bottom of this file) filled in, so every rule is provably addressed — not just promised.
 
@@ -114,12 +123,16 @@ If you catch yourself writing a closing pleasantry, delete it or convert it to a
 
 - The reference is `vessel-logon-spec.md`. Cite the requirement id (CAP-n, WAT-n, ...) in a comment
   wherever code exists because of it; if the spec and the code disagree, say so, do not quietly pick one.
-- Same shape as garageSim: `server/` is the app and knows nothing about quackit; quackit mounts it
-  (`dflask/radio_host.py`). Templates never touch the host's session, hubs or macros.
+- Same shape as garageSim: `server/` is the app and quackit mounts it (`dflask/radio_host.py`).
+  **Data:** never tie into quackit's own tables or session directly; the user, unit and connection
+  come through `Host` (`server/host.py`), and radio's tables are its own (`schemaInput_Radio.sql`).
+- **UI: DRY is king.** Before building any UI, check `quackit/DRY-CATALOG.md` and use quackit's shared
+  macros, CSS and JS. No radio-only one-offs: a generic piece radio needs (list, filter, status symbol,
+  column picker, table/card view) is built on quackit, added to the catalog, and consumed here.
 - Must run on quackit's container: Python 3.9, Flask 1.1.2, Jinja2 2.11. No `match`, no `X | Y` types.
 - Never invent a trip fact (CAP-4); keep what was heard even when it cannot be read (CAP-23); times
   are read against the call time and say how (REC-6).
-- Verify with `python3 -m unittest discover -s tests` and on the quackit Docker dev stack.
+- Verify using the single entry point documented in Quackit's `DEVELOPMENT.md`.
 
 ---
 

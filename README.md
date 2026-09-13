@@ -41,10 +41,14 @@ behind it changes two functions in `server/identity.py` and nothing else.
 
 ## Its own app, mounted by quackit
 
-Same shape as garageSim: `server/` is the app (no idea quackit exists), quackit mounts it as the
+Same shape as garageSim: `server/` owns radio's business rules, quackit mounts it as the
 submodule `radio/` through `dflask/radio_host.py`, and the tables live in quackit's database, created
 by quackit's Database management from the symlinked `server/schema/schemaInput_Radio.sql` (history
 tables and triggers included).
+
+Data access stays behind `Host`; radio does not reach into Quackit's own tables or
+session. Presentation uses Quackit's shared macros, CSS and JavaScript. Consult the
+host's `DRY-CATALOG.md` before implementing or extending a component.
 
 ```
 server/
@@ -63,18 +67,15 @@ standalone/        the app on its own (SQLite by default, MariaDB with RADIO_DB=
 tests/             unittest over real routes and SQL, plus browser_check.py against a running site
 ```
 
-## Run it on its own
+## Development, verification and rollout
 
-```
-python3 standalone/app.py                                    # http://localhost:8091
-docker compose -f standalone/docker-compose.yml up --build   # MariaDB + the app on quackit's Python/Flask versions
-python3 -m unittest discover -s tests
-RADIO_URL=http://localhost:8091 python3 tests/browser_check.py    # needs a running site + playwright
-```
+Follow Quackit's `DEVELOPMENT.md` and `DRY-CATALOG.md`. In the canonical `quackit/radio/`
+checkout these are [../DEVELOPMENT.md](../DEVELOPMENT.md) and
+[../DRY-CATALOG.md](../DRY-CATALOG.md). A separate radio clone is not the source the
+Quackit Docker build consumes; continue development in the mounted submodule.
 
-The browser check is not optional cleverness: form nesting and autosave races are invisible to a
-test client that posts straight to an endpoint, and two defects reached the running site that way.
-
-## Inside quackit (after `myUpdate`)
-
-Admin → Database → Generate → move the migration into Migrations → Execute, then navbar → Log on.
+The existing standalone adapter is retained for compatibility and isolated tests.
+It is not an alternative development or acceptance-test environment. Its copied
+base styles remain a documented consolidation task before further shared UI work.
+Browser acceptance runs through the actual Quackit layout and MariaDB using the
+host's verification entry point. Deployment and migrations follow the host procedure.

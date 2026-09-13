@@ -1,10 +1,9 @@
 """The log on app on its own: no host, no login, one nameless user, one unit.
 
-    python3 standalone/app.py                      # SQLite in standalone/radio.sqlite, http://localhost:8091
-    RADIO_DB=mysql://user:pw@host/radio python3 standalone/app.py
-    docker compose -f standalone/docker-compose.yml up --build     # MariaDB + this, port 8091
-
-This is the proof that the boundary holds: nothing here is quackit's."""
+Retained for adapter compatibility and isolated tests. Development and acceptance
+verification follow the host Quackit's DEVELOPMENT.md, using its radio/ checkout.
+This adapter does not verify Quackit's layout, database migrations or integration.
+"""
 import os
 import re
 import sys
