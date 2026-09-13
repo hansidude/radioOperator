@@ -28,6 +28,7 @@ def main(engine='chromium'):
     record = None
     layout_records = []
     watching = closed = False
+    overdue_record = None
     with sync_playwright() as pw:
         browser = getattr(pw, engine).launch()
         context = browser.new_context(viewport={'width': 1920, 'height': 1080})
@@ -710,6 +711,23 @@ def main(engine='chromium'):
                                                view: innerWidth,
                                                cap: getComputedStyle(document.querySelector('#ro-history-pane .mySpacing')).maxWidth})''')
             assert widths['history'] < widths['view'] - 300, 'History is not in the usual page width: %s' % widths
+            # An overdue notice: raised by the real checker, brought onto an open page by the 30 s refresh (no reload),
+            # and gone the moment its log on is logged off.
+            overdue = context.request.post(URL + '/logons/new', data={'fields': dict(
+                callDay=today, callTime='00:05', registration='OVERDUE-' + token, mobile='0499000111', pob='1',
+                departurePoint='Marina', destination='Verification overdue', eta='12:00',
+                etaDay=(date.today() - timedelta(days=1)).isoformat())})
+            assert overdue.status == 200 and overdue.json()['accepted'], overdue.text()
+            overdue_record = overdue.json()['id']
+            visit('/logons')
+            notice = page.locator('#roLiveAlerts .ro-alert', has=page.locator('a[href="/logon/%d"]' % overdue_record))
+            expect(notice).to_be_visible(timeout=80000)
+            expect(page).to_have_title(re.compile(r'^\(\d+\) OVERDUE'), timeout=5000)
+            visit('/logon/%d' % overdue_record)
+            page.locator('button[form="logoffForm"]').click()
+            page.wait_for_url(re.compile('/logons$'))
+            expect(page.locator('#roLiveAlerts a[href="/logon/%d"]' % overdue_record)).to_have_count(0)
+            overdue_record = None
             assert not errors, '\n'.join(errors)
             print('PASS %s: explicit save, conflicts, search, cached-CSS upgrade, compact multi-row layouts, accept/logoff; fixture %s' % (engine, record))
         except Exception:
@@ -722,6 +740,10 @@ def main(engine='chromium'):
                                                 form={'reason': 'other' if watching else 'Verification cleanup'})
                 if not response.ok:
                     print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (record, response.status))
+            if overdue_record:
+                response = context.request.post(URL + '/logon/%s/logoff' % overdue_record, form={'reason': 'other'})
+                if not response.ok:
+                    print('Fixture %s cleanup failed: HTTP %s. Log it off on port 80.' % (overdue_record, response.status))
             for fixture_id in layout_records:
                 response = context.request.post(URL + '/logon/%s/discard' % fixture_id,
                                                 form={'reason': 'Layout verification complete ' + token})

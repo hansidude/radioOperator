@@ -32,7 +32,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Dates always carry a 2-digit year (`Sun 13/9/26`); times always 4-digit 24-hour (`1400`).
 - Daily `No.` counts from 1 per call date; `Trip ID No.` (`T-00042`) is the record's key.
 - Overdue alerts on the page: pulse, count in the blinking tab title and beep until **Seen** is
-  pressed. The owner decided this stays (Seen stops it).
+  pressed. The owner decided this stays (Seen stops it). An alert goes the moment its cause does: a log off, discard or save resolves
+  that log on's alerts (`watch.settle`, the checker's own rule), and the 30 s refresh swaps the alert strip too, so a
+  raised or cleared alert shows without a reload; the beep and title flash follow the strip (fixed 2026-09-14).
 
 ### Log on form (`/logon/<id>`, `/logons/new`)
 
@@ -129,9 +131,6 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Decisions waiting on the owner
 
-- [ ] **An overdue notice outlives its log off.** Logging off does not resolve its alert: the checker does on its
-      next pass (every 30 s), and the RadioLogs page's 30 s refresh swaps only the list, not the alert strip, so the
-      notice (and its beep and title flash) stays until the page is reloaded. Reported by the owner 2026-09-14.
 
 - [ ] **"Due soon".** Owner, 2026-09-13: *"i dont want due soon"*. A logged-on record within 30 minutes
       of its return still shows a yellow `Due in n min` badge (`_ui.html` `cond`), and the watcher still

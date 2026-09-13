@@ -240,6 +240,7 @@ def _action(logon_id, do):
     _logon(cur, logon_id, h, lock=True)
     try:
         do(cur, request.form.get('version'))
+        W.settle(cur, logon_id, _now(), h.draft_followup_minutes)     # its alerts go with their cause, now
     except (L.Refused, L.Stale) as e:
         conn.rollback()
         cur.close()
@@ -262,6 +263,7 @@ def logon_reopen(logon_id):
     _logon(cur, logon_id, h, lock=True)
     try:
         L.reopen(cur, logon_id, h.user(), _now(), request.form.get('reason'), request.form.get('version'))
+        W.settle(cur, logon_id, _now(), h.draft_followup_minutes)
     except (L.Refused, L.Stale) as e:
         conn.rollback()
         cur.close()
@@ -298,6 +300,7 @@ def api_set_field(logon_id):
             out = L.set_field(cur, logon_id, body['field'], body.get('value'), h.user(), now, body.get('version'))
         else:
             raise L.Refused('expected fields')
+        W.settle(cur, logon_id, now, h.draft_followup_minutes)          # a save can take away an alert's cause
     except (L.Refused, L.Stale) as e:
         conn.rollback()
         cur.close()

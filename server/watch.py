@@ -58,6 +58,38 @@ def due_overdue(cur, now):
 
 # ---------- the alert record ----------
 
+def _wanted(cur, now, followup_minutes):
+    """Every alert whose cause stands now: {(logOnId, kind): (row, due)}."""
+    wanted = {}
+    for row, due in due_draft_followups(cur, now, followup_minutes):
+        wanted[(row['id'], 'draftfollowup')] = (row, due)
+    for row, due in due_overdue(cur, now):
+        wanted[(row['id'], 'overdue')] = (row, due)
+    return wanted
+
+
+def _resolve_stale(cur, now, wanted, existing):
+    """Resolve each open alert whose cause no longer stands, with the record's status as the reason."""
+    resolved = []
+    for key, alert in existing.items():
+        if key not in wanted:
+            row = L.get(cur, alert['logOnId'])
+            reason = (row or {}).get('watchStatus') or 'withdrawn'
+            resolve(cur, alert['id'], now, reason if reason in ('loggedOn', 'loggedOff', 'discarded', 'draft') else 'withdrawn')
+            resolved.append(alert['id'])
+    return resolved
+
+
+def settle(cur, logon_id, now, followup_minutes):
+    """Right after an operator changes one log on (log off, discard, a save): resolve its alerts whose cause has gone,
+    by the same rule the checker uses, so the notice does not outlive the log off until the next pass. Raising and
+    re-notifying stay the checker's. Returns the resolved alert ids."""
+    existing = {(a['logOnId'], a['kind']): a for a in open_alerts(cur, logon_id=logon_id)}
+    if not existing:
+        return []
+    return _resolve_stale(cur, now, _wanted(cur, now, followup_minutes), existing)
+
+
 def open_alerts(cur, unit=None, logon_id=None):
     sql = 'SELECT * FROM Alerts WHERE isActive = 1 AND resolvedAt IS NULL'
     args = []
@@ -100,23 +132,13 @@ def sweep(cur, now, followup_minutes, repeat_minutes=None, notify=None):
     accepting a draft or logging a vessel off clears its alerts on the next pass without every
     action in the app having to remember to do it."""
     repeat_minutes = followup_minutes if repeat_minutes is None else repeat_minutes
-    wanted = {}
-    for row, due in due_draft_followups(cur, now, followup_minutes):
-        wanted[(row['id'], 'draftfollowup')] = (row, due)
-    for row, due in due_overdue(cur, now):
-        wanted[(row['id'], 'overdue')] = (row, due)
+    wanted = _wanted(cur, now, followup_minutes)
 
     raised, resolved, notified = [], [], []
     existing = {}
     for a in open_alerts(cur):
         existing[(a['logOnId'], a['kind'])] = a
-
-    for key, alert in existing.items():
-        if key not in wanted:
-            row = L.get(cur, alert['logOnId'])
-            reason = (row or {}).get('watchStatus') or 'withdrawn'
-            resolve(cur, alert['id'], now, reason if reason in ('loggedOn', 'loggedOff', 'discarded', 'draft') else 'withdrawn')
-            resolved.append(alert['id'])
+    resolved = _resolve_stale(cur, now, wanted, existing)
 
     for key, (row, due) in wanted.items():
         alert = existing.get(key)

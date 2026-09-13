@@ -124,36 +124,40 @@
   </div>
   {% endfor %}
 </div>
-{% set unseen = overdue_alerts|rejectattr('acknowledgedAt')|list %}
+{% endmacro %}
+
+{# In the room: while anything on the strip is unacknowledged, make it impossible to miss (title flash and beep).
+   Rendered once per page, and read from the strip on every tick, so a refresh that brings or clears an alert
+   changes the alarm at once. This is delivery to whoever is present and to nobody else. #}
+{% macro alert_alarm() %}
 <script>
 (function () {
-  // In the room: while a page is open and something is unacknowledged, make it impossible to miss.
-  // This is delivery to whoever is present and to nobody else, which is why the page says so.
-  var unseen = {{ unseen|length }}, overdue = {{ unseen|length }};
-  var word = 'OVERDUE';
-  var title = document.title, on = false, ctx = null;
-  if (!unseen) return;
+  var title = document.title, on = false, ctx = null, lastBeep = 0;
+  function unseen() { return document.querySelectorAll('#roLiveAlerts .ro-alert.unseen').length; }
   function beep() {
     try {
       ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
       if (ctx.state === 'suspended') { ctx.resume(); }
       var o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'square'; o.frequency.value = overdue ? 880 : 560;
+      o.type = 'square'; o.frequency.value = 880;
       g.gain.value = 0.05; o.connect(g); g.connect(ctx.destination);
       o.start(); o.stop(ctx.currentTime + 0.18);
-      return true;
     } catch (e) {
-      return false;
+      console.warn('Alert beep unavailable', e);
     }
   }
-  function flash() { on = !on; document.title = on ? ('(' + unseen + ') ' + word + ' — ' + title) : title; }
-  setInterval(flash, 1000);
-  var audible = beep();
-  if (audible) { setInterval(beep, overdue ? 4000 : 15000); }
-  document.addEventListener('click', function once() { document.removeEventListener('click', once); beep(); });
+  setInterval(function () {
+    var n = unseen();
+    if (!n) { if (on) { document.title = title; on = false; } return; }
+    on = !on;
+    document.title = on ? ('(' + n + ') OVERDUE — ' + title) : title;
+    if (Date.now() - lastBeep >= 4000) { lastBeep = Date.now(); beep(); }
+  }, 1000);
+  document.addEventListener('click', function () { if (unseen()) beep(); });
 })();
 </script>
 {% endmacro %}
+
 
 {# One adapter for every radio status. Field order and business labels stay in radio;
    the host record_grid draws headers, values and the same labelled cells at every width. #}

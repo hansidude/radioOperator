@@ -19,13 +19,13 @@
    The toolbar swaps the list in place through the shared htmx (DRY-CATALOG): on any control change,
    300ms after typing in Find, and every 30s so a passed deadline shows without anyone pressing
    anything (WAT-3, minimal). hx-sync drops a slower earlier answer; the route puts the filters back in
-   the address bar. Only the list is swapped: the alerts carry their own alarm script, which must run
-   once per page, not once per refresh. hx-history="false" keeps vessel and caller details out of
+   the address bar. The list and the alert strip are both swapped (hx-select-oob), so an alert raised or
+   cleared since the page opened shows at the next refresh; the alarm is rendered once and reads the strip. hx-history="false" keeps vessel and caller details out of
    htmx's localStorage page cache. #}
 {# data-navbar-controls: Quackit moves the whole form into its fixed navbar, as on My Times and Lists, so the
    filters stay on screen however far the log scrolls. The standalone shell has no slot and leaves it here. #}
 <form id="roFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="RadioLogs filters" method="get" action="/logons"
-      hx-get="/logons/rows" hx-vals='{"partial": "1"}' hx-target="#roLiveRecords" hx-select="#roLiveRecords"
+      hx-get="/logons/rows" hx-vals='{"partial": "1"}' hx-target="#roLiveRecords" hx-select="#roLiveRecords" hx-select-oob="#roLiveAlerts"
       hx-swap="outerHTML" hx-trigger="change, input from:#roSearch delay:300ms, submit, every 30s"
       hx-sync="this:replace" hx-history="false">
   <input type="hidden" name="f" value="1">
@@ -49,7 +49,8 @@
   {{ view_controls('roRecordView', paragraphs_rows=True) }}   {# owner: the table wraps its values by default #}
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
 </form>
-{{ ui.alert_list(alerts, health) }}
+<div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
+{{ ui.alert_alarm() }}
 {# The chosen view lives on roRecordView, outside roLiveRecords, so a refresh keeps it. #}
 <div id="roRecordView"><div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
 {% endblock %}

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flask import Flask, g, session
 from server import identity as ID
 from server import logons as L
+from server import watch as W
 from server.host import Host
 from server.routes import mount
 from server.sqlite import Connection, create_schema
@@ -515,6 +516,22 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,
                                      data={'reason': 'notdeparted', 'notes': 'never sailed'}).status_code, 302)
+
+    def test_an_overdue_notice_goes_with_its_log_off_and_the_strip_refreshes(self):
+        i = self.accepted(time='0001')                                                # a return time long past
+        conn = Connection(Path(self.tmp.name) / 'test.db')
+        W.sweep(conn.cursor(), L._dt(date.today().isoformat() + ' 23:59:00'), 15)       # the checker raises it
+        conn.commit()
+        page = self.a.get('/logons').get_data(as_text=True)
+        self.assertRegex(page, r'<div id="roLiveAlerts">\s*<div class="ro-alerts">')
+        self.assertIn('<a href="/logon/%d" class="fw-semibold">' % i, page)
+        self.assertIn('hx-select-oob="#roLiveAlerts"', page)                          # the 30 s refresh brings the strip too
+        self.assertEqual(page.count("querySelectorAll('#roLiveAlerts .ro-alert.unseen')"), 1)   # one alarm, reading the strip
+        rows = self.a.get('/logons/rows?partial=1').get_data(as_text=True)
+        self.assertIn('<a href="/logon/%d" class="fw-semibold">' % i, rows)
+        self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'notes': 'back'}).status_code, 302)
+        self.assertNotIn('href="/logon/%d" class="fw-semibold"' % i, self.a.get('/logons').get_data(as_text=True))   # gone at once
+        self.assertNotIn('href="/logon/%d" class="fw-semibold"' % i, self.a.get('/logons/rows?partial=1').get_data(as_text=True))
 
     def test_units_do_not_see_each_others_records(self):
         i = self.new()

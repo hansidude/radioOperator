@@ -116,6 +116,18 @@ class Watching(unittest.TestCase):
         self.assertEqual(self.open_kinds(), [('overdue', i)])
         self.assertEqual(self.told[-1]['kind'], 'overdue')
 
+    def test_an_operators_change_settles_its_alerts_at_once(self):
+        i = self.accepted(time='1500')
+        j = self.accepted(rego='ZZ9', member='2', time='1500')
+        self.sweep(datetime(2026, 9, 12, 15, 0))
+        self.assertEqual(len(W.open_alerts(self.cur)), 2)
+        self.assertEqual(W.settle(self.cur, i, datetime(2026, 9, 12, 15, 1), FOLLOWUP), [])       # still overdue: it stands
+        L.log_off(self.cur, i, 'alice', datetime(2026, 9, 12, 15, 5), 'alongside')
+        self.assertEqual(len(W.settle(self.cur, i, datetime(2026, 9, 12, 15, 5), FOLLOWUP)), 1)   # no waiting for a pass
+        self.assertEqual([a['logOnId'] for a in W.open_alerts(self.cur)], [j])                     # only its own alert
+        self.cur.execute('SELECT resolvedReason FROM Alerts WHERE logOnId = %s', (i,))
+        self.assertEqual(self.cur.fetchone()['resolvedReason'], 'loggedOff')
+
     def test_logging_off_resolves_the_overdue(self):
         i = self.accepted(time='1500')
         self.sweep(datetime(2026, 9, 12, 15, 0))
