@@ -199,7 +199,7 @@ class Pages(unittest.TestCase):
         # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
         self.assertIn('<span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
-        self.assertIn('<span>Return time</span><span>Trip ID No.</span><span></span>', page)
+        self.assertIn('<span>Time</span><span>Trip ID No.</span><span></span>', page)
         self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)

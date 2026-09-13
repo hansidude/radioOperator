@@ -7,7 +7,9 @@
   <title>{{ brand }}</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css">
-  {% for asset in ('record_views.css', 'navbar_controls.css', 'search_controls.css') %}
+  {% from 'myMacro_record_view.html' import styles as record_styles %}
+  {{ record_styles('radio_shared.static') }}
+  {% for asset in ('navbar_controls.css', 'search_controls.css') %}
   <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset) }}">
   {% endfor %}
   <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js') }}"></script>

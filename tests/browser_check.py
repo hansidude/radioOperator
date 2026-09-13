@@ -14,7 +14,7 @@ if URL not in ('http://localhost:80', 'http://host.docker.internal:80'):
 ARTIFACTS = Path('/artifacts')
 
 
-def main():
+def main(engine='chromium'):
     token = uuid4().hex[:10].upper()
     vessel = 'VERIFY-' + token
     today = date.today().isoformat()
@@ -24,10 +24,15 @@ def main():
                   pob='2', departurePoint='Marina', destination='Verification bay',
                   etaDay=(date.today() + timedelta(days=1)).isoformat(), eta='17:00')
     record = None
+    layout_records = []
     watching = closed = False
     with sync_playwright() as pw:
-        browser = pw.chromium.launch()
+        browser = getattr(pw, engine).launch()
         context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+        # Model an existing browser holding the old unversioned stylesheet. New
+        # markup must request a new URL, rather than relying on a hard refresh.
+        context.route('**/static/css/record_views.css', lambda route: route.fulfill(
+            status=200, content_type='text/css', body='/* cached stylesheet predating the shared grid */'))
         context.tracing.start(screenshots=True, snapshots=True, sources=True)
         page = context.new_page()
         errors, writes = [], []
@@ -41,13 +46,17 @@ def main():
             assert '/login' not in page.url, 'Sample login failed'
 
         def save(status=200):
+            nonlocal record
             with page.expect_response(lambda r: r.request.method == 'POST' and '/logon' in r.url) as pending:
                 page.locator('#saveRecord').click()
             response = pending.value
             assert response.status == status, 'Save HTTP %s: %s' % (response.status, response.text()[:1000])
             if status == 200:
+                page.wait_for_url(re.compile('/logon/[0-9]+(?:#.*)?$'))
+                record = int(re.search(r'/logon/([0-9]+)', page.url).group(1))
                 expect(page.locator('#saveStatus')).to_have_text('Saved')
-            return response.json()
+                return {'id': record}
+            return None
 
         try:
             page.goto(URL + '/login')
@@ -56,6 +65,8 @@ def main():
             page.locator('button[type=submit], input[type=submit]').first.click()
             visit('/logons')
             expect(page.locator('.navbar')).to_be_visible()
+            href = page.locator('link[href*="/css/record_views.css"]').get_attribute('href')
+            assert '?v=' in href, 'New grid markup must not reuse the cached stylesheet URL'
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
             expect(page.locator('#ro-entry-pane .capture-row')).to_have_count(5)
@@ -132,17 +143,50 @@ def main():
             with page.expect_response(lambda r: '/logons/rows?' in r.url):
                 page.evaluate('refreshQueue()')
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
-            for width in (2560, 1920, 1280, 1190, 1184, 1024, 900, 768, 576, 390, 320):
-                page.set_viewport_size({'width': width, 'height': 1080})
+            # Review density with sparse and populated rows, like the owner's
+            # i_like_this.png, rather than accepting a single tall record.
+            fixtures = [
+                dict(callDay=today, callTime='14:00', registration='SPARSE-' + token),
+                dict(callDay=today, callTime='14:01', registration='VESSEL-' + token,
+                     vesselName='The great white', length='4.2', hullColour='white', destination='Sandbank'),
+                dict(fields, callTime='14:02', memberNumber='7765',
+                     vesselName='A very long vessel name to exercise truncation and full phone values',
+                     registration='FULL-' + token, destination='A long destination beyond the harbour entrance')]
+            for fixture in fixtures:
+                response = context.request.post(URL + '/logons/new', data={'fields': fixture})
+                assert response.status == 200, response.text()
+                layout_records.append(response.json()['id'])
+            visit('/logons?status=draft&day=' + today + '&q=' + token)
+            expect(page.locator('.dc-record-grid-row')).to_have_count(4)
+            for width in (2560, 1920, 1328, 1280, 1190, 1184, 1024, 960, 900, 768, 576, 390, 320):
+                page.set_viewport_size({'width': width, 'height': 800})
                 expect(page.locator('table')).to_have_count(0)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Overflow at %spx' % width
-                assert page.locator('#radioRecords').evaluate('''el =>
-                    [el, ...el.querySelectorAll('.dc-record-grid-row, .dc-record-grid-cell, .dc-record-grid-value')]
-                    .every(node => node.scrollWidth <= node.clientWidth + 1)'''), 'List/cell overflow at %spx' % width
+                metrics = page.locator('#radioRecords').evaluate("""el => {
+                    const rows = [...el.querySelectorAll('.dc-record-grid-row')];
+                    const head = el.querySelector('.dc-record-grid-head');
+                    const mobile = getComputedStyle(head).display === 'none';
+                    const nodes = [el, ...el.querySelectorAll('.dc-record-grid-row, .dc-record-grid-cell')];
+                    if (mobile) nodes.push(...el.querySelectorAll('.dc-record-grid-value'));
+                    return {mobile, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
+                        heights: rows.map(r => r.getBoundingClientRect().height),
+                        overflow: nodes.some(n => n.clientWidth && n.scrollWidth > n.clientWidth + 1),
+                        visibleBlanks: [...el.querySelectorAll('.dc-record-grid-blank')].some(n => n.getBoundingClientRect().height > 0),
+                        aligned: rows.every(r => [...r.children].every((cell, i) =>
+                            Math.abs(cell.getBoundingClientRect().left - head.children[i].getBoundingClientRect().left) < 3))};
+                }""")
+                assert metrics['grid'], 'Shared grid stylesheet is missing: %s' % metrics
+                assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
+                if width >= 768:
+                    assert not metrics['mobile'], 'Desktop/tablet unexpectedly switched to cards at %spx' % width
+                    assert max(metrics['heights']) <= 36, 'Desktop rows lost compact density: %s' % metrics
+                    assert metrics['aligned'], 'Headers and row columns do not align at %spx' % width
+                else:
+                    assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
                 assert page.locator('.dc-record-wide').evaluate('el => el.getBoundingClientRect().width <= 1920'), 'Width cap'
                 expect(row.locator('[data-column="identity"]')).to_be_visible()
-                if width in (1920, 900, 390):
-                    page.screenshot(path=str(ARTIFACTS / ('radio-list-%s.png' % width)), full_page=True)
+                if width in (1920, 1328, 960, 900, 390):
+                    page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
             page.set_viewport_size({'width': 1920, 'height': 1080})
             visit('/logon/%s' % record)
             page.locator('[data-ro-tab="identity"]').click()
@@ -167,9 +211,9 @@ def main():
             expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
             expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)
             assert not errors, '\n'.join(errors)
-            print('PASS: explicit save, persistence, stale conflict, navigation, search, layouts, accept/logoff; fixture %s' % record)
+            print('PASS %s: explicit save, conflicts, search, cached-CSS upgrade, compact multi-row layouts, accept/logoff; fixture %s' % (engine, record))
         except Exception:
-            page.screenshot(path=str(ARTIFACTS / 'radio-failure.png'), full_page=True)
+            page.screenshot(path=str(ARTIFACTS / ('radio-failure-%s.png' % engine)), full_page=True)
             raise
         finally:
             if record and not closed:
@@ -178,9 +222,15 @@ def main():
                                                 form={'reason': 'other' if watching else 'Verification cleanup', 'note': vessel})
                 if not response.ok:
                     print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (record, response.status))
-            context.tracing.stop(path=str(ARTIFACTS / 'radio-trace.zip'))
+            for fixture_id in layout_records:
+                response = context.request.post(URL + '/logon/%s/discard' % fixture_id,
+                                                form={'reason': 'Layout verification complete ' + token})
+                if not response.ok:
+                    print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (fixture_id, response.status))
+            context.tracing.stop(path=str(ARTIFACTS / ('radio-trace-%s.zip' % engine)))
             browser.close()
 
 
 if __name__ == '__main__':
-    main()
+    for engine in ('chromium', 'firefox'):
+        main(engine)

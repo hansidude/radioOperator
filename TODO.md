@@ -2,6 +2,21 @@
 
 This is the authoritative handoff for the next radio log-on implementation pass.
 
+## Compact radio rows regression (2026-09-13)
+
+Owner reference: `~/Downloads/i_like_this.png` (compact aligned rows). Reported
+regression: `260913_111830.png` (joined headers, stacked labels and empty fields).
+Reproduced by pairing the new grid markup with the old cached, unversioned stylesheet.
+The previous 74rem card breakpoint was also too high for normal desktop windows.
+
+- Shared CSS loads through the host `myMacro_record_view.styles()` macro with one
+  versioned URL, consumed by both shells. Normal reload fetches matching styles.
+- Preserve compact single-line desktop/tablet rows. Only containers at/below 36rem
+  use labelled phone cards. Long desktop values keep their full title; phone values wrap.
+- Existing acceptance now uses several sparse/populated rows, checks density and
+  header alignment at 960px/1328px, simulates stale CSS and runs Chromium + Firefox.
+- The owner’s reference, not simply the absence of scrollbars, defines visual acceptance.
+
 ## Shared radio presentation — current pass (2026-09-13)
 
 The owner authorised the five items in `~/Downloads/todo.png`, explicitly requiring
@@ -32,8 +47,8 @@ create or delete fixture records.
 
 Corrections to historical notes below: initial red minimum highlighting is committed;
 unsaved-navigation and stale-version browser acceptance checks are already implemented;
-the entry form already has the five-row order and full-width wrapper. The new grid
-replaces the old 576–900px inner scrollbar with labelled cards. The older unchecked
+the entry form already has the five-row order and full-width wrapper. The corrected grid
+keeps compact desktop/tablet rows; labelled cards are reserved for phone widths. The older unchecked
 items describing these as unbuilt are superseded by this section. Personal data deletion
 is not required by this task or a `tripRef` migration.
 
