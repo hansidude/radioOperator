@@ -22,7 +22,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   columns. Every column heading carries its symbol beside the word (📅 Date, 👤 Member No., 🛥️ Vessel Name,
   🔖 Rego …) so operators learn them; one-line cards show the symbol alone, the word in its tooltip.
 - View buttons (Quackit's shared `record_grid` `view_controls`): **Cards** at any width, fields on one
-  line; **Paragraphs**, a line per field (or wrapped row values). Kept across refreshes, not across
+  line; **Paragraphs**, a line per field (or wrapped row values). The table opens with Paragraphs on
+  (values wrap in full); cards open with it off (one line). Each view keeps its own choice. Kept across refreshes, not across
   page loads. Text size buttons (A−, 100–200%, A+, reset) grow the list's text, symbols and icons;
   remembered in this browser.
 - Draft rows show what still blocks Accept as an orange `?` (after its symbol on cards, in the cell on rows);

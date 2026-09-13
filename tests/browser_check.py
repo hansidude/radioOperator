@@ -288,7 +288,7 @@ def main(engine='chromium'):
                 assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
                 if width >= 768:
                     assert not metrics['mobile'], 'Desktop/tablet unexpectedly switched to cards at %spx' % width
-                    assert max(metrics['heights']) <= 36, 'Desktop rows lost compact density: %s' % metrics
+                    # Row heights are not capped here: the table opens with Paragraphs on, so long values wrap.
                     assert metrics['aligned'], 'Headers and row columns do not align at %spx' % width
                 else:
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
@@ -314,6 +314,11 @@ def main(engine='chromium'):
                     page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
             # Chosen views on a desktop: cards on one line, a line per field, wrapped rows; a refresh keeps them.
             page.set_viewport_size({'width': 1920, 'height': 1080})
+            # The table opens with Paragraphs on: long values wrap in full rather than ending in an ellipsis.
+            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'true')
+            long_name = page.locator('#radioRecords [data-column="vesselName"] .dc-record-grid-value', has_text='A very long vessel name')
+            expect(long_name).to_have_css('white-space', 'normal')
+            assert long_name.evaluate('el => el.scrollWidth <= el.clientWidth + 1'), 'The long vessel name is still cut off'
             view = page.locator('#roRecordView')
             grid_rows = page.locator('#radioRecords .dc-record-grid-row')
             heights = lambda: grid_rows.evaluate_all('rows => rows.map(r => r.getBoundingClientRect().height)')
@@ -322,6 +327,7 @@ def main(engine='chromium'):
             expect(page.locator('[data-dc-record-view="cards"]')).to_have_attribute('aria-pressed', 'true')
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_hidden()
             expect(grid_rows.first).to_have_css('display', 'flex')
+            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'false')   # cards keep their own: one line
             got = heights()
             assert min(got) <= 40 and max(got) <= 64, 'Cards are not compact at 1920px: %s' % got
             label = grid_rows.first.locator('[data-column="member"] .dc-record-grid-label')
@@ -342,12 +348,15 @@ def main(engine='chromium'):
             got = heights()
             assert min(got) > 64, 'Paragraph cards do not give each field a line: %s' % got
             page.screenshot(path=str(ARTIFACTS / ('radio-paragraphs-%s.png' % engine)), full_page=True)
-            page.locator('[data-dc-record-view="cards"]').click()                          # rows again, values wrapped
+            page.locator('[data-dc-record-view="cards"]').click()                          # rows again, their own Paragraphs still on
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_visible()
+            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'true')
             value = page.locator('#radioRecords [data-column="destination"] .dc-record-grid-value').first
             expect(value).to_have_css('white-space', 'normal')
             page.locator('[data-dc-record-view="paragraphs"]').click()
             expect(value).to_have_css('white-space', 'nowrap')
+            got = heights()                                                                 # Paragraphs off: the paper's one-line rows
+            assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
             expect(view).to_have_class('')
             # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
             readout = page.locator('[data-dc-record-size-readout]')

@@ -45,7 +45,7 @@
     <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
     <option value="due"{% if filters.sort == 'due' %} selected{% endif %}>Due first</option>
   </select>
-  {{ view_controls('roRecordView') }}
+  {{ view_controls('roRecordView', paragraphs_rows=True) }}   {# owner: the table wraps its values by default #}
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
 </form>
 {{ ui.alert_list(alerts, health) }}

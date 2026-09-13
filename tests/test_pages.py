@@ -244,7 +244,7 @@ class Pages(unittest.TestCase):
         self.assertIn('<option value="newest" selected>Newest first</option>', page)
         self.assertIn('<option value="due">Due first</option>', page)
         self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
-        self.assertIn('data-dc-record-view="paragraphs" aria-controls="roRecordView"', page)
+        self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
             self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
         self.assertIn('<div id="roRecordView"><div id="roLiveRecords">', page)
