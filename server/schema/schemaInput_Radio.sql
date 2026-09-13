@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   `tripRef` VARCHAR(16) DEFAULT NULL,                         -- 'T-00042'; NULL until the first save that passes the draft minimum
   `acceptedAt` DATETIME DEFAULT NULL,                         -- the moment the unit took the watch (ACC-3)
   `acceptedBy` VARCHAR(255) DEFAULT NULL,
-  `channel` VARCHAR(16) DEFAULT NULL,                         -- radio | phone | person | self (OC-1)
+  `channel` VARCHAR(16) DEFAULT NULL,                         -- radio | phone | person: how they logged on (OC-1)
   `callDayRaw` VARCHAR(64) DEFAULT NULL,                      -- paper column 1 'Date', as written ('today', '12/9')
   `callDate` DATE DEFAULT NULL,                               -- that day resolved when it was written; never re-derived later
   `callTimeRaw` VARCHAR(64) DEFAULT NULL,                     -- paper column 2 'Time'

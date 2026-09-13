@@ -4,10 +4,11 @@
 {% import 'myMacro_record_view.html' as records_ui %}
 {% import 'myMacro_filters.html' as mf %}
 
-{% macro member_panes(member, children, history, kinds, labels, failed) %}
+{# in_place: inside the log on page's tab, every form saves without leaving the page and a record opens in the tab. #}
+{% macro member_panes(member, children, history, kinds, labels, failed, in_place=False) %}
 <section id="ro-member-details" class="ro-workspace-pane">
   <p class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</p>
-  {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version) }}
+  {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version, json=in_place) }}
 </section>
 {# Contacts, vessels, trailers and cars: one row each through Quackit's shared record_grid, with its view
    buttons (cards, paragraphs, text size) and the shared search over the rows. A row opens its own page. #}
@@ -15,11 +16,11 @@
 {% set grid = 'radioMember' ~ kind|capitalize %}
 <section id="ro-member-{{ kind }}" class="ro-workspace-pane d-none">
   <div class="dc-record-toolbar ro-toolbar">
-    <a class="btn btn-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/new"><i class="bi bi-plus-lg me-1"></i>Add {{ kinds[kind].one }}</a>
+    <a class="btn btn-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/new"{% if in_place %} hx-get="/member/{{ member.id }}/{{ kind }}/new?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %}><i class="bi bi-plus-lg me-1"></i>Add {{ kinds[kind].one }}</a>
     {{ records_ui.view_controls(grid ~ 'View') }}
     {{ mf.render('member-' ~ member.id ~ '-' ~ kind, grid, row_selector='.dc-record-grid-row', show_logic=False) }}
   </div>
-  <div id="{{ grid }}View">{{ ui.member_children(member, kind, kinds[kind], labels, children[kind], grid) }}</div>
+  <div id="{{ grid }}View">{{ ui.member_children(member, kind, kinds[kind], labels, children[kind], grid, in_place) }}</div>
 </section>
 {% endfor %}
 {# Every change the member holds: their details and every contact, vessel, trailer and car, one list, each
@@ -34,12 +35,12 @@
 </section>
 {% endmacro %}
 
-{% macro vessel_panes(vessel, history, kind, labels, failed, creating=False) %}
+{% macro vessel_panes(vessel, history, kind, labels, failed, creating=False, in_place=False) %}
 {# For a public user the vessel is the record: the boat, and who to reach about it. #}
 <section id="ro-vessel-details" class="ro-workspace-pane">
   <p class="ro-section-title">{{ ui.WHO.public.symbol }} {{ ui.WHO.public.label }}</p>
   {{ ui.record_form('public', '/vessels/new' if creating else '/vessel/%d#details' % vessel.id, kind.fields, labels, vessel, failed,
-                    version=None if creating else vessel.version) }}
+                    version=None if creating else vessel.version, json=in_place) }}
 </section>
 {% if not creating %}
 <section id="ro-vessel-history" class="ro-workspace-pane d-none">

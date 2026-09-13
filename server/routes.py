@@ -107,10 +107,12 @@ def _filters():
 
 def _record_links(cur, h, row):
     """What the log on page shows about who this is: the member or public vessel the record is tied to,
-    and the members the Member No. box offers."""
-    return {'member': M.get(cur, 'member', row['memberId']) if row.get('memberId') else None,
-            'vessel': M.get(cur, 'vessels', row['vesselId']) if row.get('vesselId') else None,
-            'member_options': M.members(cur, h.unit()), 'kinds': M.KINDS, 'member_labels': M.LABELS}
+    as records (the picker badges and the boxes it fills come from them)."""
+    member = M.get(cur, 'member', row['memberId']) if row.get('memberId') else None
+    vessel = M.get(cur, 'vessels', row['vesselId']) if row.get('vesselId') else None
+    return {'member': member, 'vessel': vessel,
+            'member_item': M.member_item(member) if member else None, 'vessel_item': M.vessel_item(vessel) if vessel else None,
+            'kinds': M.KINDS, 'member_labels': M.LABELS, 'heard_note_pattern': L.heard_note('{number}')}
 
 
 def _alerts(cur, h):
@@ -202,7 +204,7 @@ def logons_new():
                  identifiers=[], gaps=L.gaps(row), condition=cond, minutes=minutes, verified=verified,
                  missing=L.missing(row), checked=checked, clash=None, **links, extra=L.EXTRA, mandatory=L.IDENTITY_SET,
                  labels=L.LABELS, time_fields=L.TIME_FIELDS, day_fields=L.DAY_FIELDS, column=L.column,
-                 box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, close_reasons=L.CLOSE_REASONS,
+                 box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, channel_labels=L.CHANNEL_LABELS, close_reasons=L.CLOSE_REASONS,
                  reference=L.reference, window=h.approaching_minutes)
 
 
@@ -227,7 +229,7 @@ def logon_page(logon_id):
                  condition=cond, minutes=minutes, verified=verified, missing=L.missing(row), clash=clash,
                  checked=checked, **links,
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
-                 day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
+                 day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS, channel_labels=L.CHANNEL_LABELS,
                  close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes,
                  history=history, history_labels=L.HISTORY_LABELS)
 

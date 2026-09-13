@@ -50,6 +50,23 @@ def _wants_json():
     return request.headers.get('Accept') == 'application/json'
 
 
+def _json_refused(cur, e):
+    cur.close()
+    return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 409 if isinstance(e, L.Stale) else 400
+
+
+def _json_saved(cur, kind, record_id, removed=False):
+    """What a save from the log on page's Member / Public vessel tab answers: the record as the log on uses it, so
+    the boxes it fills can be refreshed without leaving the page."""
+    out = {'id': record_id, 'kind': kind, 'removed': removed}
+    if kind == 'member':
+        out['member'] = M.member_item(M.get(cur, 'member', record_id))
+    elif kind in ('vessels', 'public') and not removed:
+        out['item'] = M.vessel_item(M.get(cur, 'vessels', record_id))
+    cur.close()
+    return jsonify(out)
+
+
 def _values(kind):
     return {f: request.form.get(f, '') for f in M.KINDS[kind]['fields']}
 
@@ -128,8 +145,12 @@ def member_page(member_id):
         M.save(cur, 'member', member, values, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
+        if _wants_json():
+            return _json_refused(cur, e)
         return _member_page(cur, h, member, _refused(e, 'member', values), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
+    if _wants_json():
+        return _json_saved(cur, 'member', member_id)
     cur.close()
     return redirect('/member/%d' % member_id)
 
@@ -138,7 +159,9 @@ def _child_page(cur, h, member, kind, row, failed=None, status=200):
     """One contact, vessel, trailer or car: its form, reached from its row on the member's tab (like a log
     on from the log). `row` is None for a new one."""
     cur.close()
-    return _page('member_record.html', member=member, kind=kind, spec=M.KINDS[kind], record=row or M.blank(kind),
+    # ?panel=1: the same form as content for the log on page's Member tab, saved in place.
+    template = '_member_record_panel.html' if request.args.get('panel') == '1' else 'member_record.html'
+    return _page(template, member=member, kind=kind, spec=M.KINDS[kind], record=row or M.blank(kind),
                  creating=row is None, failed=failed or {}, labels=M.LABELS), status
 
 
@@ -163,14 +186,11 @@ def member_add(member_id, kind):
     except L.Refused as e:
         conn.rollback()
         if _wants_json():
-            cur.close()
-            return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 400
+            return _json_refused(cur, e)
         return _child_page(cur, h, member, kind, None, _refused(e, kind + '-new', values), 400)
     conn.commit()
-    if _wants_json() and kind == 'vessels':
-        item = M.vessel_item(M.get(cur, 'vessels', child_id))
-        cur.close()
-        return jsonify({'id': child_id, 'item': item})
+    if _wants_json():
+        return _json_saved(cur, kind, child_id)
     cur.close()
     return redirect('/member/%d#%s' % (member_id, kind))
 
@@ -196,8 +216,12 @@ def member_child_save(member_id, kind, child_id):
         M.save(cur, kind, row, values, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
+        if _wants_json():
+            return _json_refused(cur, e)
         return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), values), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
+    if _wants_json():
+        return _json_saved(cur, kind, child_id)
     cur.close()
     return redirect('/member/%d#%s' % (member_id, kind))
 
@@ -210,8 +234,12 @@ def member_child_remove(member_id, kind, child_id):
         M.remove(cur, kind, row, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
+        if _wants_json():
+            return _json_refused(cur, e)
         return _child_page(cur, h, member, kind, row, _refused(e, '%s-%d' % (kind, child_id), {}), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
+    if _wants_json():
+        return _json_saved(cur, kind, child_id, removed=True)
     cur.close()
     return redirect('/member/%d#%s' % (member_id, kind))
 
@@ -227,10 +255,12 @@ def api_members():
 
 
 @bp.route('/api/logons/vessels')
-def api_member_vessels():
-    """One member's vessels: the second stage of the Member pick, scoped by the member chosen first."""
+@bp.route('/api/logons/members/<int:member_id>/vessels')
+def api_member_vessels(member_id=None):
+    """One member's vessels: the second stage of the Member pick (?member=), or the log on form's 🛥️ Vessel button
+    for the member already picked (/members/<id>/vessels)."""
     h, (conn, cur) = _open()
-    member = _member(cur, h, request.args.get('member', type=int) or abort(400))
+    member = _member(cur, h, member_id or request.args.get('member', type=int) or abort(400))
     items = [M.vessel_item(v) for v in M.member_vessels(cur, member['id'], request.args.get('q'))]
     cur.close()
     return jsonify({'items': items})
@@ -242,6 +272,22 @@ def api_public_vessels():
     items = [M.vessel_item(v) for v in M.public_vessels(cur, h.unit(), request.args.get('q'))]
     cur.close()
     return jsonify({'items': items})
+
+
+@bp.route('/logons/who')
+def who_badges():
+    """The log on form's badges for a pick, drawn by the one macro the page itself uses (_ui.who_badges)."""
+    h, (conn, cur) = _open()
+    member = _member(cur, h, request.args.get('member', type=int)) if request.args.get('member') else None
+    vessel = None
+    if request.args.get('vessel'):
+        vessel = M.get(cur, 'vessels', request.args.get('vessel', type=int))
+        if not vessel:
+            abort(404)
+        if vessel['unit'] != h.unit() or (vessel['memberId'] or None) != (member['id'] if member else None):
+            abort(400)
+    cur.close()
+    return _page('_who.html', member=member, vessel=vessel)
 
 
 # ---------- public vessels ----------
@@ -288,14 +334,11 @@ def vessels_new():
     except L.Refused as e:
         conn.rollback()
         if _wants_json():
-            cur.close()
-            return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 400
+            return _json_refused(cur, e)
         return _vessel_page(cur, h, M.blank('public'), _refused(e, 'public', values), 400)
     conn.commit()
     if _wants_json():
-        item = M.vessel_item(M.get(cur, 'vessels', vessel_id))
-        cur.close()
-        return jsonify({'id': vessel_id, 'item': item})
+        return _json_saved(cur, 'public', vessel_id)
     cur.close()
     return redirect('/vessel/%d' % vessel_id)
 
@@ -319,7 +362,11 @@ def vessel_page(vessel_id):
         M.save(cur, 'public', vessel, values, h.user(), _now(), request.form.get('version'))
     except (L.Refused, L.Stale) as e:
         conn.rollback()
+        if _wants_json():
+            return _json_refused(cur, e)
         return _vessel_page(cur, h, vessel, _refused(e, 'public', values), 409 if isinstance(e, L.Stale) else 400)
     conn.commit()
+    if _wants_json():
+        return _json_saved(cur, 'public', vessel_id)
     cur.close()
     return redirect('/vessel/%d' % vessel_id)

@@ -1,0 +1,15 @@
+{# One of a member's contacts, vessels, trailers or cars, opened inside the log on page's Member tab: the same form as
+   its own page, saved in place. Back returns to the member. #}
+{% import 'radio/_ui.html' as ui %}
+<div class="ro-panel-tabs">
+  <button type="button" class="btn btn-outline-success btn-sm" hx-get="/member/{{ member.id }}/panel" hx-target="#roWhoPanel" hx-swap="innerHTML"><i class="bi bi-arrow-left me-1"></i>{{ member.memberNumber }} {{ ui.full_name(member) }}</button>
+  <strong>{{ 'New ' ~ spec.one if creating else spec.one|capitalize }}</strong>
+</div>
+<section class="ro-workspace-pane">
+  {% if creating %}
+  {{ ui.record_form(kind ~ '-new', '/member/%d/%s' % (member.id, kind), spec.fields, labels, record, failed, submit='Add ' ~ spec.one, json=True) }}
+  {% else %}
+  {{ ui.record_form('%s-%d' % (kind, record.id), '/member/%d/%s/%d' % (member.id, kind, record.id), spec.fields, labels, record, failed,
+                    version=record.version, remove='/member/%d/%s/%d/remove' % (member.id, kind, record.id), json=True) }}
+  {% endif %}
+</section>

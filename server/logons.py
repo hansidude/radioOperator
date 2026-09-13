@@ -34,7 +34,11 @@ CLOSED = ('loggedOff', 'discarded', 'cancelled')     # cancelled is superseded; 
 # does not know about, left by an earlier one or by a hand-edited row, must be conspicuous rather
 # than invisible: a record in limbo is exactly the thing nobody is counting down.
 NOT_CLOSED = "watchStatus NOT IN ('loggedOn', 'loggedOff', 'discarded', 'cancelled')"
-CHANNELS = ('radio', 'phone', 'person', 'self')
+# How the vessel logged on, as the operator took it (OC-1). Self-service is not something this app takes.
+CHANNELS = ('radio', 'phone', 'person')
+CHANNEL_LABELS = {'radio': 'Radio', 'phone': 'Phone', 'person': 'In person'}
+# The log on boxes a picked vessel record fills; with a member or public vessel picked they come from the record.
+RECORD_VESSEL_FIELDS = ('vesselName', 'registration', 'length', 'hullColour', 'vesselType', 'make', 'model', 'ais')
 # Why a log on ended. A trip that never sailed is still a log on that happened, so it is logged
 # off like any other; only the reason differs (§3.3).
 CLOSE_REASONS = (('returned', 'The vessel returned'), ('notdeparted', 'It never departed'), ('other', 'Something else'))
@@ -71,7 +75,7 @@ LABELS = {
     'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Other vessel details',
     'pob': 'POB', 'departurePoint': 'Departure Point', 'destination': 'Going to',
     'etaDay': 'Return Day or Date', 'eta': 'Time',
-    'channel': 'Channel', 'departureDay': 'Departure day', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
+    'channel': 'How they logged on', 'departureDay': 'Departure day', 'departureTime': 'Departure time', 'radioChannel': 'Radio channel',
     'contactName': 'Contact (aboard / ashore)', 'contactNumber': 'Contact number', 'ais': 'AIS / MMSI',
     'length': 'Length (m)', 'hullColour': 'Hull colour', 'vesselType': 'Type', 'make': 'Make', 'model': 'Model', 'notes': 'Notes',
 }
@@ -112,6 +116,15 @@ class InvalidDraft(Refused):
         self.fields = fields
         super().__init__('A log on keeps everything required: %s' % ', '.join(LABELS.get(f, f) for f in fields) if logged_on else
                          'A draft needs a valid date, time, and one of member number, vessel rego or mobile')
+
+
+class NotFromRecord(InvalidDraft):
+    """Vessel details typed on a log on whose member was picked with no vessel. A member's vessel comes from their
+    record (owner, 2026-09-14): pick one of their vessels or add one, and the boxes fill from it."""
+
+    def __init__(self, fields):
+        self.fields = fields
+        Refused.__init__(self, "A member's vessel comes from their record: pick one of their vessels or add one")
 
 
 class Stale(Exception):
@@ -570,6 +583,11 @@ def _prepare_fields(cur, row, values):
         links['notes'] = _with_heard(after.get('notes'), not_member)
     sets.update(links)
     after.update(links)
+    not_from_record = []
+    if 'vesselId' in values:
+        record, not_from_record = _record_values(cur, after, clean)
+        sets.update(record)
+        after.update(record)
 
     day_for = {target: source for source, target in DAY_FIELDS.items()}
     for time_field in ('callTime', 'departureTime', 'eta'):
@@ -597,7 +615,23 @@ def _prepare_fields(cur, row, values):
         # A log on stays complete (ACC-1, WAT-10): no save may take away, or make unreadable, what
         # the watch depends on. The boxes it would empty are named, and nothing is written.
         required.extend(box for m in missing(after) for box in m['boxes'])
-    return sets, after, sorted(set(invalid)), displays, required, not_member
+    return sets, after, sorted(set(invalid)), displays, required, not_member, not_from_record
+
+
+def _record_values(cur, after, clean):
+    """A form save states its pick (`vesselId`). With a member or public vessel picked, what the pick fills is the
+    record's, not what the browser sent (owner, 2026-09-14): a picked vessel's details come from the vessel, and a
+    member picked with no vessel has none. Returns (columns to set, boxes holding vessel details a member with no
+    vessel cannot have): a save refuses those, a check turns them red. The single-field API (`set_field`) states no
+    pick and is unchanged."""
+    from . import members
+    if after.get('vesselId'):
+        vessel = members.get(cur, 'vessels', after['vesselId'])
+        return {f: vessel.get(f) for f in RECORD_VESSEL_FIELDS}, []
+    if after.get('memberId'):
+        typed = [f for f in RECORD_VESSEL_FIELDS if f in clean and clean[f]]
+        return ({} if typed else {f: None for f in RECORD_VESSEL_FIELDS}), typed
+    return {}, []
 
 
 def check_fields(cur, row, values):
@@ -605,8 +639,8 @@ def check_fields(cur, row, values):
     read, and on a draft what still stops acceptance (ACC-1). The page asks this as focus leaves a box,
     so there is one rule, here, and not a second copy in the browser. `notMember` is a Member No. that
     names no member: the form empties that box and adds `notMemberNote` to Notes, as a save would (CAP-24)."""
-    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
-    red = set(required) | set(invalid)
+    sets, after, invalid, displays, required, not_member, not_from_record = _prepare_fields(cur, row, values)
+    red = set(required) | set(invalid) | set(not_from_record)
     if row['watchStatus'] == 'draft':
         for m in missing(after):
             red.update(m['boxes'])
@@ -614,6 +648,8 @@ def check_fields(cur, row, values):
     # blocks nothing, and a box already red stays red.
     pair = ('memberNumber', 'vesselName')
     heard = [field for field in pair if after.get(field)]
+    if 'vesselId' in values and after.get('memberId'):
+        heard = []                      # a picked member's vessel comes from their record, not from asking
     orange = [field for field in pair if len(heard) == 1 and field not in heard and field not in red]
     return {'red': sorted(red), 'orange': orange, 'notMember': not_member,
             'notMemberNote': heard_note(not_member) if not_member else None}
@@ -629,7 +665,9 @@ def form_values(row):
 def save_fields(cur, logon_id, values, user, now, version=None):
     """Save one whole operator form as one LogOns update and therefore one host history event."""
     row = _open_row(cur, logon_id, version)
-    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
+    sets, after, invalid, displays, required, not_member, not_from_record = _prepare_fields(cur, row, values)
+    if not_from_record:
+        raise NotFromRecord(not_from_record)
     if required:
         raise InvalidDraft(required, logged_on=row['watchStatus'] == 'loggedOn')
     for field in IDENT_FIELDS:
@@ -651,7 +689,9 @@ def save_fields(cur, logon_id, values, user, now, version=None):
 def create_saved(cur, values, user, unit, now):
     """Create the first durable draft only after the explicit form save passes its minimum."""
     row = blank(now, unit)
-    sets, after, invalid, displays, required, not_member = _prepare_fields(cur, row, values)
+    sets, after, invalid, displays, required, not_member, not_from_record = _prepare_fields(cur, row, values)
+    if not_from_record:
+        raise NotFromRecord(not_from_record)
     if required:
         raise InvalidDraft(required)
     day = after['callDate']

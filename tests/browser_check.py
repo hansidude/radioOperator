@@ -19,7 +19,7 @@ def main(engine='chromium'):
     token = uuid4().hex[:10].upper()
     vessel = 'VERIFY-' + token
     today = date.today().isoformat()
-    fields = dict(callDay=today, callTime='13:45', memberNumber=token,
+    fields = dict(callDay=today, callTime='13:45',
                   vesselName=vessel, registration=token, mobile='0412345678',
                   length='6', hullColour='white', make='Quintrex', model='610',
                   pob='2', departurePoint='Marina', destination='Verification bay',
@@ -196,8 +196,12 @@ def main(engine='chromium'):
             expect(page.locator('#f-memberNumber')).to_have_value(member_no)
             for name, value in (('vesselName', vessel), ('registration', token), ('length', '6'), ('mobile', '0412 345 678')):
                 expect(page.locator('#f-' + name)).to_have_value(value)
-            expect(page.locator('#roWhoNow')).to_contain_text(member_no)
+            expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # badges with their symbols
+            expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
             expect(page.locator('#f-vesselId')).not_to_have_value('')
+            for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model'):
+                expect(page.locator('#f-' + name)).not_to_be_editable()                          # the record's, not typed
+            expect(page.locator('#f-mobile')).to_be_editable()                                    # the caller's number
             who_tab = page.locator('#roWhoTab')                                                   # the member's own page, in a tab
             expect(who_tab).to_be_visible()
             expect(who_tab).to_have_text(re.compile('Member'))
@@ -215,8 +219,25 @@ def main(engine='chromium'):
             expect(panel.locator('#ro-member-history [data-history-toolbar]')).to_be_visible()      # its controls stay in the tab
             expect(page.locator('#appNavbarControls #roWhoPanel, #appNavbarControls [aria-label="Member history controls"]')).to_have_count(0)
             page.screenshot(path=str(ARTIFACTS / ('radio-who-member-tab-%s.png' % engine)), full_page=True)
+            panel.locator('[data-entity-tab="vessels"]').click()                                 # correct the vessel on the tab
+            panel.locator('#radioMemberVessels .dc-record-grid-row').filter(has_not_text='SECOND-').first.locator('a[title="Open vessel"]').click()
+            expect(panel.locator('input[name="hullColour"]')).to_be_visible()
+            panel.locator('input[name="hullColour"]').fill('green')
+            panel.locator('form button.btn-warning').first.click()
+            expect(panel.locator('#radioMemberVessels')).to_be_attached()                         # back on the member, in place
             page.locator('[data-ro-tab="entry"]').click()
+            expect(page.locator('#f-hullColour')).to_have_value('green')                          # the log on box follows the record
             expect(page).to_have_url(re.compile('/logons/new(#.*)?$'))
+            page.locator('#roWhoNow [data-ro-clear="vessel"]').click()                            # a wrong vessel goes, the member stays
+            expect(page.locator('#f-vesselName')).to_have_value('')
+            expect(page.locator('#f-vesselName')).not_to_be_editable()
+            expect(page.locator('#f-memberNumber')).to_have_value(member_no)
+            expect(page.locator('#roWhoNow [data-who="vessel"]')).to_have_count(0)
+            page.locator('#roWhoNow [data-ro-pick-vessel]').click()                               # pick one of theirs again
+            expect(page.locator('#spLabel')).to_have_text("Member's vessel: name or rego")
+            pick(vessel)
+            expect(page.locator('#f-vesselName')).to_have_value(vessel)
+            expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
             first_pick = page.locator('#f-vesselId').input_value()
             page.locator('#roPickMember').click()                                                 # a boat not on their record yet
             page.locator('#spInput').fill(token)
@@ -252,12 +273,12 @@ def main(engine='chromium'):
             who_tab.click()
             expect(panel.locator('#public-ownerName')).to_have_value('Verify Public ' + token)
             page.locator('[data-ro-tab="entry"]').click()
-            page.locator('#roClearWho').click()                                                   # remove the pick, easily
+            page.locator('#roWhoNow [data-ro-clear="vessel"]').click()                            # a public user's vessel is the pick: all goes
             for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'vesselId'):
                 expect(page.locator('#f-' + name)).to_have_value('')
             expect(page.locator('#f-mobile')).to_have_value('0412 345 678')                       # the caller's number stays
             expect(who_tab).to_be_hidden()
-            expect(page.locator('#roClearWho')).to_be_hidden()
+            expect(page.locator('#roWhoNow [data-ro-clear]')).to_have_count(0)
             expect(page.locator('#roWhoNow')).to_have_text('')
             expect(page.locator('#f-registration')).to_have_class(re.compile('is-invalid'))      # re-checked: an ID is needed again
             page.locator('#roPickPublic').click()                                                 # a public user seen for the first time
@@ -283,7 +304,6 @@ def main(engine='chromium'):
             page.unroute(failing_search)
             page.keyboard.press('Escape')
             expect(page.locator('#searchPicker')).to_be_hidden()
-            fields['memberNumber'] = first['memberNumber'] = member_no
             visit('/logons')
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
@@ -304,6 +324,8 @@ def main(engine='chromium'):
             page.locator('[data-now-for="callTime"]').click()           # a real click: sets now as 4-digit 24-hour
             expect(page.locator('#f-callTime')).to_have_value(re.compile(r'^([01][0-9]|2[0-3])[0-5][0-9]$'))
             page.locator('#f-callTime').fill(fields['callTime'])
+            page.select_option('#f-channel', 'phone')                                             # how they logged on
+            expect(page.locator('#f-channel option')).to_have_text(['—', 'Radio', 'Phone', 'In person'])
             expect(page.locator('[data-ro-tab="contact"], [data-ro-tab="identity"], [data-ro-tab="record"]')).to_have_count(0)
             page.wait_for_timeout(400)  # detect unwanted debounced autosave
             assert len(writes) == before, 'Typing wrote a record'
@@ -357,8 +379,8 @@ def main(engine='chromium'):
             expect(row.locator('[data-column="day"]')).to_contain_text('/%02d' % (date.today().year % 100))
             expect(row.locator('[data-column="time"]')).to_contain_text('1345')            # typed 13:45, always 4-digit
             expect(row.locator('[data-column="returnTime"]')).to_contain_text('1700')
-            expect(row.locator('[data-column="member"]')).to_contain_text(member_no)
-            expect(row.locator('[data-column="member"]').get_by_role('img', name='Member', exact=True)).to_be_visible()
+            expect(row.locator('[data-column="member"]')).to_contain_text('Public')             # nothing picked: a public user
+            expect(row.locator('[data-column="member"]').get_by_role('img', name='Public user', exact=True)).to_be_visible()
             expect(page.locator('.dc-record-grid-head')).to_contain_text('👤 Member No.')       # symbols taught in the headings
             # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
             expect(page.get_by_role('button', name='Apply', exact=True)).to_have_count(0)
@@ -458,17 +480,25 @@ def main(engine='chromium'):
             expect(page.locator('#f-destination')).to_have_class(re.compile('is-invalid'))
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')   # checking wrote nothing
             expect(page.locator('#f-vesselName')).to_have_class(re.compile('is-invalid'))   # one ID so far: still red
-            page.locator('#f-memberNumber').fill('m99999')                                 # not a member: left blank
-            page.locator('#f-memberNumber').press('Tab')
-            expect(page.locator('#f-memberNumber')).to_have_value('')
+            expect(page.locator('#f-memberNumber')).not_to_be_editable()                         # set only by picking a member
+            page.locator('#roPickMember').click()
+            page.locator('#spInput').fill('m99999')                                               # heard, but not a member
+            page.locator('#spFilter [data-create]').click()                                       # Not a member: note it
             expect(page.locator('#f-notes')).to_have_value('Member No. heard: m99999 (no such member)')   # kept in Notes (CAP-24)
-            expect(page.locator('#saveStatus')).to_contain_text('m99999 is not a member')
-            page.locator('#f-memberNumber').fill(member_no)                                # Member No. heard, Vessel Name empty
-            page.locator('#f-memberNumber').press('Tab')
-            expect(page.locator('#f-memberNumber')).to_have_value(member_no)
-            expect(page.locator('#f-vesselName')).to_have_class(re.compile(r'\bro-hint\b'))    # orange, not red
-            expect(page.locator('#f-vesselName')).not_to_have_class(re.compile('is-invalid'))
-            expect(page.locator('#f-vesselName')).to_have_css('border-top-color', 'rgb(253, 126, 20)')
+            expect(page.locator('#f-memberNumber')).to_have_value('')
+            page.locator('#f-vesselName').fill('Heard boat')                                      # Vessel Name heard, no member
+            page.locator('#f-vesselName').press('Tab')
+            expect(page.locator('#f-memberNumber')).to_have_class(re.compile(r'\bro-hint\b'))  # orange: worth asking for
+            expect(page.locator('#f-memberNumber')).not_to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-memberNumber')).to_have_css('border-top-color', 'rgb(253, 126, 20)')
+            page.locator('#roPickMember').click()
+            page.locator('#spInput').fill(token)
+            pick(member_no)
+            page.locator('#spFilter [data-skip]').click()                                         # No vessel
+            expect(page.locator('#f-vesselName')).to_have_value('')                               # a member with no vessel has none
+            expect(page.locator('#f-registration')).not_to_be_editable()
+            expect(page.locator('#roWhoNow [data-ro-pick-vessel]')).to_be_visible()
+            page.locator('#roWhoNow [data-ro-clear="member"]').click()
             page.locator('#f-mobile').fill('041234567')                                    # 9 digits: red on leaving
             page.locator('#f-mobile').press('Tab')
             expect(page.locator('#f-mobile')).to_have_class(re.compile('is-invalid'))
@@ -476,7 +506,8 @@ def main(engine='chromium'):
             page.locator('#f-mobile').press('Tab')
             expect(page.locator('#f-mobile')).not_to_have_class(re.compile('is-invalid'))
             visit('/logon/%s' % layout_records[1])                                           # rego of a public vessel, no member
-            expect(page.locator('.ro-who[data-who="public"]')).to_have_attribute('href', '/vessel/%d' % public_vessel)
+            expect(page.locator('#roWhoNow [data-who="public"]')).to_be_visible()
+            expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text('PUBLIC-' + token)
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
             expect(page.locator('[data-record="%s"] [data-column="member"]' % layout_records[1]).get_by_role(
@@ -613,8 +644,8 @@ def main(engine='chromium'):
                 save()                                                                           # the save logs it on
             expect(page.locator('.ro-status-now')).to_contain_text('👀')                          # the same symbol and word as the log
             expect(page.locator('.ro-status-now')).to_contain_text('Logged on')
-            expect(page.locator('.ro-who[data-who="member"]')).to_contain_text(member_no)       # tied to the member record
-            expect(page.locator('.ro-who[data-who="member"]')).to_have_attribute('href', urlsplit(member_page).path)
+            expect(page.locator('#f-channel')).to_have_value('phone')                             # how they logged on, kept
+            expect(page.locator('#roWhoNow [data-who]')).to_have_count(0)                         # nothing picked: typed as heard
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
             bottoms = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms

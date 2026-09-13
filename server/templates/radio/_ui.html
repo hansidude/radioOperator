@@ -90,7 +90,9 @@
 .ro-record-form{padding:.5rem 0 1rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-record-form label{display:block;font-size:1rem;font-weight:600;margin:0 0 .35rem}
 .ro-record-form .form-control{font-size:1.1rem;min-height:2.9rem}
-.ro-who{text-decoration:none}
+.ro-who-badge{display:inline-flex;align-items:center;gap:.1rem;margin-right:.35rem}
+.ro-who-clear{padding:.05rem .35rem;color:var(--bs-danger)}
+.ro-primary-form .form-control[readonly]{background-color:var(--bs-secondary-bg)}
 .ro-who-row{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:.25rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-who-row>label{display:block;flex-basis:100%;font-size:1rem;font-weight:600;margin:0}
 .ro-who-row .btn{font-size:1rem;padding:.55rem .9rem}
@@ -350,11 +352,20 @@
 {%- endif -%}
 {%- endmacro %}
 
-{# A log on's own page: the member or public vessel it is tied to, linked to that record. #}
-{% macro who_badge(member, vessel) -%}
-{%- if member -%}<a class="ro-who" href="/member/{{ member.id }}" data-who="member">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=member.memberNumber ~ ' ' ~ full_name(member)) }}</a>
-{%- elif vessel -%}<a class="ro-who" href="/vessel/{{ vessel.id }}" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public · ' ~ (vessel.vesselName or vessel.registration)) }}</a>
-{%- else -%}<span class="ro-who" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public') }}</span>
+{# What a log on is tied to, as badges with their symbols: 👤 the member (✕ removes the member and their vessel),
+   🌐 a public user, 🛥️ the vessel (✕ removes only the vessel, so a wrong vessel does not cost the member). With a
+   member and no vessel, a 🛥️ Vessel button picks one of theirs. Drawn here and swapped in by /logons/who. #}
+{% macro who_badges(member, vessel, open) -%}
+{%- if member -%}
+<span class="ro-who-badge" data-who="member">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=member.memberNumber ~ ' ' ~ full_name(member)) }}{% if open %}<button type="button" class="btn btn-sm ro-who-clear" data-ro-clear="member" title="Remove the member and their vessel" aria-label="Remove the member and their vessel"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}</span>
+{%- elif vessel -%}
+<span class="ro-who-badge" data-who="public">{{ records_ui.symbol(WHO.public.symbol, WHO.public.label, value='Public') }}</span>
+{%- endif -%}
+{%- if vessel -%}
+{% set words = [vessel.vesselName or '', vessel.registration or '']|select|join(' · ') %}
+<span class="ro-who-badge" data-who="vessel">{{ records_ui.symbol(FIELD_SYMBOLS.vesselName, 'Vessel', value=words) }}{% if open %}<button type="button" class="btn btn-sm ro-who-clear" data-ro-clear="vessel" title="Remove the vessel" aria-label="Remove the vessel"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}</span>
+{%- elif member and open -%}
+<button type="button" class="btn btn-outline-secondary btn-sm" data-ro-pick-vessel>{{ FIELD_SYMBOLS.vesselName }} Vessel</button>
 {%- endif -%}
 {%- endmacro %}
 
@@ -388,7 +399,7 @@
     {% if remove %}<button form="{{ form }}-remove" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>{% endif %}
   </div>
 </form>
-{% if remove %}<form id="{{ form }}-remove" method="post" action="{{ remove }}" onsubmit="return confirm('Remove this?')"><input type="hidden" name="version" value="{{ version }}"></form>{% endif %}
+{% if remove %}<form id="{{ form }}-remove" method="post" action="{{ remove }}"{% if json %} data-ro-json data-ro-remove{% else %} onsubmit="return confirm('Remove this?')"{% endif %}><input type="hidden" name="version" value="{{ version }}"></form>{% endif %}
 {% endmacro %}
 
 {# A member's contacts, vessels, trailers or cars as record_grid rows: a column per field, the log's symbol
@@ -396,14 +407,14 @@
 {% set CHILD_SYMBOLS = {'vesselName': FIELD_SYMBOLS.vesselName, 'registration': FIELD_SYMBOLS.registration,
                         'length': FIELD_SYMBOLS.length, 'hullColour': FIELD_SYMBOLS.hullColour, 'make': FIELD_SYMBOLS.make,
                         'model': FIELD_SYMBOLS.model, 'phone': FIELD_SYMBOLS.mobile} %}
-{% macro member_children(member, kind, spec, labels, rows, key) %}
+{% macro member_children(member, kind, spec, labels, rows, key, in_place=False) %}
 {% set grid = namespace(columns=[], rows=[]) %}
 {% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': CHILD_SYMBOLS.get(f, ''),
                                                                'width': 'minmax(0,1.3fr)' if loop.first else 'minmax(0,1fr)'}] %}{% endfor %}
 {% set grid.columns = grid.columns + [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
-  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/{{ c.id }}" title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {% set action %}<a class="btn btn-outline-primary btn-sm" href="/member/{{ member.id }}/{{ kind }}/{{ c.id }}"{% if in_place %} hx-get="/member/{{ member.id }}/{{ kind }}/{{ c.id }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
   {% set _ = cells.update({'action': action}) %}
   {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells}] %}
 {% endfor %}

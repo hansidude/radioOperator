@@ -96,6 +96,14 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   record by `vesselId`; new vessels are saved from the page and picked at once. Typing over Member No., Vessel
   Name or Rego drops the pick, and the rego decides again. **✕ Remove** beside the choice undoes it: Member No., the
   vessel boxes and the vessel link are emptied and the tab goes; Mobile stays.
+- Superseded the same day (owner): the choice shows as badges, **👤 member** and **🛥️ vessel** (or 🌐 public), each with
+  its own ✕; ✕ on the vessel keeps the member, and **🛥️ Vessel** picks one of theirs. What a pick fills is the
+  record's: Member No. is set only by picking (a heard number that is not a member: "Not a member: note it" in the
+  member search puts it in Notes), and with a member or public vessel picked the vessel boxes are read only;
+  Mobile stays typeable. A member with no vessel has none. The server takes those values from the records on a
+  form save (`logons._record_values`). Corrections are made on the Member / Public vessel tab, which saves in place
+  (records open inside it) and refreshes the boxes and badges.
+- **How they logged on** (Radio / Phone / In person) is in the first row, beside Date and Time.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
   8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's
@@ -120,6 +128,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 ## Open
 
 ### Decisions waiting on the owner
+
+- [ ] **An overdue notice outlives its log off.** Logging off does not resolve its alert: the checker does on its
+      next pass (every 30 s), and the RadioLogs page's 30 s refresh swaps only the list, not the alert strip, so the
+      notice (and its beep and title flash) stays until the page is reloaded. Reported by the owner 2026-09-14.
 
 - [ ] **"Due soon".** Owner, 2026-09-13: *"i dont want due soon"*. A logged-on record within 30 minutes
       of its return still shows a yellow `Due in n min` badge (`_ui.html` `cond`), and the watcher still
@@ -167,7 +179,7 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
       `entity_nav.tabs`. Move the log on page onto the shared tabs.
 
 - [ ] **Set aside on 2026-09-13, to be redone properly:** the log on page's Contact, Vessel, Identity and Record
-      tabs (owner: *"all these fields are shit"*). Out of sight until then: channel, departure, radio
+      tabs (owner: *"all these fields are shit"*). Out of sight until then: departure, radio
       channel, contact, AIS, vessel type/details (values kept, not editable); Find and apply an
       earlier trip; the identity check's evidence, including IDV-1's "applied, so it does not corroborate"
       (still computed, shown nowhere); Still to ask; the Heard list; reopening a closed record (route kept,

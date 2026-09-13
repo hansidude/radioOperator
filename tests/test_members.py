@@ -185,10 +185,14 @@ class Members(unittest.TestCase):
         vessel = M.children(self.db(), 'vessels', m)[0]
         self.assertEqual((row['memberNumber'], row['memberId'], row['vesselId']), ('m00001', m, vessel['id']))
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
-        self.assertIn('href="/member/%d" data-who="member"' % m, page)
-        self.assertIn('m00001 Jane Smith', page)
-        self.assertIn('<datalist id="roMembers"><option value="m00001">Jane Smith · Sea Dog</option>', page)
-        self.assertIn('list="roMembers"', page)
+        self.assertIn('<span class="ro-who-badge" data-who="member">', page)            # badges with their symbols
+        self.assertIn('<span class="dc-record-badge-value">m00001 Jane Smith</span>', page)
+        self.assertIn('<span class="dc-record-badge-value">Sea Dog · AB123Q</span>', page)
+        self.assertIn('data-ro-clear="member"', page)
+        self.assertIn('data-ro-clear="vessel"', page)                                  # a wrong vessel goes on its own
+        self.assertRegex(page, r'id="f-memberNumber"[^>]* readonly')                  # set only by picking
+        self.assertRegex(page, r'id="f-registration"[^>]* readonly')                  # the record's, while picked
+        self.assertNotRegex(page, r'id="f-mobile"[^>]* readonly')                     # the caller's number stays typeable
         log = self.a.get('/logons').get_data(as_text=True)
         cell = log[log.index('data-record="%d"' % row['id']):]
         cell = cell[cell.index('data-column="member"'):cell.index('data-column="vesselName"')]
@@ -213,8 +217,8 @@ class Members(unittest.TestCase):
         self.assertEqual(row['notes'], 'Two aboard, one child\nMember No. heard: m09999 (no such member)')
         self.assertIsNotNone(row['vesselId'])                                        # tied to the public vessel
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
-        self.assertIn('href="/vessel/%d" data-who="public"' % row['vesselId'], page)
-        self.assertIn('Public · Blue Duck', page)
+        self.assertIn('<span class="ro-who-badge" data-who="public">', page)
+        self.assertIn('<span class="dc-record-badge-value">Blue Duck · PUB01</span>', page)
         self.assertIn('<label for="f-notes">Notes</label>', page)
         self.assertIn('Member No. heard: m09999 (no such member)</textarea>', page)
         again = self.a.post('/api/logon/%d' % row['id'], json={'fields': {'memberNumber': 'm09999',
@@ -321,14 +325,16 @@ class Members(unittest.TestCase):
     def test_a_picked_member_or_public_vessel_gets_its_own_tab_on_the_log_on_page(self):
         new = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('id="roWhoTab" hidden', new)                                  # nothing picked: no tab
-        self.assertRegex(new, r'id="roClearWho"[^>]* hidden>')                        # and nothing to remove
+        self.assertNotIn('data-ro-clear=', new)                                       # and nothing to remove
+        self.assertNotRegex(new, r'id="f-registration"[^>]* readonly')                # nothing picked: typed freely
+        self.assertIn('<option value="person" >In person</option>', new)              # how they logged on
         self.assertIn('<div id="roWhoPanel" data-navbar-local></div>', new)
         m = self.member()
         self.vessel(m)
         r = self.logon(memberNumber='m00001', registration='AB123Q')
         page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
         self.assertIn('id="roWhoTab"><span data-ro-who-label>👤 Member</span>', page)
-        self.assertRegex(page, r'id="roClearWho"[^>]*><i class="bi bi-x-lg me-1"></i>Remove</button>')   # shown: something to remove
+        self.assertIn('data-ro-clear="member"', page)                                 # shown: something to remove
         self.assertIn('hx-get="/member/%d/panel" hx-trigger="load" hx-swap="innerHTML"' % m, page)
         panel = self.a.get('/member/%d/panel' % m).get_data(as_text=True)
         self.assertNotIn('<html', panel)                                            # content only, for swapping in
@@ -365,6 +371,79 @@ class Members(unittest.TestCase):
         self.assertEqual((row['memberNumber'], row['memberId'], row['vesselId'], row['registration']), (None, None, None, None))
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
         self.assertIn('id="roWhoTab" hidden', page)
+
+    def test_what_a_pick_fills_comes_from_the_records(self):
+        m = self.member()
+        self.vessel(m, hullColour='blue', make='Quintrex')
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        # a picked vessel: its details are the record's, whatever the form sent
+        r = self.logon(memberNumber='m00001', vesselName='Typo Dog', registration='XX1', hullColour='red', vesselId=str(vessel['id']))
+        self.assertEqual(r.status_code, 200, r.data)
+        row = L.get(self.db(), r.json['id'])
+        self.assertEqual((row['vesselName'], row['registration'], row['hullColour'], row['make']), ('Sea Dog', 'AB123Q', 'blue', 'Quintrex'))
+        # a member picked with no vessel has none: vessel details typed anyway are refused, the boxes named
+        r = self.logon(memberNumber='m00001', vesselName='Typed Boat', registration='TY1', vesselId='')
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(set(r.json['fields']), {'vesselName', 'registration'})
+        self.assertIn("pick one of their vessels", r.json['error'])
+        r = self.logon(memberNumber='m00001', vesselId='')
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertIsNone(L.get(self.db(), r.json['id'])['vesselName'])
+        # nothing picked: typed as heard
+        r = self.logon(vesselName='Heard Boat', registration='HB1', vesselId='')
+        self.assertEqual(L.get(self.db(), r.json['id'])['vesselName'], 'Heard Boat')
+        # the orange "worth asking for" does not ask for a picked member's vessel name
+        check = self.a.post('/logons/new', json={'check': True, 'fields': {'callDay': date.today().isoformat(), 'callTime': '0915',
+                                                                           'memberNumber': 'm00001', 'mobile': '0400000001', 'vesselId': ''}})
+        self.assertEqual(check.json['orange'], [])
+
+    def test_the_badges_and_the_member_vessel_picker_answer_for_the_log_on_page(self):
+        m = self.member()
+        self.vessel(m)
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        both = self.a.get('/logons/who?member=%d&vessel=%d' % (m, vessel['id'])).get_data(as_text=True)
+        self.assertIn('data-who="member"', both)
+        self.assertIn('data-ro-clear="vessel"', both)
+        alone = self.a.get('/logons/who?member=%d' % m).get_data(as_text=True)
+        self.assertIn('data-ro-pick-vessel', alone)                                   # no vessel: a button to pick one
+        pub = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333'},
+                          headers={'Accept': 'application/json'}).json['id']
+        self.assertEqual(self.a.get('/logons/who?member=%d&vessel=%d' % (m, pub)).status_code, 400)   # not this member's
+        self.assertIn('data-who="public"', self.a.get('/logons/who?vessel=%d' % pub).get_data(as_text=True))
+        self.assertEqual([i['primary'] for i in self.a.get('/api/logons/members/%d/vessels' % m).json['items']], ['Sea Dog'])
+
+    def test_the_member_tab_saves_in_place(self):
+        m = self.member()
+        self.vessel(m)
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        json = {'Accept': 'application/json'}
+        panel = self.a.get('/member/%d/panel' % m).get_data(as_text=True)
+        self.assertIn('<form id="member" method="post" action="/member/%d#details" class="ro-record-form" autocomplete="off" novalidate data-ro-json>' % m, panel)
+        self.assertIn('hx-get="/member/%d/vessels/new?panel=1" hx-target="#roWhoPanel"' % m, panel)
+        self.assertIn('hx-get="/member/%d/vessels/%d?panel=1" hx-target="#roWhoPanel"' % (m, vessel['id']), panel)
+        form = self.a.get('/member/%d/vessels/%d?panel=1' % (m, vessel['id'])).get_data(as_text=True)
+        self.assertNotIn('<html', form)
+        self.assertIn('data-ro-json data-ro-remove', form)
+        saved = self.a.post('/member/%d' % m, data={'firstName': 'Janet', 'lastName': 'Smith', 'mobile': '0412345678', 'version': '0'}, headers=json)
+        self.assertEqual((saved.status_code, saved.json['member']['primary']), (200, 'm00001 Janet Smith'))
+        bad = self.a.post('/member/%d' % m, data={'firstName': '', 'lastName': 'Smith', 'version': '1'}, headers=json)
+        self.assertEqual((bad.status_code, bad.json['fields']), (400, ['firstName']))
+        stale = self.a.post('/member/%d' % m, data={'firstName': 'J', 'lastName': 'S', 'version': '0'}, headers=json)
+        self.assertEqual(stale.status_code, 409)
+        boat = self.a.post('/member/%d/vessels/%d' % (m, vessel['id']), data={'vesselName': 'Sea Dog II', 'registration': 'AB123Q', 'version': '0'}, headers=json)
+        self.assertEqual(boat.json['item']['primary'], 'Sea Dog II')
+        car = self.a.post('/member/%d/cars' % m, data={'registration': 'CAR1'}, headers=json)
+        self.assertEqual((car.status_code, car.json['kind']), (200, 'cars'))
+        gone = self.a.post('/member/%d/vessels/%d/remove' % (m, vessel['id']), data={'version': '1'}, headers=json)
+        self.assertEqual((gone.json['removed'], gone.json['id']), (True, vessel['id']))
+        pub = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333'}, headers=json).json['id']
+        vpanel = self.a.get('/vessel/%d/panel' % pub).get_data(as_text=True)
+        self.assertIn('data-ro-json', vpanel)
+        again = self.a.post('/vessel/%d' % pub, data={'vesselName': 'Blue Duck', 'hullColour': 'blue', 'ownerName': 'Alex', 'ownerPhone': '0411222333',
+                                                     'version': '0'}, headers=json)
+        self.assertEqual(again.json['item']['fields']['hullColour'], 'blue')
+        page = self.a.get('/member/%d' % m).get_data(as_text=True)                   # the member page itself stays plain forms
+        self.assertNotIn('data-ro-json', page)
 
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history

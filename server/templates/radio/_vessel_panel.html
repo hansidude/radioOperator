@@ -3,4 +3,4 @@
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 <div class="ro-panel-tabs">{{ entity_nav.parent_link('/vessel/%d' % vessel.id, vessel.vesselName or vessel.registration, 'life-preserver') }}
 {{ entity_nav.tabs('vesselPanelTabs', 'Public vessel tabs', vessel_tabs, prefix='ro-vessel-') }}</div>
-{{ views.vessel_panes(vessel, history, kind, labels, failed) }}
+{{ views.vessel_panes(vessel, history, kind, labels, failed, in_place=True) }}

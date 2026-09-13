@@ -4,6 +4,9 @@
 {% set creating = creating|default(false) %}
 {% set open = creating or logon.watchStatus not in ('loggedOff', 'discarded', 'cancelled') %}
 {% set who_public = vessel and not member and not vessel.memberId %}
+{# With a member or public vessel picked, the boxes the pick fills are the record's: read only (owner, 2026-09-14). #}
+{% set pick_locked = member or who_public %}
+{% set record_boxes = ('vesselName', 'registration', 'length', 'hullColour', 'make', 'model') %}
 {% set draft = creating or logon.watchStatus not in ('loggedOn', 'loggedOff', 'discarded', 'cancelled') %}
 {% block body_wrap_class %}container-fluid{% endblock %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
@@ -33,8 +36,8 @@
 {% set hint = name in checked.orange %}
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
   {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="3" data-auto-grow data-field="{{ name }}"{% if open and not draft %} name="notes" form="logoffForm"{% endif %} {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
-  {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% elif hint %} ro-hint{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %} {% if name == 'memberNumber' %}list="roMembers"{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
+  {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ channel_labels[c] }}</option>{% endfor %}</select>
+  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% elif hint %} ro-hint{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %}{% if name == 'memberNumber' or (pick_locked and name in record_boxes) %} readonly title="From the record: pick or remove it above; correct it on the Member or Public vessel tab"{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
 </div>
 {% endmacro %}
 {% if not creating %}<div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>{% endif %}
@@ -46,8 +49,7 @@
        public vessel (spec CAP-24). Chosen through Quackit's shared search picker, without leaving the page. #}
     <div class="ro-who-row" id="roWho">
       <label>Member or public user</label>
-      <span class="ro-who-now" id="roWhoNow">{% if not creating %}{{ ui.who_badge(member, vessel) }}{% endif %}</span>
-      {% if open %}<button type="button" class="btn btn-outline-danger" id="roClearWho" title="Remove the member or public vessel from this log on"{% if not (member or vessel) %} hidden{% endif %}><i class="bi bi-x-lg me-1"></i>Remove</button>{% endif %}
+      <span class="ro-who-now" id="roWhoNow">{{ ui.who_badges(member, vessel if pick_locked else None, open) }}</span>
       {% if open %}<button type="button" class="btn btn-outline-primary" id="roPickMember">{{ ui.WHO.member.symbol }} Member</button>
       <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>{% endif %}
     </div>
@@ -62,7 +64,7 @@
     </section>
     {% endif %}
     <form id="capture" class="ro-primary-form" autocomplete="off" onsubmit="return false">
-      <div class="capture-row row g-3">{{ field('callDay', 'col-12 col-md-6') }}{{ field('callTime', 'col-12 col-md-6') }}</div>
+      <div class="capture-row row g-3">{{ field('callDay', 'col-12 col-md-5') }}{{ field('callTime', 'col-12 col-md-4') }}{{ field('channel', 'col-12 col-md-3') }}</div>
       <div class="capture-row row g-3">
         <div class="col-12 col-lg-6"><div class="row g-2">{{ field('memberNumber', 'col-12 col-sm-5 paper-col') }}{{ field('vesselName', 'col-12 col-sm-7 paper-col') }}</div></div>
         {{ field('registration', 'col-6 col-lg-3') }}{{ field('mobile', 'col-6 col-lg-3') }}
@@ -74,8 +76,6 @@
       <div class="ro-notes-row row g-3">{{ field('notes', 'col-12') }}</div>
       <input type="hidden" id="f-vesselId" data-field="vesselId" value="{{ logon.vesselId if logon.vesselId is not none else '' }}">
     </form>
-    {# The Member No. box offers the unit's members; a number that is not one is emptied (logons._links). #}
-    <datalist id="roMembers">{% for m in member_options %}<option value="{{ m.memberNumber }}">{{ ui.full_name(m) }}{% if m.vesselNames %} · {{ m.vesselNames }}{% endif %}</option>{% endfor %}</datalist>
     {# Save is at the bottom of every editable pane, first in the row, as well as in the navbar. #}
     {% if creating %}
     <div class="ro-primary-actions">{{ save_button() }}</div>
@@ -171,17 +171,6 @@
         if (seq !== checkSeq) return;
         if (!x.ok) throw new Error(x.d.error || 'HTTP ' + x.status);
         mark(x.d.red, x.d.orange);
-        if (x.d.notMember) {             // CAP-24: not a member, so the box is left blank and what was heard goes in Notes
-          var member = document.getElementById('f-memberNumber'), notes = document.getElementById('f-notes');
-          if (member.value.trim() === x.d.notMember) {
-            member.value = '';
-            if (notes.value.indexOf(x.d.notMemberNote) === -1) notes.value = notes.value.trim() ? notes.value.replace(/\s+$/, '') + '\n' + x.d.notMemberNote : x.d.notMemberNote;
-            notes.dispatchEvent(new Event('input', { bubbles: true }));
-            changed(member);
-            checked = null;
-            setStatus(x.d.notMember + ' is not a member: Member No. left blank, kept in Notes (public user)', 'text-warning');
-          }
-        }
       })
       .catch(function (e) {
         if (seq !== checkSeq) return;
@@ -278,66 +267,56 @@
     ev.preventDefault(); ev.returnValue = '';
   });
 
-  // ---- Member or public user: Quackit's shared search picker fills the boxes from the records (CAP-24) ----
+  // ---- Member or public user (CAP-24): Quackit's shared search picker. What a pick fills is the record's: the boxes
+  // are read only, the choice shows as badges (👤 member, 🛥️ vessel, each with ✕), and corrections are made on the
+  // Member / Public vessel tab, which saves in place and refreshes them. The server takes those values from the
+  // records whatever is sent (logons._record_values). ----
   var pickMember = document.getElementById('roPickMember'), pickPublic = document.getElementById('roPickPublic');
-  var vesselId = document.getElementById('f-vesselId'), whoNow = document.getElementById('roWhoNow'), filling = false;
+  var vesselId = document.getElementById('f-vesselId'), whoNow = document.getElementById('roWhoNow');
   var VESSEL_BOXES = ['vesselName', 'registration', 'length', 'hullColour', 'make', 'model'];
+  var HEARD = {{ heard_note_pattern|tojson }};
+  var currentMember = {{ member_item|tojson if pick_locked else 'null' }}, currentVessel = {{ vessel_item|tojson if pick_locked else 'null' }};
   function box(name) { return document.getElementById('f-' + name); }
-  function put(name, value, always) {
-    var el = box(name);
-    if (!el || (!always && (value === null || value === undefined || value === ''))) return;
-    el.value = value === null || value === undefined ? '' : value;
+  function put(name, value) {
+    var el = box(name), next = value === null || value === undefined ? '' : String(value);
+    if (!el || el.value === next) return;
+    el.value = next;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
-  // Typing over the member or the vessel's name or rego undoes a picked vessel: the rego decides again.
-  ['memberNumber', 'vesselName', 'registration'].forEach(function (name) {
-    var el = box(name);
-    if (el) el.addEventListener('input', function () { if (!filling && vesselId.value) { vesselId.value = ''; changed(vesselId); } });
-  });
-  function useMember(member) {
-    put('memberNumber', member.memberNumber, true);
-    if (!box('mobile').value.trim()) put('mobile', member.mobile);
-  }
-  function useVessel(item) {
-    VESSEL_BOXES.forEach(function (name) { put(name, item.fields[name]); });
-    if (item.fields.ownerPhone && !box('mobile').value.trim()) put('mobile', item.fields.ownerPhone);
-    vesselId.value = item.id;
-    changed(vesselId);
+  function apply(hadPick) {
+    put('memberNumber', currentMember ? currentMember.memberNumber : '');
+    if (currentMember && currentMember.mobile && !box('mobile').value.trim()) put('mobile', currentMember.mobile);
+    if (currentVessel) {
+      VESSEL_BOXES.forEach(function (name) { put(name, currentVessel.fields[name]); });
+      if (currentVessel.fields.ownerPhone && !box('mobile').value.trim()) put('mobile', currentVessel.fields.ownerPhone);
+    } else if (currentMember || hadPick) {
+      VESSEL_BOXES.forEach(function (name) { put(name, ''); });           // a member with no vessel has none
+    }
+    var id = currentVessel ? String(currentVessel.id) : '';
+    if (vesselId.value !== id) { vesselId.value = id; changed(vesselId); }
+    VESSEL_BOXES.forEach(function (name) { box(name).readOnly = !!(currentMember || currentVessel); });
+    refreshBadges();
+    showWho(currentMember ? '/member/' + currentMember.id + '/panel' : currentVessel ? '/vessel/' + currentVessel.id + '/panel' : null,
+            currentMember ? WHO_MEMBER + ' Member' : WHO_PUBLIC + ' Public vessel');
+    checked = null;
+    check();
   }
   function chosen(member, vessel) {
-    filling = true;
-    if (member) useMember(member); else put('memberNumber', '', true);
-    if (vessel) useVessel(vessel); else if (vesselId.value) { vesselId.value = ''; changed(vesselId); }
-    filling = false;
-    whoNow.textContent = (member ? WHO_MEMBER + ' ' + member.primary : WHO_PUBLIC + ' Public') +
-                         (vessel ? ' · ' + vessel.primary : '') + ' (not saved)';
-    whoNow.dataset.who = member ? 'member' : 'public';
-    if (clearWho) clearWho.hidden = !(member || vessel);
-    showWho(member ? '/member/' + member.id + '/panel' : vessel ? '/vessel/' + vessel.id + '/panel' : null,
-            member ? WHO_MEMBER + ' Member' : WHO_PUBLIC + ' Public vessel');
-    checked = null;
-    check();
+    var had = !!(currentMember || currentVessel);
+    currentMember = member;
+    currentVessel = vessel;
+    apply(had);
   }
-  // Remove: undo the pick. Everything it filled goes (Member No., the vessel boxes, the vessel link) and so does
-  // the tab; Mobile stays, it is the caller's number. Saving then stores no member and no vessel.
-  var clearWho = document.getElementById('roClearWho');
-  if (clearWho) clearWho.addEventListener('click', function () {
-    filling = true;
-    put('memberNumber', '', true);
-    VESSEL_BOXES.forEach(function (name) { put(name, '', true); });
-    vesselId.value = '';
-    changed(vesselId);
-    filling = false;
-    Object.keys(panels).forEach(function (k) { if (panels[k]) panels[k].hidden = true; });
-    whoNow.textContent = '';
-    delete whoNow.dataset.who;
-    clearWho.hidden = true;
-    showWho(null, '');
-    checked = null;
-    check();
-  });
+  function refreshBadges() {
+    var q = [];
+    if (currentMember) q.push('member=' + currentMember.id);
+    if (currentVessel) q.push('vessel=' + currentVessel.id);
+    if (!q.length) { whoNow.innerHTML = ''; return; }
+    htmx.ajax('GET', '/logons/who?' + q.join('&'), { target: whoNow, swap: 'innerHTML' });
+  }
   // The Member / Public vessel tab: the picked record's own page content, loaded in place (Quackit's htmx).
-  var whoTab = document.getElementById('roWhoTab'), whoPanel = document.getElementById('roWhoPanel'), whoUrl = null;
+  var whoTab = document.getElementById('roWhoTab'), whoPanel = document.getElementById('roWhoPanel');
+  var whoUrl = whoPanel.getAttribute('hx-get');
   function showWho(url, label) {
     whoTab.querySelector('[data-ro-who-label]').textContent = label;
     whoTab.hidden = !url;
@@ -347,9 +326,11 @@
       whoUrl = null;
       return;
     }
+    if (url === whoUrl && whoPanel.innerHTML.trim()) return;
     whoUrl = url;
     htmx.ajax('GET', url, { target: whoPanel, swap: 'innerHTML' });
   }
+  function reloadWho() { if (whoUrl) htmx.ajax('GET', whoUrl, { target: whoPanel, swap: 'innerHTML' }); }
   var panels = { vessels: document.getElementById('roNewVesselPanel'), public: document.getElementById('roNewPublicPanel') };
   var panelMember = null;
   function openPanel(kind, member, typed) {
@@ -372,36 +353,80 @@
     panel.scrollIntoView({ block: 'nearest' });
     form.querySelector('input').focus();
   }
-  document.querySelectorAll('form[data-ro-json]').forEach(function (form) {
-    var panel = form.closest('.ro-new-record'), error = form.querySelector('[data-ro-form-error]');
-    form.querySelector('[data-ro-cancel]').addEventListener('click', function () { panel.hidden = true; });
-    form.addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      error.hidden = true;
-      fetch(form.action, { method: 'POST', credentials: 'same-origin', body: new FormData(form), headers: { Accept: 'application/json' } })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { throw new Error('HTTP ' + r.status); }); })
-        .then(function (x) {
-          form.querySelectorAll('input, textarea').forEach(function (el) {
-            var bad = !x.ok && (x.d.fields || []).indexOf(el.name) !== -1;
-            el.classList.toggle('is-invalid', bad);
-            if (bad) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
-          });
-          if (!x.ok) { error.textContent = x.d.error || 'HTTP ' + x.status; error.hidden = false; return; }
-          panel.hidden = true;
-          chosen(panel === panels.vessels ? panelMember : null, x.d.item);
-        })
-        .catch(function (e) {
-          error.textContent = 'Not saved: ' + e.message;
-          error.hidden = false;
-          console.error('New vessel save failed', e);
-        });
+  function pickMemberVessel() {
+    SearchPicker.open({
+      title: 'Vessel for ' + currentMember.primary,
+      stages: [{ key: 'vessel', endpoint: '/api/logons/members/' + currentMember.id + '/vessels', label: "Member's vessel: name or rego",
+                 create: { label: 'New vessel for this member', onCreate: function (typed) { openPanel('vessels', currentMember, typed); } } }],
+      onConfirm: function (id, picks) { chosen(currentMember, picks.vessel.item); }
     });
+  }
+  document.addEventListener('click', function (ev) {
+    var clear = ev.target.closest('[data-ro-clear]');
+    if (clear) {
+      if (clear.dataset.roClear === 'vessel' && currentMember) chosen(currentMember, null);   // keep the member
+      else chosen(null, null);
+      return;
+    }
+    if (ev.target.closest('[data-ro-pick-vessel]')) { pickMemberVessel(); return; }
+    var cancel = ev.target.closest('[data-ro-cancel]');
+    if (cancel) {
+      var newRecord = cancel.closest('.ro-new-record');
+      if (newRecord) newRecord.hidden = true;
+      else if (whoPanel.contains(cancel)) reloadWho();
+    }
+  });
+  // Every form that saves without leaving this page: a new vessel (below the question) and anything inside the tab.
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target.closest('form[data-ro-json]');
+    if (!form) return;
+    ev.preventDefault();
+    if (form.hasAttribute('data-ro-remove') && !confirm('Remove this?')) return;
+    var owner = document.getElementById(form.id.replace(/-remove$/, '')) || form;
+    var error = owner.querySelector('[data-ro-form-error]');
+    error.hidden = true;
+    fetch(form.action, { method: 'POST', credentials: 'same-origin', body: new FormData(form), headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { throw new Error('HTTP ' + r.status); }); })
+      .then(function (x) {
+        owner.querySelectorAll('input, textarea').forEach(function (el) {
+          var bad = !x.ok && (x.d.fields || []).indexOf(el.name) !== -1;
+          el.classList.toggle('is-invalid', bad);
+          if (bad) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+        });
+        if (!x.ok) { error.textContent = x.d.error || 'HTTP ' + x.status; error.hidden = false; return; }
+        var newRecord = form.closest('.ro-new-record');
+        if (newRecord) {
+          newRecord.hidden = true;
+          chosen(newRecord === panels.vessels ? panelMember : null, x.d.item);
+          return;
+        }
+        // Saved inside the tab: the picked records are refreshed from what was saved, then the tab reloads.
+        if (x.d.kind === 'member' && currentMember && x.d.id === currentMember.id) currentMember = x.d.member;
+        if ((x.d.kind === 'vessels' || x.d.kind === 'public') && currentVessel && x.d.id === currentVessel.id) {
+          currentVessel = x.d.removed ? null : x.d.item;
+        }
+        apply(true);
+        reloadWho();
+      })
+      .catch(function (e) {
+        error.textContent = 'Not saved: ' + e.message;
+        error.hidden = false;
+        console.error('Save from the log on page failed', e);
+      });
   });
   if (pickMember) pickMember.addEventListener('click', function () {
     SearchPicker.open({
       title: 'Member',
       stages: [
-        { key: 'member', endpoint: '/api/logons/members', label: 'Member: number, name or mobile' },
+        { key: 'member', endpoint: '/api/logons/members', label: 'Member: number, name or mobile',
+          create: { label: 'Not a member: note it', onCreate: function (typed) {   // CAP-24: what was heard goes in Notes
+            if (!typed) return;
+            var notes = box('notes'), line = HEARD.replace('{number}', typed);
+            if (notes.value.indexOf(line) === -1) {
+              notes.value = notes.value.trim() ? notes.value.replace(/\s+$/, '') + '\n' + line : line;
+              notes.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          } } },
         { key: 'vessel', endpoint: '/api/logons/vessels', label: "Member's vessel: name or rego",
           scopeFrom: 'member', scopeParam: 'member', optional: true, skipLabel: 'No vessel',
           create: { label: 'New vessel for this member', onCreate: function (typed, picks) {
