@@ -6,7 +6,6 @@
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Radio log">
-  <span id="queueNote" class="small text-danger me-auto" role="alert" hidden></span>
   <a class="btn btn-primary btn-sm" href="/logons/new"><i class="bi bi-plus-lg me-1"></i>New log on</a>
 </div>
 {% endblock %}
@@ -14,8 +13,17 @@
 {{ ui.styles() }}
 {# One collection, four filters. There are no per-status tabs and no per-status renderers: the same
    rows, narrowed. Counts are not shown beside the filters -- a number on a filter you have not
-   chosen is noise, and a red zero is worse (see the abnormal-situation note in _ui.html). #}
-<form class="dc-record-toolbar ro-toolbar" method="get" action="/logons">
+   chosen is noise, and a red zero is worse (see the abnormal-situation note in _ui.html).
+   The toolbar swaps the list in place through the shared htmx (DRY-CATALOG): on any control change,
+   300ms after typing in Find, and every 30s so a passed deadline shows without anyone pressing
+   anything (WAT-3, minimal). hx-sync drops a slower earlier answer; the route puts the filters back in
+   the address bar. Only the list is swapped: the alerts carry their own alarm script, which must run
+   once per page, not once per refresh. hx-history="false" keeps vessel and caller details out of
+   htmx's localStorage page cache. #}
+<form id="roFilters" class="dc-record-toolbar ro-toolbar" method="get" action="/logons"
+      hx-get="/logons/rows" hx-vals='{"partial": "1"}' hx-target="#roLiveRecords" hx-select="#roLiveRecords"
+      hx-swap="outerHTML" hx-trigger="change, input from:#roSearch delay:300ms, submit, every 30s"
+      hx-sync="this:replace" hx-history="false">
   <input type="hidden" name="f" value="1">
   <label for="roStatus">Status</label>
   <select class="form-select form-select-sm" id="roStatus" name="status">
@@ -34,9 +42,7 @@
     <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
   </select>
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
-  <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
 </form>
 {{ ui.alert_list(alerts, health) }}
 <div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>
-{{ ui.refresh_script(None) }}
 {% endblock %}

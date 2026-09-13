@@ -317,27 +317,3 @@
 {% endmacro %}
 
 {# The queue keeps the paper log's information, but presents one vessel per Quackit-style record card. #}
-{% macro refresh_script(current) %}
-<script>
-// The log re-fetches itself so a passed deadline shows without anyone pressing anything (WAT-3, minimal).
-// The whole filter state rides along in the query string, so the refresh returns the view on screen
-// rather than snapping back to the default one.
-window.refreshQueue = function () {
-  if (!document.getElementById('roLiveRecords')) return;
-  var params = new URLSearchParams(window.location.search);
-  params.set('partial', '1');
-  {% if current %}params.set('current', '{{ current }}');{% endif %}
-  fetch('/logons/rows?' + params.toString(), { credentials: 'same-origin' })
-    .then(function (r) { if (!r.ok) throw new Error('Log refresh failed (' + r.status + ')'); return r.text(); })
-    .then(function (html) {
-      var fresh = new DOMParser().parseFromString(html, 'text/html');
-      ['roLiveAlerts', 'roLiveRecords'].forEach(function (id) {
-        var here = document.getElementById(id), next = fresh.getElementById(id);
-        if (here && next) here.innerHTML = next.innerHTML;
-      });
-    })
-    .catch(function (e) { var n = document.getElementById('queueNote'); if (n) { n.textContent = e.message; n.hidden = false; } });
-};
-setInterval(window.refreshQueue, 30000);
-</script>
-{% endmacro %}

@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset) }}">
   {% endfor %}
   <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js') }}"></script>
+  <script src="{{ url_for('radio_shared.static', filename='vendor/htmx-1.9.10/htmx.min.js') }}"></script>
+  <script src="{{ url_for('radio_shared.static', filename='js/htmx_errors.js') }}"></script>
   <style>
     body { font: 14px/1.5 system-ui, sans-serif; padding-top: var(--app-navh, 56px); }
     .navbar > .container-fluid { flex-wrap: wrap; }

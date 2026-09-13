@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import os
 from pathlib import Path
 import re
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 from playwright.sync_api import sync_playwright, expect
 
@@ -63,6 +64,9 @@ def main(engine='chromium'):
             page.locator('input[name=username]').fill(os.environ.get('RADIO_USER', 'test'))
             page.locator('input[name=password]').fill(os.environ.get('RADIO_PASS', 'test'))
             page.locator('button[type=submit], input[type=submit]').first.click()
+            # Let the post-login page finish loading: navigating away mid-load leaves Firefox running
+            # htmx's start-up on a document that has no body yet, reported as a page error.
+            page.wait_for_url(lambda url: '/login' not in url, wait_until='load')
             visit('/logons')
             expect(page.locator('.navbar')).to_be_visible()
             href = page.locator('link[href*="/css/record_views.css"]').get_attribute('href')
@@ -128,21 +132,58 @@ def main(engine='chromium'):
             expect(row.get_by_role('img', name='Vessel name', exact=True)).to_be_visible()
             expect(row.locator('[data-column="identity"]')).to_contain_text(vessel)
             expect(row.locator('[data-column="identity"]')).to_contain_text(token)
-            # Exercise the existing shared single-input search/reset via real GETs.
-            page.locator('#roSearch').fill('NO-MATCH-' + token)
-            page.get_by_role('button', name='Apply', exact=True).click()
+            # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
+            expect(page.get_by_role('button', name='Apply', exact=True)).to_have_count(0)
+            def rows_for(**want):
+                # A /logons/rows request whose query holds exactly these values, whatever their order.
+                def match(response):
+                    parts = urlsplit(response.url)
+                    query = {k: v[0] for k, v in parse_qs(parts.query, keep_blank_values=True).items()}
+                    return parts.path == '/logons/rows' and all(query.get(k) == v for k, v in want.items())
+                return match
+            with page.expect_response(rows_for(q='NO-MATCH-' + token)):
+                page.locator('#roSearch').fill('NO-MATCH-' + token)
             expect(page.locator('#radioRecords')).to_have_text('0 drafts')
-            page.get_by_role('button', name='Reset search', exact=True).click()
+            with page.expect_response(rows_for(q='', status='draft')):
+                page.get_by_role('button', name='Reset search', exact=True).click()
             expect(page.locator('#roSearch')).to_have_value('')
             expect(page.locator('#roStatus')).to_have_value('draft')
-            page.locator('#roSearch').fill(vessel)
-            page.get_by_role('button', name='Apply', exact=True).click()
+            expect(row).to_have_count(1)
+            with page.expect_response(rows_for(q=vessel)):
+                page.locator('#roSearch').fill(vessel)
+            expect(page).to_have_url(re.compile(r'/logons\?.*q=' + vessel))
+            # The reported bug: choosing a status must change the list straight away.
+            with page.expect_response(rows_for(status='loggedon', q=vessel)):
+                page.select_option('#roStatus', 'loggedon')
+            expect(page.locator('#radioRecords')).to_have_text('0 logged on')
+            expect(page).to_have_url(re.compile(r'/logons\?.*status=loggedon'))
+            with page.expect_response(rows_for(status='draft', q=vessel)):
+                page.select_option('#roStatus', 'draft')
+            expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             page.reload()
             expect(page.locator('#roSearch')).to_have_value(vessel)
+            expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
-            with page.expect_response(lambda r: '/logons/rows?' in r.url):
-                page.evaluate('refreshQueue()')
-            expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
+            # A failed swap is shown, never a list that silently stops updating.
+            failing = re.compile(r'/logons/rows\?')
+            page.route(failing, lambda route: route.fulfill(status=500, body='verification failure'))
+            with page.expect_response(rows_for(status='closed')):
+                page.select_option('#roStatus', 'closed')
+            expect(page.locator('#dcHtmxError')).to_contain_text('/logons/rows?')
+            expect(page.locator('#dcHtmxError')).to_contain_text('HTTP 500')
+            expect(row).to_have_count(1)
+            page.unroute(failing)
+            page.locator('#dcHtmxError button').click()
+            expect(page.locator('#dcHtmxError')).to_be_hidden()
+            # The 30s poll, on a fake clock, without waiting 30 real seconds (WAT-3, minimal).
+            poll = context.new_page()
+            poll.clock.install()
+            poll.goto(URL + '/logons?status=draft&day=' + today + '&q=' + vessel)
+            expect(poll.locator('[data-record="%s"]' % record)).to_have_count(1)
+            with poll.expect_response(rows_for(q=vessel)):
+                poll.clock.run_for(30000)
+            expect(poll.locator('[data-record="%s"]' % record).get_by_role('img', name='Draft', exact=True)).to_be_visible()
+            poll.close()
             # Review density with sparse and populated rows, like the owner's
             # i_like_this.png, rather than accepting a single tall record.
             fixtures = [

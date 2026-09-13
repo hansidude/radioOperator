@@ -8,8 +8,9 @@ liftable.
 """
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlencode
 
-from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request
+from flask import Blueprint, abort, current_app, jsonify, make_response, redirect, render_template, request
 
 from . import identity as ID
 from . import logons as L
@@ -132,7 +133,9 @@ def logons_page():
 
 @bp.route('/logons/rows')
 def logons_rows():
-    """The queue on its own: what the pages re-fetch so overdue shows without anyone pressing anything (WAT-3, minimal)."""
+    """The queue on its own: what the log's toolbar swaps in on every change and every 30s, so overdue
+    shows without anyone pressing anything (WAT-3, minimal). The swap happens in place, so the address
+    bar is told the view it now shows (HX-Replace-Url): a refresh, a bookmark and the back button keep it."""
     h, (conn, cur) = _open()
     if request.args.get('partial') != '1':
         cur.close()
@@ -144,8 +147,12 @@ def logons_rows():
                      search=f['search'], newest_first=f['newest'])
     alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,
-                 current=request.args.get('current', type=int), window=h.approaching_minutes, reference=L.reference)
+    response = make_response(_page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,
+                                   current=request.args.get('current', type=int), window=h.approaching_minutes,
+                                   reference=L.reference))
+    view = urlencode([(k, v) for k, v in request.args.items(multi=True) if k not in ('partial', 'current')])
+    response.headers['HX-Replace-Url'] = '/logons' + ('?' + view if view else '')
+    return response
 
 
 @bp.route('/logons/new', methods=['GET', 'POST'])

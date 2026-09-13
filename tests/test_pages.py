@@ -136,7 +136,10 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'vesselName', 'value': 'Sea Dog', 'version': 2}).status_code, 200)
         listing = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Sea Dog', listing)
-        self.assertIn('Sea Dog', self.a.get('/logons/rows?partial=1&current=%d' % i).get_data(as_text=True))
+        self.assertIn('hx-get="/logons/rows"', listing)
+        rows = self.a.get('/logons/rows?partial=1&current=%d&f=1&status=draft&q=Sea+Dog' % i)
+        self.assertIn('Sea Dog', rows.get_data(as_text=True))
+        self.assertEqual(rows.headers['HX-Replace-Url'], '/logons?f=1&status=draft&q=Sea+Dog')
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
