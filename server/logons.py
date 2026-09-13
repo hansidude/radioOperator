@@ -159,6 +159,22 @@ def column(field):
     return field
 
 
+# The history viewer's names for LogOns columns: each form label on the column its value is stored in,
+# the two Time boxes told apart, and the record's own state and interpretation columns.
+HISTORY_LABELS = dict({column(f): LABELS[f] for f in FIELDS},
+                      callTimeRaw='Call time', etaDayRaw='Return day', etaRaw='Return time', departureRaw='Departure time',
+                      callDate='Call date (read)', callTime='Call time (read)', callTimeBasis='Call time reading',
+                      etaDate='Return date (read)', eta='Return deadline', etaBasis='Return time reading',
+                      departureDate='Departure date (read)', departureTime='Departure time (read)', departureBasis='Departure reading',
+                      watchStatus='Status', dayNumber='No.', dayDate='Day', tripRef='Trip ID No.',
+                      acceptedAt='Logged on at', acceptedBy='Logged on by', loggedOffAt='Logged off at',
+                      loggedOffNote='Log off note', closeReason='Log off reason', discardedAt='Discarded at',
+                      discardReason='Discard reason', cancelledAt='Cancelled at', cancelReason='Cancel reason',
+                      duplicateOf='Duplicate of', reopenedAt='Reopened at', reopenReason='Reopen reason',
+                      verifyOutcome='Identity check', verifyBasis='Identity check basis', createdBy='Entered by',
+                      createdAt='Entered at', isActive='Active', unit='Unit')
+
+
 def resolved_day(row, field):
     """The date a day cell settled on: the stored date, or for a row written before that column
     existed, the date of the instant it already produced. Never the words read again."""

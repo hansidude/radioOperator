@@ -61,6 +61,11 @@ class Host:
         """The watch owner (§3.3) for records this user creates and sees: an opaque tag. One unit by default."""
         return ''
 
+    def history(self, cur, table, record_id):
+        """The change history of one row of the app's own `table`, as the host's history viewer events
+        (newest first), or None when this host keeps no history; the page then says so."""
+        return None
+
     def system_actor(self):
         """Who a host should record for something the app did on its own (REC-2: automated events
         identify the system actor rather than inventing an operator). Hosts whose audit trail

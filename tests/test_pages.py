@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from flask import Flask, g, session
+from server import logons as L
 from server.host import Host
 from server.routes import mount
 from server.sqlite import Connection, create_schema
@@ -169,6 +170,16 @@ class Pages(unittest.TestCase):
         rows = self.a.get('/logons/rows?partial=1&current=%d&f=1&status=draft&q=Sea+Dog' % i)
         self.assertIn('Sea Dog', rows.get_data(as_text=True))
         self.assertEqual(rows.headers['HX-Replace-Url'], '/logons?f=1&status=draft&q=Sea+Dog')
+
+    def test_a_log_on_has_a_history_tab_and_no_summary_line(self):
+        i = self.new()
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertIn('data-ro-tab="history" aria-controls="ro-history-pane"', page)
+        self.assertIn('This host keeps no change history.', page)             # this test host keeps none: said, not blank
+        self.assertNotIn('<strong>This system</strong>', page)                  # the summary line is gone
+        self.assertNotIn('data-ro-tab="history"', self.a.get('/logons/new').get_data(as_text=True))
+        for column in ('etaRaw', 'callTimeRaw', 'watchStatus', 'acceptedBy', 'mobile', 'pob'):
+            self.assertIn(column, L.HISTORY_LABELS)
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
@@ -411,7 +422,6 @@ class Pages(unittest.TestCase):
         first, second = self.new(), self.new()
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         self.assertIn('Draft 2', page)
-        self.assertIn('draft 2 of', page)
         page = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('<span class="dc-record-index">1</span>', page)
         self.assertIn('<span class="dc-record-index">2</span>', page)
@@ -481,9 +491,9 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'note': 'thought it was back'}).status_code, 302)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': ''}).status_code, 400)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'wrong boat'}).status_code, 302)
-        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('wrong boat', page)
-        self.assertIn('thought it was back', page)                                    # the closure event is kept
+        row = L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)          # History shows these on quackit
+        self.assertEqual(row['reopenReason'], 'wrong boat')
+        self.assertEqual(row['loggedOffNote'], 'thought it was back')                 # the closure event is kept
         reopened = self.a.get('/logons?f=1&status=all').get_data(as_text=True)
         self.assertIn('data-record="%d"' % i, reopened)
         self.assertIn('OVERDUE', reopened)                                            # time did not stop

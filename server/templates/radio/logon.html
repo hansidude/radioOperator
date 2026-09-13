@@ -19,7 +19,8 @@
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="contact" aria-controls="ro-contact-pane" aria-pressed="false"><i class="bi bi-telephone me-1"></i>Contact</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="vessel" aria-controls="ro-vessel-pane" aria-pressed="false"><i class="bi bi-water me-1"></i>Vessel</button>
     {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>Record</button>{% endif %}
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-journal-text me-1"></i>Record</button>
+    <button type="button" class="btn btn-outline-secondary" data-ro-tab="history" aria-controls="ro-history-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>History</button>{% endif %}
   </div>
   {% if open %}{{ save_button('saveRecord', 'btn-sm') }}{% endif %}
   <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>
@@ -97,15 +98,18 @@
 </section>
 
 <section id="ro-record-pane" class="ro-workspace-pane d-none" data-ro-pane="record">
-  <h2 class="ro-section-title">Record history and actions</h2>
+  <h2 class="ro-section-title">Record actions</h2>
   {% if logon.watchStatus in ('discarded', 'cancelled') %}<div class="alert alert-warning">Discarded {{ ui.when(logon.discardedAt or logon.cancelledAt, now) }}: {{ logon.discardReason or logon.cancelReason }}. This was never a log on.</div>
   {% elif not open %}<div class="alert alert-secondary">Logged off {{ ui.when(logon.loggedOffAt, now) }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}.</div>{% endif %}
   {% if logon.watchStatus in ('discarded', 'cancelled') or not open %}{{ reopen_form() }}{% endif %}
-  <div class="ro-sys mt-4">
-    {% if logon.reopenedAt and open %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b ') ~ logon.reopenedAt|hhmm }}: {{ logon.reopenReason }}. Before that it was {% if logon.cancelledAt %}cancelled {{ logon.cancelledAt|hhmm }}{% if logon.cancelReason %}: {{ logon.cancelReason }}{% endif %}{% else %}logged off {{ logon.loggedOffAt|hhmm if logon.loggedOffAt }}{% if logon.loggedOffNote %}: {{ logon.loggedOffNote }}{% endif %}{% endif %}.</div>{% elif logon.reopenedAt %}<div class="text-warning">Reopened {{ logon.reopenedAt.strftime('%a %d %b ') ~ logon.reopenedAt|hhmm }}: {{ logon.reopenReason }}, then closed again.</div>{% endif %}
-    <strong>This system</strong> · {{ 'draft' if draft else 'log on' }} {{ reference(logon) }} of {{ logon.dayDate.strftime('%a %d %b') if logon.dayDate }} · record #{{ logon.id }} · entered {{ logon.createdAt.strftime('%a %d %b ') ~ logon.createdAt|hhmm }} by {{ logon.createdBy }} · version {{ logon.version }}{% if logon.updatedAt != logon.createdAt %} · last change {{ logon.updatedAt|hhmm }} by {{ logon.updatedBy }}{% endif %}{% if logon.acceptedAt %} · accepted {{ logon.acceptedAt|hhmm }} by {{ logon.acceptedBy }}{% endif %}{% if logon.loggedOffAt %} · logged off {{ logon.loggedOffAt|hhmm }} by {{ logon.updatedBy }}{% endif %}
-  </div>
   {% if identifiers %}<div class="ro-idents mt-4"><strong>Heard</strong><ul class="mb-0">{% for i in identifiers %}<li class="{{ '' if i.isActive else 'old' }}">{{ labels[i.kind] }}: <code>{{ i.raw }}</code> <span class="text-secondary">{{ i.capturedAt|hhmm }} {{ i.source }}{% if not i.isActive %} superseded{% endif %}</span></li>{% endfor %}</ul></div>{% endif %}
+</section>
+{# Every change to this record, from quackit's generated LogOns_history, in the history viewer every
+   other quackit page uses. A host that keeps no history says so. #}
+<section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
+  {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
+  {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges with context %}
+  {{ dcFn_ShowHistoryChanges(history, dcKey_i='logon-history', dcTitle_i='Log on history', dcFieldLabelsDictionary_i=history_labels, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
 </section>
 {{ ui.find_script(logon.id) }}
 {% endif %}

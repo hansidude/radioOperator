@@ -60,6 +60,12 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Behind it
 
+- One record table, `LogOns`, with one status column (`watchStatus`: draft, watching, loggedoff,
+  discarded). quackit's migration generator gives it `LogOns_history` and triggers. The **History** tab
+  shows that history in quackit's shared viewer (through `Host.history`); the old summary line is gone.
+- Side tables: `Identifiers` (every ID value heard), `Alerts` (what the checker raised), `WatchHealth`
+  (the checker's heartbeat and lease).
+
 - Deadline checker runs without a browser, raises and clears alerts, records delivery.
 - Radio data only through `Host`; the standalone shell loads Quackit's real shared templates and assets.
 - `./verify` covers Quackit and radio: Python tests, DOM tests, and the browser check on port 80 /
@@ -98,6 +104,14 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Define "smart" widths before building (content-sized up to a cap, blank columns shrink).
 
 ### Clean-up
+
+- [ ] **`Identifiers` overlaps `LogOns_history`.** Every change to Member No., Rego, Mobile and Vessel
+      Name is already in history; `Identifiers` adds the normalised copy the identity check matches
+      earlier trips on. Owner, 2026-09-13: leave it for now; replacing it is a separate decision.
+- [ ] A closed log on shows the yellow DRAFT badge beside the RadioLogs button (`ui.cond` treats every
+      not-watched record as a draft). Seen on the History screenshot.
+- [ ] Logged on by / Entered by store the quackit user id (history shows `4`); the event's own person
+      is named. Name them through `Host` if wanted.
 
 - [ ] Consolidate the Quackit UI duplicates listed in `DRY-CATALOG.md` (compact toggles, context combo
       enhancement, old attachment macros). The catalog lists them; none is extracted yet.

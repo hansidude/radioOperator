@@ -410,6 +410,17 @@ def main(engine='chromium'):
             visit('/logon/%s#record' % record)
             expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
             expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)
+            # History: quackit's LogOns_history in the shared viewer, the whole life of this record.
+            page.locator('[data-ro-tab="history"]').click()
+            history = page.locator('#ro-history-pane .dc-history')
+            expect(history).to_be_visible()
+            # The viewer's toolbar (search, sort, count) rides in the navbar, as on every quackit history page.
+            expect(page.locator('#appNavbarControls [data-history-toolbar] [data-history-count]')).to_have_text(re.compile(r'^([4-9]|\d\d+) events$'))
+            expect(history).to_contain_text('Saved by second operator')                         # the second operator's edit
+            expect(history).to_contain_text('Going to')                                         # labelled, not the column name
+            expect(history).to_contain_text('Logged on by')
+            expect(history).to_contain_text('Verification complete ' + token)                   # the log off
+            page.screenshot(path=str(ARTIFACTS / ('radio-history-%s.png' % engine)), full_page=True)
             assert not errors, '\n'.join(errors)
             print('PASS %s: explicit save, conflicts, search, cached-CSS upgrade, compact multi-row layouts, accept/logoff; fixture %s' % (engine, record))
         except Exception:

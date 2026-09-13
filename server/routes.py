@@ -205,6 +205,7 @@ def logon_page(logon_id):
     unaccepted = _drafts(cur, h)
     alerts, health = _alerts(cur, h)
     clash = L.open_for_vessel(cur, h.unit(), row) if row['watchStatus'] != 'watching' else None
+    history = h.history(cur, 'LogOns', logon_id)
     cur.close()
     cond, minutes = L.condition(row, _now(), h.approaching_minutes)
     return _page('logon.html', logon=row, queue=rows, drafts=unaccepted, alerts=alerts, health=health,
@@ -213,7 +214,8 @@ def logon_page(logon_id):
                  checked=L.check_fields(row, L.form_values(row)) if row['watchStatus'] not in ('loggedoff', 'discarded', 'cancelled') else {'red': [], 'orange': []},
                  extra=L.EXTRA, mandatory=L.IDENTITY_SET, labels=L.LABELS, time_fields=L.TIME_FIELDS,
                  day_fields=L.DAY_FIELDS, column=L.column, box=L.box, pair=L.DAY_FIELDS, channels=L.CHANNELS,
-                 close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes)
+                 close_reasons=L.CLOSE_REASONS, reference=L.reference, window=h.approaching_minutes,
+                 history=history, history_labels=L.HISTORY_LABELS)
 
 
 def _action(logon_id, do):
