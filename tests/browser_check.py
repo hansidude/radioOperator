@@ -140,13 +140,12 @@ def main(engine='chromium'):
             row = page.locator('[data-record="%s"]' % record)
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             expect(row).to_have_css('background-color', 'rgba(253, 126, 20, 0.1)')      # drafts are tinted orange
-            expect(row.get_by_role('img', name='Member number', exact=True)).to_be_visible()
-            expect(row.get_by_role('img', name='Vessel name', exact=True)).to_be_visible()
-            expect(row.locator('[data-column="identity"]')).to_contain_text(vessel)
+            expect(row.locator('[data-column="vesselName"]')).to_contain_text(vessel)          # its own column
             expect(row.locator('[data-column="day"]')).to_contain_text('/%02d' % (date.today().year % 100))
             expect(row.locator('[data-column="time"]')).to_contain_text('1345')            # typed 13:45, always 4-digit
             expect(row.locator('[data-column="returnTime"]')).to_contain_text('1700')
-            expect(row.locator('[data-column="identity"]')).to_contain_text(token)
+            expect(row.locator('[data-column="member"]')).to_contain_text(token)
+            expect(page.locator('.dc-record-grid-head')).to_contain_text('👤 Member No.')       # symbols taught in the headings
             # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
             expect(page.get_by_role('button', name='Apply', exact=True)).to_have_count(0)
             def rows_for(**want):
@@ -245,6 +244,12 @@ def main(engine='chromium'):
             expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))
             expect(page.locator('#f-destination')).to_have_class(re.compile('is-invalid'))
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')   # checking wrote nothing
+            expect(page.locator('#f-vesselName')).to_have_class(re.compile('is-invalid'))   # one ID so far: still red
+            page.locator('#f-memberNumber').fill('4471')                                   # Member No. heard, Vessel Name empty
+            page.locator('#f-memberNumber').press('Tab')
+            expect(page.locator('#f-vesselName')).to_have_class(re.compile(r'\bro-hint\b'))    # orange, not red
+            expect(page.locator('#f-vesselName')).not_to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-vesselName')).to_have_css('border-top-color', 'rgb(253, 126, 20)')
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
             expect(page.locator('#appNavbarControls #roFilters')).to_have_count(1)            # the filters ride in the navbar
@@ -274,7 +279,7 @@ def main(engine='chromium'):
                 else:
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
                 assert page.locator('.dc-record-wide').evaluate('el => el.getBoundingClientRect().width <= 1920'), 'Width cap'
-                expect(row.locator('[data-column="identity"]')).to_be_visible()
+                expect(row.locator('[data-column="member"]')).to_be_visible()
                 if width >= 1328:                       # dates and times are never cut off on a desktop
                     cut = page.locator('#radioRecords').evaluate("""el => [...el.querySelectorAll(
                         '[data-column="day"] .dc-record-grid-value, [data-column="returnDay"] .dc-record-grid-value, '
@@ -305,6 +310,10 @@ def main(engine='chromium'):
             expect(grid_rows.first).to_have_css('display', 'flex')
             got = heights()
             assert min(got) <= 40 and max(got) <= 64, 'Cards are not compact at 1920px: %s' % got
+            label = grid_rows.first.locator('[data-column="member"] .dc-record-grid-label')
+            expect(label.locator('.dc-record-grid-symbol')).to_be_visible()                 # symbol instead of the word
+            expect(label.locator('.dc-record-grid-label-text')).to_have_css('position', 'absolute')
+            expect(label).to_have_attribute('title', 'Member No.')
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-%s.png' % engine)), full_page=True)
             with page.expect_response(rows_for(sort='oldest', q=token)):
                 page.select_option('#roSort', 'oldest')

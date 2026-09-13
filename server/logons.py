@@ -475,7 +475,7 @@ def _prepare_fields(row, values):
 
 
 def check_fields(row, values):
-    """The boxes the form's current values turn red, writing nothing: the draft minimum, what cannot be
+    """The boxes the form's current values turn red or orange, writing nothing: the draft minimum, what cannot be
     read, and on a draft what still stops acceptance (ACC-1). The page asks this as focus leaves a box,
     so there is one rule, here, and not a second copy in the browser."""
     sets, after, invalid, displays, required = _prepare_fields(row, values)
@@ -483,7 +483,12 @@ def check_fields(row, values):
     if row['watchStatus'] == 'draft':
         for m in missing(after):
             red.update(m['boxes'])
-    return {'red': sorted(red)}
+    # The paper's "Member No. or Vessel Name": with one heard, the other is worth asking for. Orange
+    # blocks nothing, and a box already red stays red.
+    pair = ('memberNumber', 'vesselName')
+    heard = [field for field in pair if after.get(field)]
+    orange = [field for field in pair if len(heard) == 1 and field not in heard and field not in red]
+    return {'red': sorted(red), 'orange': orange}
 
 
 def form_values(row):

@@ -18,7 +18,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   Quackit's htmx; state kept in the URL; 30s refresh.
 - Due first: overdue, then by return time; drafts and closed after, newest call first. One rule,
   `logons.due_first`, also used by `queue()`.
-- Status symbol after the daily number (emoji with accessible name); member and vessel badges.
+- Status symbol after the daily number (emoji with accessible name). Member No. and Vessel Name are separate
+  columns. Every column heading carries its symbol beside the word (📅 Date, 👤 Member No., 🛥️ Vessel Name,
+  🔖 Rego …) so operators learn them; one-line cards show the symbol alone, the word in its tooltip.
 - View buttons (Quackit's shared `record_grid` `view_controls`): **Cards** at any width, fields on one
   line; **Paragraphs**, a line per field (or wrapped row values). Kept across refreshes, not across
   page loads.
@@ -38,6 +40,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every
   editable pane. A draft's bottom row: Save · Accept the log on · reason · Discard draft.
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
+- Orange boxes: with Member No. or Vessel Name heard, the other empty one turns orange (worth asking for,
+  blocks nothing). Red wins. Same server check as red.
 - Red boxes only, no messages. The server decides (`logons.check_fields`): the draft minimum, values
   that cannot be read, and on a draft everything that blocks Accept. Shown when the page opens and
   re-checked as focus leaves a box (a `{check: true}` post that writes nothing). No client copy of the rule.

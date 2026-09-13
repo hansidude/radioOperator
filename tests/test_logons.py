@@ -101,6 +101,17 @@ class LogOns(unittest.TestCase):
         with self.assertRaises(L.Refused):
             L.accept(self.cur, i, 'alice', T0)                          # already accepted
 
+    def test_member_or_vessel_name_heard_turns_the_other_orange(self):   # the paper's "Member No. or Vessel Name"
+        base = {'callDay': '12/9', 'callTime': '1400'}
+        check = lambda **kw: L.check_fields(L.blank(T0), dict(base, **kw))
+        self.assertEqual(check(memberNumber='4471', registration='AB1')['orange'], ['vesselName'])
+        self.assertEqual(check(vesselName='Sea Dog', registration='AB1')['orange'], ['memberNumber'])
+        self.assertEqual(check(memberNumber='4471', vesselName='Sea Dog')['orange'], [])
+        self.assertEqual(check(registration='AB1', mobile='0400')['orange'], [])       # neither heard: nothing to prompt
+        one = check(memberNumber='4471')                                             # still short of two IDs: red wins
+        self.assertIn('vesselName', one['red'])
+        self.assertEqual(one['orange'], [])
+
     def test_due_first_is_the_watch_order_then_the_rest_newest_first(self):
         late = self.accepted(rego='LATE01', member='1001', time='2000')
         over = self.accepted(rego='OVER01', member='1002', time='1000')  # past at 1432

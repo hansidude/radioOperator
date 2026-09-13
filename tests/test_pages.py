@@ -230,8 +230,11 @@ class Pages(unittest.TestCase):
 
         # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
-        self.assertIn('<span>No.</span><span>Date</span><span>Time</span><span>Member / Vessel</span><span>Rego</span>', page)
-        self.assertIn('<span>Time</span><span>Trip ID No.</span><span></span>', page)
+        head = page[page.index('class="dc-record-grid-head"'):page.index('</div>', page.index('class="dc-record-grid-head"'))]
+        self.assertEqual([h.split('</span> ')[-1].split('</span>')[0] for h in head.split('<span title=')[1:]],
+                         ['No.', 'Date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
+                          'Departure', 'Going to', 'Return date', 'Time', 'Trip ID No.'])
+        self.assertIn('<span title="Member No."><span class="dc-record-grid-symbol">👤</span> Member No.</span>', head)
         self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)
@@ -262,8 +265,9 @@ class Pages(unittest.TestCase):
         row = page[page.index('data-record="%d"' % i):]
         row = row[:row.index('</article>')]
         self.assertLess(row.index('aria-label="Draft"'), row.index('data-column="day"'))
-        self.assertIn('aria-label="Member number"', row)
-        self.assertIn('aria-label="Vessel name"', row)
+        self.assertIn('data-column="member"', row)
+        self.assertIn('data-column="vesselName"', row)
+        self.assertNotIn('Member / Vessel', page)
         self.assertIn('12345', row)
         self.assertIn('&lt;img', row)
         self.assertNotIn('<img', row)
