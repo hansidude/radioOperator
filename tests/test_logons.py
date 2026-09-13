@@ -101,6 +101,23 @@ class LogOns(unittest.TestCase):
         with self.assertRaises(L.Refused):
             L.accept(self.cur, i, 'alice', T0)                          # already accepted
 
+    def test_the_save_that_completes_the_mandatory_set_logs_it_on(self):   # ACC-3, spec v1.1
+        base = {'callDay': 'today', 'callTime': '1400', 'registration': 'AB123Q', 'memberNumber': '4471',
+                'pob': '3', 'departurePoint': 'Marina', 'destination': 'Facing Island', 'etaDay': 'today'}
+        i = L.create(self.cur, 'alice', '', T0)
+        out = L.save_fields(self.cur, i, base, 'alice', T0)                # no return time yet
+        self.assertFalse(out['accepted'])
+        self.assertEqual(L.get(self.cur, i)['watchStatus'], 'draft')
+        out = L.save_fields(self.cur, i, dict(base, eta='1800'), 'bob', T0, version=out['version'])
+        self.assertTrue(out['accepted'])
+        row = L.get(self.cur, i)
+        self.assertEqual((row['watchStatus'], row['acceptedBy'], row['acceptedAt'], row['version']), ('watching', 'bob', T0, 2))
+        new = L.create_saved(self.cur, dict(base, eta='1900', registration='NEW01', memberNumber='5000'), 'carol', '', T0)
+        self.assertTrue(new['accepted'])                                   # complete on its very first save
+        clash = L.create_saved(self.cur, dict(base, eta='1900'), 'carol', '', T0)
+        self.assertFalse(clash['accepted'])                                # same vessel already out (ACC-6)
+        self.assertEqual(L.get(self.cur, clash['id'])['watchStatus'], 'draft')
+
     def test_a_mobile_is_ten_digits_written_0412_345_678(self):
         self.assertEqual(L.written_mobile('0412345678'), ('0412 345 678', False))
         self.assertEqual(L.written_mobile(' 04 1234 5678 '), ('0412 345 678', False))  # spaces typed anywhere

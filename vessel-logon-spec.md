@@ -1,7 +1,7 @@
 # Vessel Log On — Functional Specification
 
-**Version:** 1.0 (draft)<br>
-**Revised:** 12 September 2026 (AEST)<br>
+**Version:** 1.1 (draft)<br>
+**Revised:** 13 September 2026 (AEST)<br>
 **Status:** For operational review; not an approved operating procedure<br>
 **Domain:** Marine rescue vessel log on, watch, and log off<br>
 **Audience:** Anyone implementing or evaluating a system that performs this function
@@ -47,6 +47,7 @@
 - [Appendix C — Traceability from version 0.3](#section-appendix-c-traceability-from-version-03)
 - [Appendix D — Open questions](#section-appendix-d-open-questions)
 - [Appendix E — Revision history](#section-appendix-e-revision-history)
+    - [Version 1.1 — changes from 1.0](#section-version-11-changes-from-10)
     - [Version 1.0 — changes from 0.9](#section-version-10-changes-from-09)
     - [Version 0.9 — changes from 0.8](#section-version-09-changes-from-08)
     - [Version 0.8 — changes from 0.7](#section-version-08-changes-from-07)
@@ -99,7 +100,8 @@ One such conflict is resolved in this version and is stated here because it is t
 consequential decision in the document. **Nothing is watched until the log on is accepted**
 (§5.3). A vessel that gave a return time into a call that was never finished is therefore not
 being counted down. That is the unit's decision, and it is deliberate: a watch the unit cannot
-act on is not a watch, and acceptance is the moment the unit tells the vessel it is logged on.
+act on is not a watch, and acceptance, the save that completes the required details, is the moment
+the unit tells the vessel it is logged on.
 The cost is a new failure mode — an unfinished draft, forgotten, while the vessel believes it is
 under watch. PSO is served against that not by monitoring an incomplete record but by making an
 unaccepted draft impossible to ignore (ACC-5, WAT-9). If that chase is weak, this decision is
@@ -159,7 +161,7 @@ justification. **May** — optional.
 | **Verification** | Evidence that independently supplied identifiers consistently identify a stored person/vessel association; not proof of the caller or trip facts. |
 | **Cross-verification** | Comparison of independently captured identifiers and their candidate associations. See §7. |
 | **Draft** | A saved but unaccepted record: the mandatory set (ACC-1) is not yet complete. A draft preserves what was heard and nothing more. It is not a log on, it is not watched, and no time in it is monitored. The vessel has not been told it is logged on. |
-| **Accepted** | The mandatory set is complete and an operator has taken the watch. Acceptance is one explicit action, recorded against that operator and time, and is what the unit tells the vessel. |
+| **Accepted** | The mandatory set is complete and saved, and with that save the operator has taken the watch. Acceptance is recorded against the saving operator and time, and is what the unit tells the vessel. There is no separate accept action (ACC-3). |
 | **Mandatory set** | The values a log on cannot be accepted without (ACC-1). Absent, capture continues as a draft; nothing is refused or discarded. |
 | **Watched** | The unit is counting down to an accepted log on's deadlines and will raise them as approaching and then overdue. Only accepted log ons are watched. |
 | **Discard** | Throw away a draft that was never a log on: a record begun in error, or one the caller abandoned before anything identifying was given (ACC-7). An accepted log on can never be discarded; it is logged off. |
@@ -229,8 +231,8 @@ shall never imply otherwise. A draft is either finished and accepted, or discard
 was never a log on (ACC-7). It is never left alone: an unaccepted draft is chased under ACC-5,
 because the caller may be at sea believing the opposite.
 
-**Watching.** The mandatory set is complete and an operator has accepted the log on (ACC-1,
-ACC-3). This is the moment the unit takes the watch and the moment the vessel is told it is
+**Watching.** The mandatory set is complete and an operator has saved it, which accepts the log on
+(ACC-1, ACC-3). This is the moment the unit takes the watch and the moment the vessel is told it is
 logged on. Deadlines are evaluated from this instant, so a return time already in the past is
 overdue immediately (ACC-4). One vessel has one open log on; a vessel already being watched
 cannot be accepted again (ACC-6).
@@ -261,7 +263,7 @@ capture and transfer do not close it.
 |---|---|
 | Begin capture | Create a Draft owned by the capturing unit. Not watched. Visible and chased under ACC-5. |
 | Enrich | Add or amend any value on a draft or an accepted log on, in any order, at any time (CAP-3, CAP-13). |
-| Accept the log on | Requires the mandatory set (ACC-1) and no other open log on for this vessel (ACC-6). Draft → Watching; record the accepting operator and time; evaluate deadlines immediately (ACC-4). |
+| Save with the mandatory set complete | Accepts the log on in the same save (ACC-3), unless another open log on holds this vessel (ACC-6), when it stays a draft and keeps everything. Draft → Watching; record the saving operator and time; evaluate deadlines immediately (ACC-4). |
 | Discard | A draft only, and only one that was never a log on: begun in error, or abandoned before anything identifying was given. Record actor, time and reason (ACC-7). |
 | Deadline passes | An accepted log on becomes Overdue for that obligation; alert under WAT-3. |
 | Amend obligation | Retain the previous deadline and its reason and source; recompute the condition. An existing escalation requires explicit disposition. |
@@ -302,7 +304,7 @@ kind. This section names them, so that no requirement below looks arbitrary.
 
 **The ideal call.** The vessel calls. The operator takes identity, persons on board, departure
 point, where they are going, and when they will be back. The mandatory set is complete, so the
-operator accepts the log on and tells the vessel so: *"Vessel Sea Dog, you are logged on, back
+operator's save logs it on, and the operator tells the vessel so: *"Vessel Sea Dog, you are logged on, back
 by fifteen hundred."* The unit is now counting down. The vessel returns and calls. The operator
 logs it off. Nothing in the ideal call needs a draft, a warning or a follow-up.
 
@@ -312,7 +314,7 @@ logs it off. Nothing in the ideal call needs a draft, a warning or a follow-up.
 |---|---|
 | The caller rings off before giving everything, or the channel is lost | Keep what was heard as a draft. Do not claim a watch. Chase it (ACC-5): the caller may believe they are logged on. |
 | A priority call interrupts capture | Suspend and resume without loss; several drafts open at once (CAP-6). |
-| Identity arrives late, on this call or a later one | Accept nothing until it does; when it arrives, accept and evaluate the deadline at once, so a return time already past is overdue immediately (ACC-4, OC-6). |
+| Identity arrives late, on this call or a later one | Accept nothing until it does; the save that adds it accepts and evaluates the deadline at once, so a return time already past is overdue immediately (ACC-4, OC-6). |
 | The caller gives one identifier only | Not acceptable; the second is the unit's accuracy check (ACC-1, A.8). |
 | Two identifiers disagree | Show the conflict, do not resolve it silently, and let the operator clarify (IDV-2, IDV-3). |
 | A registration is misheard | Offer the near match with the substituted character named, never as a match (IDV-6). |
@@ -544,12 +546,14 @@ as being under watch. A draft **shall** be labeled as not a log on wherever it a
 is not is worse than one that plainly is not. The consequence is ACC-5, without which this
 requirement is unsafe (§1.2).*
 
-**ACC-3.** Acceptance **shall** be one explicit operator action, recording the accepting
-operator and the time. It **shall** be the point at which the unit undertakes the watch, and
-the operator's acknowledgment to the vessel corresponds to it. The system **shall not** accept
-a log on automatically on the mandatory set becoming complete.
-*Rationale: the vessel is told something by a person. That undertaking is not a side effect
-of a field being filled in.*
+**ACC-3.** Saving a draft whose mandatory set is complete and valid **shall** accept it, in that
+same save, recording the saving operator and the time. There **shall not** be a separate accept
+action. The save **shall** be the point at which the unit undertakes the watch, and the operator's
+acknowledgment to the vessel corresponds to it. A save that leaves the set incomplete keeps a
+draft; a save refused acceptance under ACC-6 keeps a draft with everything captured.
+*Rationale: the operator fills in the required details because the vessel is logging on; once they
+are there, the unit has accepted it. A second confirmation adds a step and a way to leave a
+complete record unwatched. Nothing is accepted by filling in a box, only by saving.*
 
 **ACC-4.** On acceptance the system **shall** evaluate every deadline immediately. A return
 time already in the past **shall** be overdue at once, not at the next transition or refresh.
@@ -935,9 +939,9 @@ within a section is not always contiguous.
 | **AC-42** | Record POB as unknown, mobile number as explicitly unavailable, and an ETA of `25:70`. | The three states are distinguishable from each other and from empty; the implausible time is retained as captured with a warning, no deadline is fabricated, and WAT-9 follow-up applies (CAP-23). |
 | **AC-48** | Lay a filled paper log row (A.1) beside the capture view and the queue row for the same trip. | Every trip column (1 to 12) has a field with the same heading, in the same order; return day-or-date and return time are separate fields; additional fields are visibly after the paper columns (DAT-6). |
 | **AC-49** | Look for the paper's Trip ID No., Entered in Noggin and Logged off in Noggin on the capture view. | No field claims to be them; the system's own reference, entry and closure are shown as its own, and what those three paper columns record is stated (DAT-6). |
-| **AC-50** | Complete every mandatory value except one, repeatedly, one value at a time. | Acceptance is refused each time and names what is missing; nothing captured is refused, altered or lost; acceptance succeeds only when the set is complete (ACC-1, ACC-8). |
-| **AC-51** | Accept a log on. | It is one explicit action, recorded against that operator and time; the system never accepts one by itself when the last value is filled (ACC-3). |
-| **AC-52** | Capture a return time that has already passed, then complete the mandatory set and accept. | The log on is overdue at the moment of acceptance, without waiting for a refresh, a state change or another edit (ACC-4). |
+| **AC-50** | Complete every mandatory value except one, repeatedly, one value at a time. | Each save keeps a draft and names what is missing; nothing captured is refused, altered or lost; the save that completes the set logs it on (ACC-1, ACC-8). |
+| **AC-51** | Save a draft with the mandatory set complete; separately, fill the last value without saving. | The save logs it on, recorded against that operator and time, with no separate accept action; filling a value without saving accepts nothing (ACC-3). |
+| **AC-52** | Capture a return time that has already passed, then complete the mandatory set and save. | The log on is overdue at the moment of acceptance, without waiting for a refresh, a state change or another edit (ACC-4). |
 | **AC-53** | Identify, on a new draft, a vessel that already holds an open log on at this unit. | Acceptance is refused, the open record is named and offered, and nothing captured on the draft is discarded (ACC-6). |
 | **AC-54** | Discard a draft begun in error; then attempt to discard an accepted log on. | The draft is discarded with actor, time and reason, remains searchable, and counts as evidence of no vessel or person; the accepted log on refuses and must be logged off (ACC-7). |
 | **AC-55** | View the queue on a screen other than the one that created a draft, with several drafts open. | Every draft is counted and visible, each with the values it is missing and its age, plainly separate from the watched log ons (WAT-1, ACC-5). |
@@ -1286,6 +1290,16 @@ revisions add identifiers; they do not renumber.
 <a id="section-appendix-e-revision-history"></a>
 
 ## Appendix E — Revision history
+
+<a id="section-version-11-changes-from-10"></a>
+
+### Version 1.1 — changes from 1.0
+
+- **Saving a complete draft logs it on** (§5.3 ACC-3). Version 1.0 required a separate, explicit accept
+  action after the mandatory set was complete. The unit's position: the required details are filled
+  because the vessel is logging on, so the save that completes them is the acceptance. The save is
+  recorded against the operator and time; ACC-1, ACC-4 and ACC-6 are unchanged. §1.2, the glossary,
+  §3.3 and its actions table, the ideal call, AC-50, AC-51 and AC-52 follow.
 
 <a id="section-version-10-changes-from-09"></a>
 

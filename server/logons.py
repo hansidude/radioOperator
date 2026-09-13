@@ -532,8 +532,10 @@ def save_fields(cur, logon_id, values, user, now, version=None):
         # move: it was issued once and it is the record's key.
         sets.update(dayDate=_sd(after['callDate']),
                     dayNumber=_next_day_number(cur, row['unit'], _sd(after['callDate'])))
+    sets.update(acceptance(cur, after, user, now))       # a complete draft is logged on by this save (ACC-3)
     saved_version = _bump(cur, row, sets, user, now)
-    return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after)}
+    return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after),
+            'accepted': sets.get('watchStatus') == 'watching'}
 
 
 def create_saved(cur, values, user, unit, now):
@@ -551,6 +553,7 @@ def create_saved(cur, values, user, unit, now):
     sets.update(unit=unit, watchStatus='draft', dayDate=_sd(day),
                 verifyOutcome=verification_result['outcome'], verifyBasis=verification_result['basis'][:255],
                 createdBy=str(user), createdAt=_s(now), updatedBy=str(user), updatedAt=_s(now), version=0)
+    sets.update(acceptance(cur, dict(after, id=0, unit=unit, watchStatus='draft'), user, now))   # complete on its first save (ACC-3)
 
     # This is the moment the record gets its numbers: the save passed the draft minimum, so it is a
     # real record now. Both are read under a lock and the insert is retried on a unique clash.
@@ -572,7 +575,8 @@ def create_saved(cur, values, user, unit, now):
     for field in IDENT_FIELDS:
         if after.get(field):
             _record_identifier(cur, logon_id, field, after[field], None, user, now)
-    return {'id': logon_id, 'version': 0, 'invalid': invalid, 'displays': displays}
+    return {'id': logon_id, 'version': 0, 'invalid': invalid, 'displays': displays,
+            'accepted': sets.get('watchStatus') == 'watching'}
 
 
 def _open_row(cur, logon_id, version):
@@ -716,11 +720,20 @@ def open_for_vessel(cur, unit, row):
     return None
 
 
+def acceptance(cur, row, user, now):
+    """What a save adds to take the watch (ACC-3): Draft -> Watching, recorded against the saving
+    operator and time. Empty while the record stays as it is: not a draft, short of the mandatory set
+    (ACC-1), or its vessel already out on another log on (ACC-6, the draft keeps everything). Deadlines
+    count from this save, so a return time already past is overdue at once (ACC-4)."""
+    if row['watchStatus'] != 'draft' or missing(row) or open_for_vessel(cur, row['unit'], row):
+        return {}
+    return {'watchStatus': 'watching', 'acceptedAt': _s(now), 'acceptedBy': str(user)}
+
+
 def accept(cur, logon_id, user, now, version=None):
-    """Draft -> Watching (ACC-3). This is the moment the unit takes the watch and the moment the
-    vessel is told it is logged on, so it is one deliberate action and never a side effect of a
-    field being filled in. Deadlines count from here, so a return time already past is overdue
-    immediately (ACC-4)."""
+    """Take the watch on a stored record now, or say why not. The form never calls this: its save
+    applies `acceptance` in the same update. This is the same transition for the logic's own tests
+    and tools, with the reason spelled out when it is refused."""
     row = _open_row(cur, logon_id, version)
     if row['watchStatus'] == 'watching':
         raise Refused('This log on is already accepted and being watched')
@@ -731,7 +744,7 @@ def accept(cur, logon_id, user, now, version=None):
     if other:
         raise Refused('%s is already logged on as %s. Open that record instead, or log it off first '
                       'if that trip has ended.' % (identity.vessel_label(row), reference(other)))
-    return _bump(cur, row, {'watchStatus': 'watching', 'acceptedAt': _s(now), 'acceptedBy': str(user)}, user, now)
+    return _bump(cur, row, acceptance(cur, row, user, now), user, now)
 
 
 def discard(cur, logon_id, user, now, reason, version=None):

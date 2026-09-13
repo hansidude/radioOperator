@@ -77,9 +77,15 @@ class Pages(unittest.TestCase):
             self.field(i, name, value)
         return i
 
+    def save(self, i, **fields):
+        """The form's Save: one batched write, which logs a complete draft on (ACC-3)."""
+        r = self.a.post('/api/logon/%d' % i, json={'fields': fields})
+        self.assertEqual(r.status_code, 200, r.data)
+        return r.json
+
     def accepted(self, **kw):
         i = self.mandatory(self.new(), **kw)
-        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 302)
+        self.assertTrue(self.save(i)['accepted'])
         return i
 
     def test_not_logged_in_goes_to_the_hosts_login(self):
@@ -347,11 +353,7 @@ class Pages(unittest.TestCase):
         i = self.new()
         for name, value in (('etaDay', 'today'), ('eta', '0001'), ('pob', '3'), ('destination', 'Facing Island')):
             self.field(i, name, value)
-        r = self.a.post('/logon/%d/accept' % i)                           # short of the mandatory set
-        self.assertEqual(r.status_code, 400)
-        body = r.get_data(as_text=True)
-        self.assertIn('Still needed', body)
-        self.assertIn('Member No.', body)
+        self.assertFalse(self.save(i)['accepted'])                        # short of the mandatory set: still a draft
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('DRAFT', page)
         self.assertNotIn('NOT WATCHED', page)
@@ -362,9 +364,13 @@ class Pages(unittest.TestCase):
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])
         self.assertEqual(len(self.a.get('/api/logons/queue').json['drafts']), 1)
 
-    def test_accepting_takes_the_watch_and_starts_it_at_once(self):       # AC-51, AC-52, ACC-3, ACC-4
+    def test_saving_a_complete_draft_logs_it_on_at_once(self):           # AC-51, AC-52, ACC-3, ACC-4
         i = self.mandatory(self.new(), time='0001')                       # a return time already long past
-        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 302)
+        self.assertEqual(self.a.get('/api/logons/queue').json['watching'], [])   # filled in, not saved: nothing accepted
+        page = self.a.get('/logon/%d' % i).get_data(as_text=True)
+        self.assertNotIn('/accept"', page)                                # there is no Accept button
+        saved = self.save(i)
+        self.assertTrue(saved['accepted'])
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
         self.assertIn('Logged on and watched', page)
         self.assertIn('OVERDUE', page)                                    # overdue from the moment of acceptance
@@ -373,19 +379,18 @@ class Pages(unittest.TestCase):
         self.assertIn('data-record="%d"' % i, listing)
         self.assertNotIn('class="ro-status-counts"', listing)
         self.assertEqual(self.a.get('/api/logons/queue').json['watching'][0]['condition'], 'overdue')
-        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 400)
+        self.assertEqual(self.a.post('/logon/%d/accept' % i).status_code, 404)  # no separate accept action
+        self.assertFalse(self.save(i)['accepted'])                        # saving a log on again changes nothing
 
     def test_one_vessel_one_log_on(self):                                 # AC-53, ACC-6
         first = self.accepted()
         second = self.mandatory(self.new())
-        r = self.a.post('/logon/%d/accept' % second)
-        self.assertEqual(r.status_code, 400)
-        self.assertIn('already logged on', r.get_data(as_text=True))
+        self.assertFalse(self.save(second)['accepted'])                  # the vessel is already out: stays a draft
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
         self.assertIn('One vessel has one log on', page)
         self.assertIn('AB123Q', page)                                     # nothing captured was discarded
         self.assertEqual(self.a.post('/logon/%d/logoff' % first, data={'note': 'back'}).status_code, 302)
-        self.assertEqual(self.a.post('/logon/%d/accept' % second).status_code, 302)
+        self.assertTrue(self.save(second)['accepted'])                   # now the vessel is free
 
     def test_a_draft_is_discarded_and_a_log_on_is_logged_off(self):       # AC-54, ACC-7
         d = self.new()
@@ -465,7 +470,7 @@ class Pages(unittest.TestCase):
         for name, value in (('pob', '2'), ('departurePoint', 'Marina'), ('destination', 'Bay'),
                             ('etaDay', 'today'), ('eta', '2300')):
             self.field(mixed, name, value)
-        self.assertEqual(self.a.post('/logon/%d/accept' % mixed).status_code, 302)     # IDV-5: a conflict blocks nothing
+        self.assertTrue(self.save(mixed)['accepted'])                                  # IDV-5: a conflict blocks nothing
         self.assertIn('CONFLICT', self.a.get('/logons?f=1&status=loggedon').get_data(as_text=True))
 
 

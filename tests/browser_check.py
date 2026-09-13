@@ -24,6 +24,7 @@ def main(engine='chromium'):
                   length='6', hullColour='white', make='Quintrex', model='610',
                   pob='2', departurePoint='Marina', destination='Verification bay',
                   etaDay=(date.today() + timedelta(days=1)).isoformat(), eta='17:00')
+    first = {k: v for k, v in fields.items() if k != 'pob'}    # POB comes later: a complete save would log it on (ACC-3)
     record = None
     layout_records = []
     watching = closed = False
@@ -92,7 +93,7 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile('/logons/new$'))
             expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
             before = len(writes)
-            for name, value in fields.items():
+            for name, value in first.items():
                 page.locator('#f-' + name).fill(value)
             page.locator('[data-picker-target="callDay"]').evaluate(
                 '(el, value) => {el.value=value; el.dispatchEvent(new Event("change", {bubbles:true}));}', fields['callDay'])
@@ -105,7 +106,8 @@ def main(engine='chromium'):
             page.wait_for_timeout(400)  # detect unwanted debounced autosave
             assert len(writes) == before, 'Typing or switching tabs wrote a record'
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
-            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(0)
+            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             dialogs = []
             def dismiss_leave(dialog):
                 dialogs.append(dialog.type)
@@ -119,14 +121,16 @@ def main(engine='chromium'):
             record = save()['id']
             page.wait_for_url(re.compile('/logon/%s(?:#.*)?$' % record))
             assert len(writes) == before + 1, 'First Save was not one batched write'
-            for name, value in fields.items():
+            for name, value in first.items():
                 if name not in ('callDay', 'etaDay'):   # settled times read back 4-digit: 13:45 shows 1345
                     shown = {'callTime': value.replace(':', ''), 'eta': value.replace(':', ''), 'mobile': '0412 345 678'}.get(name, value)
                     expect(page.locator('#f-' + name)).to_have_value(shown)   # times 4-digit, mobile written 0412 345 678
-            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(0)
+            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             actions = page.locator('#ro-entry-pane .ro-primary-actions')
-            expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save left of Accept
-            expect(actions.locator('form[action="/logon/%s/accept"] button' % record)).to_be_enabled()
+            expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save
+            expect(actions.locator('form[action$="/accept"]')).to_have_count(0)                  # no Accept: saving complete logs on
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))             # still needed, so still a draft
             # Second operator saves first; stale browser must fail visibly.
             other = context.new_page()
             other.on('dialog', lambda dialog: dialog.accept())
@@ -216,7 +220,7 @@ def main(engine='chromium'):
                 dict(callDay=today, callTime='14:00', registration='SPARSE-' + token),
                 dict(callDay=today, callTime='14:01', registration='VESSEL-' + token,
                      vesselName='The great white', length='4.2', hullColour='white', destination='Sandbank'),
-                dict(fields, callTime='14:02', memberNumber='7765',
+                dict(first, callTime='14:02', memberNumber='7765',
                      vesselName='A very long vessel name to exercise truncation and full phone values',
                      registration='FULL-' + token, destination='A long destination beyond the harbour entrance')]
             for fixture in fixtures:
@@ -383,7 +387,11 @@ def main(engine='chromium'):
             page.locator('#findBox').fill(vessel)
             expect(page.locator('#findHits')).to_contain_text(vessel)
             page.locator('[data-ro-tab="entry"]').click()
-            page.locator('form[action="/logon/%s/accept"] button' % record).click()
+            page.locator('#f-pob').fill(fields['pob'])                                          # the last required value
+            expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
+            assert '#' in page.url, 'The tab should be in the address, as it is after any tab click'
+            with page.expect_navigation():                                                       # a real reload, not a hash jump
+                save()                                                                           # the save logs it on
             expect(page.locator('#ro-entry-pane .ro-primary-actions')).to_contain_text('Logged on and watched')
             watching = True
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)

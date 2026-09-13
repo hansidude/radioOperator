@@ -41,7 +41,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Explicit save only: nothing is written until Save, one save is one update and one history event,
   a stale version is refused visibly (409), leaving with unsaved changes warns.
 - Yellow Save (Quackit's "changes data" colour) in the navbar and first in the bottom row of every
-  editable pane. A draft's bottom row: Save · Accept the log on · reason · Discard draft.
+  editable pane. A draft's bottom row: Save · reason · Discard draft.
+- **Saving a complete draft logs it on** (spec v1.1 ACC-3): no Accept button. A save that leaves the
+  mandatory set short keeps a draft; so does one refused because the vessel already has an open log on.
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
 - Mobile: exactly 10 digits, saved and shown as `0412 345 678` (spaces while typing are fine); anything else
   is kept as typed and red. Search finds it with or without spaces.

@@ -231,13 +231,6 @@ def _action(logon_id, do):
     return redirect(request.form.get('back') or '/logon/%d' % logon_id)
 
 
-@bp.route('/logon/<int:logon_id>/accept', methods=['POST'])
-def logon_accept(logon_id):
-    """Take the watch (ACC-3). Refused until the mandatory set is there and no other log on holds
-    this vessel; the refusal says which, and discards nothing."""
-    return _action(logon_id, lambda cur, v: L.accept(cur, logon_id, host().user(), _now(), v))
-
-
 @bp.route('/logon/<int:logon_id>/discard', methods=['POST'])
 def logon_discard(logon_id):
     """Throw away a draft that was never a log on (ACC-7)."""
