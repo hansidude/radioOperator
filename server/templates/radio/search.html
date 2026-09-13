@@ -1,6 +1,7 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
+{% import 'myMacro_groups.html' as grp %}
 {% from 'myMacro_filters.html' import search_controls %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-search me-1"></i>Search{% endblock %}
@@ -27,18 +28,30 @@
 {% else %}
   {% set total = logons|length + found.members|length + found.contacts|length + found.vessels|length + found.trailers|length + found.cars|length %}
   {% if not total %}<div class="dc-record-empty ro-zero">0 records match “{{ search }}”</div>{% endif %}
-  {% if logons %}<p class="ro-section-title mt-3" data-found="logons">{{ ui.FIELD_SYMBOLS.tripRef }} Log ons <span class="text-secondary">{{ logons|length }}</span></p>
-  {{ ui.record_list(logons, now, reference) }}{% endif %}
-  {% if found.members %}<p class="ro-section-title mt-3" data-found="members">{{ ui.WHO.member.symbol }} Members <span class="text-secondary">{{ found.members|length }}</span></p>
-  {{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endif %}
-  {% if found.contacts %}<p class="ro-section-title mt-3" data-found="contacts">{{ ui.FIELD_SYMBOLS.name }} Emergency contacts <span class="text-secondary">{{ found.contacts|length }}</span></p>
-  {{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endif %}
-  {% if found.vessels %}<p class="ro-section-title mt-3" data-found="vessels">{{ ui.FIELD_SYMBOLS.vesselName }} Vessels <span class="text-secondary">{{ found.vessels|length }}</span></p>
-  {{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endif %}
-  {% if found.trailers %}<p class="ro-section-title mt-3" data-found="trailers">🚚 Trailers <span class="text-secondary">{{ found.trailers|length }}</span></p>
-  {{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endif %}
-  {% if found.cars %}<p class="ro-section-title mt-3" data-found="cars">🚗 Cars <span class="text-secondary">{{ found.cars|length }}</span></p>
-  {{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endif %}
+  {# Each kind is a collapsible group (Quackit's myMacro_groups): the blue header with its count; a group collapsed
+     stays collapsed for the next search in this browser. #}
+  {% macro found_group(gid, symbol, label, rows) %}
+  {% set body = caller() %}
+  {% call grp.group('radioSearch', gid, extra_attrs='data-found="' ~ gid ~ '"') %}
+  {{ grp.groupHeader('', symbol ~ ' ' ~ label, count=rows|length) }}
+  <div>{{ body }}</div>
+  {% endcall %}
+  {% endmacro %}
+  {% if logons %}{% call found_group('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', logons) %}{{ ui.record_list(logons, now, reference) }}{% endcall %}{% endif %}
+  {% if found.members %}{% call found_group('members', ui.WHO.member.symbol, 'Members', found.members) %}{{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endcall %}{% endif %}
+  {% if found.contacts %}{% call found_group('contacts', ui.FIELD_SYMBOLS.name, 'Emergency contacts', found.contacts) %}{{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endcall %}{% endif %}
+  {% if found.vessels %}{% call found_group('vessels', ui.FIELD_SYMBOLS.vesselName, 'Vessels', found.vessels) %}{{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endcall %}{% endif %}
+  {% if found.trailers %}{% call found_group('trailers', '🚚', 'Trailers', found.trailers) %}{{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endcall %}{% endif %}
+  {% if found.cars %}{% call found_group('cars', '🚗', 'Cars', found.cars) %}{{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endcall %}{% endif %}
 {% endif %}
 </div></div>
+{{ grp.groupStyles() }}
+{{ grp.groupEngineScript() }}
+<script>
+(function () {
+  var engine = GroupEngine.init({ key: 'radioSearch', root: '#roFoundView', itemSel: '.dc-record-grid-row', defaultCollapsed: false, hideEmpty: false });
+  // A new search swaps the groups in: give them the collapsed state this browser remembers.
+  document.addEventListener('htmx:afterSettle', function () { if (engine) engine.apply(); });
+})();
+</script>
 {% endblock %}

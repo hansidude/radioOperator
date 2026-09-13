@@ -338,6 +338,15 @@ def main(engine='chromium'):
                 page.locator('#roFindAll').fill(token)
             for kind in ('members', 'contacts', 'vessels'):
                 expect(page.locator('#roFound [data-found="%s"]' % kind)).to_be_visible()
+            page.locator('[data-found="contacts"] > .grp-header').click()                           # a kind collapses
+            expect(page.locator('#radioFoundContacts')).to_be_hidden()
+            expect(page.locator('#radioFoundMembers')).to_be_visible()
+            with page.expect_response(lambda r: '/radio/search?' in r.url):
+                page.locator('#roFindAll').fill(token + ' ')
+            expect(page.locator('#roFound [data-found="contacts"]')).to_have_class(re.compile(r'\bcollapsed\b'))   # and stays collapsed on the next search
+            expect(page.locator('#radioFoundContacts')).to_be_hidden()
+            page.locator('[data-found="contacts"] > .grp-header').click()
+            expect(page.locator('#radioFoundContacts')).to_be_visible()
             expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Contact ' + token)).to_contain_text(member_no)   # held by
             expect(page.locator('#radioFoundContacts .dc-record-grid-row').filter(has_text='Verify Public Contact ' + token)).to_contain_text('PUBLIC-' + token)
             page.locator('#radioFoundMembers a[title^="Open member"]').first.click()               # a row opens its record

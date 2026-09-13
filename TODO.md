@@ -112,7 +112,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   member), **📱 Mobile** (members' mobiles, public vessel owners' phones and emergency contacts' phones; picks the member or
   public vessel the number belongs to and fills an empty Mobile) and **🔎 Search** (the Search page in a new tab).
 - **🔎 Search** page (`/radio/search`, on the RadioLogs navbar): one box over log ons, members, emergency contacts,
-  vessels, trailers and cars, in any field including notes, grouped by kind as each kind's own list; rows open their
+  vessels, trailers and cars, in any field including notes, grouped by kind as each kind's own list; each kind
+  collapses from its header (Quackit's `myMacro_groups`, remembered in this browser across searches); rows open their
   record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
 - Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
   one map, `_ui.FIELD_SYMBOLS`.

@@ -509,6 +509,8 @@ class Members(unittest.TestCase):
         everything = found('77')
         for kind in ('trailers', 'cars', 'vessels'):
             self.assertIn('data-found="%s"' % kind, everything)
+        self.assertIn('data-gid="cars" data-found="cars"', everything)   # each kind collapses
+        self.assertIn('GroupEngine.init({ key: \'radioSearch\', root: \'#roFoundView\'', page)                  # outside the swapped results
         self.assertIn('href="/member/%d/trailers/' % m, everything)                                  # each row opens its record
         contacts = found('0499888777')                                                               # phone without spaces
         self.assertIn('href="/member/%d/contacts/' % m, contacts)
