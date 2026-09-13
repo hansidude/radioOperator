@@ -91,6 +91,11 @@
 .ro-record-form label{display:block;font-size:1rem;font-weight:600;margin:0 0 .35rem}
 .ro-record-form .form-control{font-size:1.1rem;min-height:2.9rem}
 .ro-who{text-decoration:none}
+.ro-who-row{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:.25rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-who-row>label{display:block;flex-basis:100%;font-size:1rem;font-weight:600;margin:0}
+.ro-who-row .btn{font-size:1rem;padding:.55rem .9rem}
+.ro-who-now{font-size:1.05rem}
+.ro-new-record{padding-top:.5rem}
 .ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
 {% endmacro %}
@@ -368,13 +373,17 @@
 
 {# A whole member / vessel form: its boxes, then Save first in the bottom row (yellow: it changes data, as on
    the log on), then Remove when there is one. Nested forms are not allowed, so Remove posts its own form. #}
-{% macro record_form(form, action, fields, labels, values, failed, version=None, submit='Save', remove=None) %}
-<form id="{{ form }}" method="post" action="{{ action }}" class="ro-record-form" autocomplete="off">
+{# json: saved by the page script without leaving the page (logon.html); Cancel closes it, errors land in data-ro-form-error. #}
+{% macro record_form(form, action, fields, labels, values, failed, version=None, submit='Save', remove=None, json=False) %}
+{# novalidate: the server's rule (members._clean) turns boxes red, not a second copy in the browser's email check. #}
+<form id="{{ form }}" method="post" action="{{ action }}" class="ro-record-form" autocomplete="off" novalidate{% if json %} data-ro-json{% endif %}>
   {% if version is not none %}<input type="hidden" name="version" value="{{ version }}">{% endif %}
   <div class="row g-3">{% for name in fields %}{{ record_field(form, name, labels[name], values[name], failed) }}{% endfor %}</div>
   {% if failed.get('form') == form and not failed.red %}<div class="text-danger mt-2" role="alert">{{ failed.error }}</div>{% endif %}
+  {% if json %}<div class="text-danger mt-2" role="alert" data-ro-form-error hidden></div>{% endif %}
   <div class="ro-primary-actions">
     <button class="btn btn-warning"><i class="bi bi-floppy me-1"></i>{{ submit }}</button>
+    {% if json %}<button type="button" class="btn btn-outline-secondary" data-ro-cancel>Cancel</button>{% endif %}
     {% if remove %}<button form="{{ form }}-remove" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>{% endif %}
   </div>
 </form>

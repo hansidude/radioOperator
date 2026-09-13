@@ -5,7 +5,7 @@ Plain forms: a save posts, a refusal renders the same page again with the values
 boxes that stopped it red (400), or with the reason when someone else saved first (409). Every form
 action carries its tab (`#vessels`), so the browser comes back to the tab it was on either way.
 """
-from flask import abort, make_response, redirect, request
+from flask import abort, jsonify, make_response, redirect, request
 
 from . import logons as L
 from . import members as M
@@ -23,6 +23,11 @@ def _member(cur, h, member_id, lock=False):
     if row['unit'] != h.unit():
         abort(403)
     return row
+
+
+def _wants_json():
+    """A save from the log on page, which stays where it is and wants the new record back."""
+    return request.headers.get('Accept') == 'application/json'
 
 
 def _values(kind):
@@ -104,11 +109,18 @@ def member_add(member_id, kind):
     member = _member(cur, h, member_id)
     values = _values(kind)
     try:
-        M.add_child(cur, kind, member, values, h.user(), _now())
+        child_id = M.add_child(cur, kind, member, values, h.user(), _now())
     except L.Refused as e:
         conn.rollback()
+        if _wants_json():
+            cur.close()
+            return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 400
         return _member_page(cur, h, member, _refused(e, kind + '-new', values), 400)
     conn.commit()
+    if _wants_json() and kind == 'vessels':
+        item = M.vessel_item(M.get(cur, 'vessels', child_id))
+        cur.close()
+        return jsonify({'id': child_id, 'item': item})
     cur.close()
     return redirect('/member/%d' % member_id)
 
@@ -152,6 +164,34 @@ def member_child_remove(member_id, kind, child_id):
     return redirect('/member/%d' % member_id)
 
 
+# ---------- what the log on's shared search picker asks (myMacro_search_picker.html) ----------
+
+@bp.route('/api/logons/members')
+def api_members():
+    h, (conn, cur) = _open()
+    items = [M.member_item(m) for m in M.members(cur, h.unit(), request.args.get('q'))]
+    cur.close()
+    return jsonify({'items': items})
+
+
+@bp.route('/api/logons/vessels')
+def api_member_vessels():
+    """One member's vessels: the second stage of the Member pick, scoped by the member chosen first."""
+    h, (conn, cur) = _open()
+    member = _member(cur, h, request.args.get('member', type=int) or abort(400))
+    items = [M.vessel_item(v) for v in M.member_vessels(cur, member['id'], request.args.get('q'))]
+    cur.close()
+    return jsonify({'items': items})
+
+
+@bp.route('/api/logons/public-vessels')
+def api_public_vessels():
+    h, (conn, cur) = _open()
+    items = [M.vessel_item(v) for v in M.public_vessels(cur, h.unit(), request.args.get('q'))]
+    cur.close()
+    return jsonify({'items': items})
+
+
 # ---------- public vessels ----------
 
 @bp.route('/vessels')
@@ -180,8 +220,15 @@ def vessels_new():
         vessel_id = M.create_public(cur, values, h.user(), h.unit(), _now())
     except L.Refused as e:
         conn.rollback()
+        if _wants_json():
+            cur.close()
+            return jsonify({'error': str(e), 'fields': getattr(e, 'fields', [])}), 400
         return _vessel_page(cur, h, M.blank('public'), _refused(e, 'public', values), 400)
     conn.commit()
+    if _wants_json():
+        item = M.vessel_item(M.get(cur, 'vessels', vessel_id))
+        cur.close()
+        return jsonify({'id': vessel_id, 'item': item})
     cur.close()
     return redirect('/vessel/%d' % vessel_id)
 

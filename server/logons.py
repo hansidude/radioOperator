@@ -93,6 +93,8 @@ NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 NUMBER = re.compile(r'^\d+(\.\d+)?$')
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
 FIELDS = tuple(f for _, fs in PAPER + EXTRA for f in fs)
+# Not a box: the vessel record the operator picked on the form ('' = none picked, read from the rego).
+LINK_FIELDS = ('vesselId',)
 DATETIMES = ('eta', 'departureTime', 'callTime', 'createdAt', 'updatedAt', 'acceptedAt', 'loggedOffAt',
              'discardedAt', 'cancelledAt', 'reopenedAt', 'capturedAt')
 RANK = {'overdue': 0, 'approaching': 1, 'nodeadline': 2, 'notdue': 3, 'notwatched': 4}
@@ -500,12 +502,16 @@ def _with_heard(notes, number):
     return (notes.rstrip() + '\n' + line) if (notes or '').strip() else line
 
 
-def _links(cur, row, clean):
+def _links(cur, row, clean, picked=None):
     """The member and vessel records a save ties this log on to: (columns to set, a Member No. that names
     no member). CAP-24: the Member No. is a real member record or it is blank. A new or changed number that
     is not a member is never stored there; the caller keeps it in Notes, and with no member the log on is a
     public user's, whose rego may name one of the public vessels. A number saved before members existed
-    stays as it was until it is changed."""
+    stays as it was until it is changed.
+
+    `picked` is a vessel record chosen on the form. It has to be one of this member's vessels, or with no
+    member a public vessel of this unit; anything else is refused rather than linked. '' means none was
+    picked, and the rego decides as before."""
     from . import members        # members.py imports this module; a top-level import would be circular
     sets, not_member = {}, None
     if 'memberNumber' in clean:
@@ -519,8 +525,13 @@ def _links(cur, row, clean):
             else:
                 not_member = number
                 sets.update(memberNumber=row.get('memberNumber'), memberId=row.get('memberId'))
-    if 'registration' in clean or 'memberId' in sets:
-        member_id = sets['memberId'] if 'memberId' in sets else row.get('memberId')
+    member_id = sets['memberId'] if 'memberId' in sets else row.get('memberId')
+    if picked not in (None, ''):
+        vessel = members.get(cur, 'vessels', int(picked)) if str(picked).isdigit() else None
+        if not vessel or vessel['unit'] != row['unit'] or (vessel['memberId'] or None) != (member_id or None):
+            raise Refused('That vessel is not %s' % ("one of this member's vessels" if member_id else 'a public vessel'))
+        sets['vesselId'] = vessel['id']
+    elif picked == '' or 'registration' in clean or 'memberId' in sets:
         rego = clean['registration'] if 'registration' in clean else row.get('registration')
         sets['vesselId'] = members.vessel_for(cur, row['unit'], rego, member_id)
     return sets, not_member
@@ -531,12 +542,14 @@ def _prepare_fields(cur, row, values):
     draft minimum still absent; the caller decides whether that refuses a save or only turns boxes red."""
     if not isinstance(values, dict):
         raise Refused('expected fields')
-    unknown = sorted(set(values) - set(FIELDS))
+    unknown = sorted(set(values) - set(FIELDS) - set(LINK_FIELDS))
     if unknown:
         raise Refused('No such field: %s' % unknown[0])
 
     clean, sets, after, invalid, displays = {}, {}, dict(row), [], {}
     for field, raw in values.items():
+        if field in LINK_FIELDS:
+            continue
         value = raw.strip() if isinstance(raw, str) else ('' if raw is None else str(raw))
         if len(value) > (65535 if field == 'notes' else 255):
             raise Refused('%s: too long to store' % LABELS[field])
@@ -552,7 +565,7 @@ def _prepare_fields(cur, row, values):
         after[col] = value or None
         if field in NUMBER_FIELDS and value and not NUMBER.match(value):
             invalid.append(field)
-    links, not_member = _links(cur, row, clean)
+    links, not_member = _links(cur, row, clean, values.get('vesselId'))
     if not_member:
         links['notes'] = _with_heard(after.get('notes'), not_member)
     sets.update(links)
@@ -608,7 +621,9 @@ def check_fields(cur, row, values):
 
 def form_values(row):
     """What the form's boxes hold when the page opens, so its first red is the same check as later."""
-    return {field: box(row, field) for field in FIELDS}
+    out = {field: box(row, field) for field in FIELDS}
+    out.update({field: '' if row.get(field) is None else str(row[field]) for field in LINK_FIELDS})
+    return out
 
 
 def save_fields(cur, logon_id, values, user, now, version=None):

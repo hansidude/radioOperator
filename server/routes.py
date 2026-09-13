@@ -110,7 +110,7 @@ def _record_links(cur, h, row):
     and the members the Member No. box offers."""
     return {'member': M.get(cur, 'member', row['memberId']) if row.get('memberId') else None,
             'vessel': M.get(cur, 'vessels', row['vesselId']) if row.get('vesselId') else None,
-            'member_options': M.members(cur, h.unit())}
+            'member_options': M.members(cur, h.unit()), 'kinds': M.KINDS, 'member_labels': M.LABELS}
 
 
 def _alerts(cur, h):

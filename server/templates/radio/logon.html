@@ -12,7 +12,7 @@
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
     {{ entity_nav.parent_link('/logons', brand, 'list-ul') }}
-    {% if not creating %}{{ ui.status_badge(dict(logon, condition=condition)) }}{{ ui.who_badge(member, vessel) }}{% endif %}
+    {% if not creating %}{{ ui.status_badge(dict(logon, condition=condition)) }}{% endif %}
   </div>
   <div class="btn-group btn-group-sm ro-view-tabs" id="logonViewTabs" role="group" aria-label="Log on views">
     <button type="button" class="btn btn-outline-secondary active" data-ro-tab="entry" aria-controls="ro-entry-pane" aria-pressed="true"><i class="bi bi-pencil-square me-1"></i>Log on</button>
@@ -39,6 +39,24 @@
 {# The operator's main entry point: the paper radio log fields in the five working rows requested by the unit (DAT-6). #}
 <section id="ro-entry-pane" class="ro-workspace-pane" data-ro-pane="entry">
   <div class="ro-entry-shell">
+    {# The first question on a log on: a member, tied to their record and their vessel, or a public user, tied to a
+       public vessel (spec CAP-24). Chosen through Quackit's shared search picker, without leaving the page. #}
+    <div class="ro-who-row" id="roWho">
+      <label>Member or public user</label>
+      <span class="ro-who-now" id="roWhoNow">{% if not creating %}{{ ui.who_badge(member, vessel) }}{% endif %}</span>
+      {% if open %}<button type="button" class="btn btn-outline-primary" id="roPickMember">{{ ui.WHO.member.symbol }} Member</button>
+      <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>{% endif %}
+    </div>
+    {% if open %}
+    <section class="ro-new-record" id="roNewVesselPanel" hidden>
+      <p class="ro-section-title">New vessel for <span data-ro-member-name></span></p>
+      {{ ui.record_form('roNewVessel', '', kinds.vessels.fields, member_labels, {}, {}, submit='Save vessel', json=True) }}
+    </section>
+    <section class="ro-new-record" id="roNewPublicPanel" hidden>
+      <p class="ro-section-title">New public vessel</p>
+      {{ ui.record_form('roNewPublic', '/vessels/new', kinds.public.fields, member_labels, {}, {}, submit='Save public vessel', json=True) }}
+    </section>
+    {% endif %}
     <form id="capture" class="ro-primary-form" autocomplete="off" onsubmit="return false">
       <div class="capture-row row g-3">{{ field('callDay', 'col-12 col-md-6') }}{{ field('callTime', 'col-12 col-md-6') }}</div>
       <div class="capture-row row g-3">
@@ -50,6 +68,7 @@
       <div class="capture-row row g-3">{{ field('etaDay', 'col-12 col-md-7') }}{{ field('eta', 'col-12 col-md-5') }}</div>
       {# Not a paper column (DAT-6): what was heard that has no box, including a Member No. that is not a member (CAP-24). #}
       <div class="ro-notes-row row g-3">{{ field('notes', 'col-12') }}</div>
+      <input type="hidden" id="f-vesselId" data-field="vesselId" value="{{ logon.vesselId if logon.vesselId is not none else '' }}">
     </form>
     {# The Member No. box offers the unit's members; a number that is not one is emptied (logons._links). #}
     <datalist id="roMembers">{% for m in member_options %}<option value="{{ m.memberNumber }}">{{ ui.full_name(m) }}{% if m.vesselNames %} · {{ m.vesselNames }}{% endif %}</option>{% endfor %}</datalist>
@@ -106,6 +125,7 @@
 <script>
 (function () {
   var id = {{ 'null' if creating else logon.id }}, version = {{ logon.version }}, creating = {{ 'true' if creating else 'false' }};
+  var WHO_MEMBER = {{ ui.WHO.member.symbol|tojson }}, WHO_PUBLIC = {{ ui.WHO.public.symbol|tojson }};
   var open = {{ 'true' if open else 'false' }}, draft = {{ 'true' if draft else 'false' }}, dirty = false;
   var status = document.getElementById('saveStatus'), stale = document.getElementById('stale');
   var saveButtons = Array.prototype.slice.call(document.querySelectorAll('[data-save-record]'));
@@ -247,6 +267,120 @@
     if (!dirty) return;
     ev.preventDefault(); ev.returnValue = '';
   });
+
+  // ---- Member or public user: Quackit's shared search picker fills the boxes from the records (CAP-24) ----
+  var pickMember = document.getElementById('roPickMember'), pickPublic = document.getElementById('roPickPublic');
+  var vesselId = document.getElementById('f-vesselId'), whoNow = document.getElementById('roWhoNow'), filling = false;
+  var VESSEL_BOXES = ['vesselName', 'registration', 'length', 'hullColour', 'make', 'model'];
+  function box(name) { return document.getElementById('f-' + name); }
+  function put(name, value, always) {
+    var el = box(name);
+    if (!el || (!always && (value === null || value === undefined || value === ''))) return;
+    el.value = value === null || value === undefined ? '' : value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  // Typing over the member or the vessel's name or rego undoes a picked vessel: the rego decides again.
+  ['memberNumber', 'vesselName', 'registration'].forEach(function (name) {
+    var el = box(name);
+    if (el) el.addEventListener('input', function () { if (!filling && vesselId.value) { vesselId.value = ''; changed(vesselId); } });
+  });
+  function useMember(member) {
+    put('memberNumber', member.memberNumber, true);
+    if (!box('mobile').value.trim()) put('mobile', member.mobile);
+  }
+  function useVessel(item) {
+    VESSEL_BOXES.forEach(function (name) { put(name, item.fields[name]); });
+    if (item.fields.ownerPhone && !box('mobile').value.trim()) put('mobile', item.fields.ownerPhone);
+    vesselId.value = item.id;
+    changed(vesselId);
+  }
+  function chosen(member, vessel) {
+    filling = true;
+    if (member) useMember(member); else put('memberNumber', '', true);
+    if (vessel) useVessel(vessel); else if (vesselId.value) { vesselId.value = ''; changed(vesselId); }
+    filling = false;
+    whoNow.textContent = (member ? WHO_MEMBER + ' ' + member.primary : WHO_PUBLIC + ' Public') +
+                         (vessel ? ' · ' + vessel.primary : '') + ' (not saved)';
+    whoNow.dataset.who = member ? 'member' : 'public';
+    checked = null;
+    check();
+  }
+  var panels = { vessels: document.getElementById('roNewVesselPanel'), public: document.getElementById('roNewPublicPanel') };
+  var panelMember = null;
+  function openPanel(kind, member, typed) {
+    var panel = panels[kind], form = panel.querySelector('form');
+    Object.keys(panels).forEach(function (k) { if (panels[k]) panels[k].hidden = k !== kind; });
+    panelMember = member;
+    if (member) {
+      form.action = '/member/' + member.id + '/vessels';
+      panel.querySelector('[data-ro-member-name]').textContent = member.primary;
+    }
+    form.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); el.removeAttribute('aria-invalid'); });
+    form.querySelector('[data-ro-form-error]').hidden = true;
+    form.querySelectorAll('input').forEach(function (el) { el.value = ''; });
+    VESSEL_BOXES.forEach(function (name) {                      // what the operator already typed goes with it
+      var into = form.querySelector('[name="' + name + '"]');
+      if (into) into.value = box(name).value.trim() || (name === 'vesselName' ? typed : '') || '';
+    });
+    var phone = form.querySelector('[name="ownerPhone"]');
+    if (phone) phone.value = box('mobile').value.trim();
+    panel.scrollIntoView({ block: 'nearest' });
+    form.querySelector('input').focus();
+  }
+  document.querySelectorAll('form[data-ro-json]').forEach(function (form) {
+    var panel = form.closest('.ro-new-record'), error = form.querySelector('[data-ro-form-error]');
+    form.querySelector('[data-ro-cancel]').addEventListener('click', function () { panel.hidden = true; });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      error.hidden = true;
+      fetch(form.action, { method: 'POST', credentials: 'same-origin', body: new FormData(form), headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { throw new Error('HTTP ' + r.status); }); })
+        .then(function (x) {
+          form.querySelectorAll('input, textarea').forEach(function (el) {
+            var bad = !x.ok && (x.d.fields || []).indexOf(el.name) !== -1;
+            el.classList.toggle('is-invalid', bad);
+            if (bad) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+          });
+          if (!x.ok) { error.textContent = x.d.error || 'HTTP ' + x.status; error.hidden = false; return; }
+          panel.hidden = true;
+          chosen(panel === panels.vessels ? panelMember : null, x.d.item);
+        })
+        .catch(function (e) {
+          error.textContent = 'Not saved: ' + e.message;
+          error.hidden = false;
+          console.error('New vessel save failed', e);
+        });
+    });
+  });
+  if (pickMember) pickMember.addEventListener('click', function () {
+    SearchPicker.open({
+      title: 'Member',
+      stages: [
+        { key: 'member', endpoint: '/api/logons/members', label: 'Member: number, name or mobile' },
+        { key: 'vessel', endpoint: '/api/logons/vessels', label: "Member's vessel: name or rego",
+          scopeFrom: 'member', scopeParam: 'member', optional: true, skipLabel: 'No vessel',
+          create: { label: 'New vessel for this member', onCreate: function (typed, picks) {
+            chosen(picks.member.item, null);
+            openPanel('vessels', picks.member.item, typed);
+          } } }
+      ],
+      onConfirm: function (id, picks) { chosen(picks.member.item, picks.vessel && picks.vessel.item); }
+    });
+  });
+  if (pickPublic) pickPublic.addEventListener('click', function () {
+    SearchPicker.open({
+      title: 'Public user',
+      stages: [
+        { key: 'vessel', endpoint: '/api/logons/public-vessels', label: 'Public vessel: name, rego or owner',
+          create: { label: 'New public vessel', onCreate: function (typed) {
+            chosen(null, null);
+            openPanel('public', null, typed);
+          } } }
+      ],
+      onConfirm: function (id, picks) { chosen(null, picks.vessel.item); }
+    });
+  });
+
   if (open && !document.activeElement.matches('[data-field]')) {
     var activePane = document.querySelector('[data-ro-pane]:not(.d-none)');
     var first = activePane && activePane.querySelector('[data-field]');
@@ -254,4 +388,6 @@
   }
 })();
 </script>
+{% import 'myMacro_search_picker.html' as picker %}
+{{ picker.searchPickerModal() }}
 {% endblock %}

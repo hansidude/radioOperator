@@ -151,11 +151,84 @@ def main(engine='chromium'):
             public_vessel = int(page.url.rsplit('/', 1)[1])
             visit('/vessels?q=' + token)
             expect(page.locator('#radioVessels .dc-record-grid-row')).to_have_count(1)
+            # Member or public user, answered through Quackit's shared search picker without leaving the page.
+            visit('/logons/new')
+            def pick(text):
+                page.locator('#spResults [data-pick]', has_text=text).first.click()
+            page.locator('#roPickMember').click()
+            expect(page.locator('#searchPicker')).to_be_visible()
+            expect(page.locator('label[for="spInput"]')).to_have_text('Member: number, name or mobile')
+            expect(page.locator('#searchPicker [placeholder]')).to_have_count(0)                # a label on top, nothing inside
+            page.locator('#spInput').fill(token)
+            pick(member_no)
+            expect(page.locator('#spLabel')).to_have_text("Member's vessel: name or rego")
+            expect(page.locator('#spFilter')).to_contain_text('No vessel')
+            pick(vessel)
+            expect(page.locator('#searchPicker')).to_be_hidden()
+            expect(page.locator('#f-memberNumber')).to_have_value(member_no)
+            for name, value in (('vesselName', vessel), ('registration', token), ('length', '6'), ('mobile', '0412 345 678')):
+                expect(page.locator('#f-' + name)).to_have_value(value)
+            expect(page.locator('#roWhoNow')).to_contain_text(member_no)
+            expect(page.locator('#f-vesselId')).not_to_have_value('')
+            first_pick = page.locator('#f-vesselId').input_value()
+            page.locator('#roPickMember').click()                                                 # a boat not on their record yet
+            page.locator('#spInput').fill(token)
+            pick(member_no)
+            page.locator('#spInput').fill('NEWBOAT-' + token)
+            expect(page.locator('#spResults')).to_contain_text('No matches')
+            page.locator('#spFilter [data-create]').click()
+            expect(page.locator('#roNewVesselPanel')).to_be_visible()
+            expect(page.locator('#roNewVesselPanel')).to_contain_text(member_no)
+            expect(page.locator('#roNewVesselPanel [placeholder]')).to_have_count(0)
+            page.locator('#roNewVessel-vesselName').fill('NEWBOAT-' + token)
+            page.locator('#roNewVessel-registration').fill('NB-' + token)
+            page.locator('#roNewVessel-length').fill('six')                                       # not a number: red, still on the page
+            page.locator('#roNewVessel button.btn-warning').click()
+            expect(page.locator('#roNewVessel-length')).to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#roNewVessel [data-ro-form-error]')).to_contain_text('Length')
+            page.locator('#roNewVessel-length').fill('5')
+            page.locator('#roNewVessel button.btn-warning').click()
+            expect(page.locator('#roNewVesselPanel')).to_be_hidden()
+            expect(page.locator('#f-vesselName')).to_have_value('NEWBOAT-' + token)
+            expect(page.locator('#f-registration')).to_have_value('NB-' + token)
+            expect(page.locator('#f-vesselId')).not_to_have_value(first_pick)
+            page.locator('#roPickPublic').click()                                                 # a public user's known vessel
+            expect(page.locator('#spLabel')).to_have_text('Public vessel: name, rego or owner')
+            page.locator('#spInput').fill('PUBLIC-' + token)
+            pick('PUBLIC-' + token)
+            expect(page.locator('#f-memberNumber')).to_have_value('')
+            expect(page.locator('#f-vesselName')).to_have_value('PUBLIC-' + token)
+            expect(page.locator('#f-registration')).to_have_value('VESSEL-' + token)
+            expect(page.locator('#f-vesselId')).to_have_value(str(public_vessel))
+            expect(page.locator('#roWhoNow')).to_contain_text('Public')
+            page.locator('#roPickPublic').click()                                                 # a public user seen for the first time
+            page.locator('#spInput').fill('NEWPUB-' + token)
+            page.locator('#spFilter [data-create]').click()
+            expect(page.locator('#roNewPublicPanel')).to_be_visible()
+            page.locator('#roNewPublic-vesselName').fill('NEWPUB-' + token)
+            page.locator('#roNewPublic-registration').fill('NP-' + token)
+            page.locator('#roNewPublic button.btn-warning').click()                               # no owner yet: red
+            expect(page.locator('#roNewPublic-ownerName')).to_have_class(re.compile('is-invalid'))
+            page.locator('#roNewPublic-ownerName').fill('Verify Public New ' + token)
+            page.locator('#roNewPublic-ownerPhone').fill('0400111222')
+            page.locator('#roNewPublic button.btn-warning').click()
+            expect(page.locator('#roNewPublicPanel')).to_be_hidden()
+            expect(page.locator('#f-vesselName')).to_have_value('NEWPUB-' + token)
+            expect(page.locator('#f-vesselId')).not_to_have_value(str(public_vessel))
+            expect(page).to_have_url(re.compile('/logons/new$'))                                  # never left the page
+            page.screenshot(path=str(ARTIFACTS / ('radio-who-%s.png' % engine)), full_page=True)
+            failing_search = re.compile(r'/api/logons/members')
+            page.route(failing_search, lambda route: route.fulfill(status=500, body='verification failure'))
+            page.locator('#roPickMember').click()
+            expect(page.locator('#spResults [data-sp-error]')).to_have_text('Search failed: HTTP 500 from /api/logons/members?q=')
+            page.unroute(failing_search)
+            page.keyboard.press('Escape')
+            expect(page.locator('#searchPicker')).to_be_hidden()
             fields['memberNumber'] = first['memberNumber'] = member_no
             visit('/logons')
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
-            expect(page.locator('#ro-entry-pane .ro-primary-actions [data-save-record]')).to_be_visible()
+            expect(page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions [data-save-record]')).to_be_visible()
             expect(page.locator('#ro-entry-pane .capture-row')).to_have_count(5)
             expect(page.locator('form form')).to_have_count(0)
             expect(page.locator('#f-callTime')).to_have_value('')
@@ -197,7 +270,7 @@ def main(engine='chromium'):
                     expect(page.locator('#f-' + name)).to_have_value(shown)   # times 4-digit, mobile written 0412 345 678
             expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
-            actions = page.locator('#ro-entry-pane .ro-primary-actions')
+            actions = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')
             expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save
             expect(actions.locator('form[action$="/accept"]')).to_have_count(0)                  # no Accept: saving complete logs on
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))             # still needed, so still a draft
@@ -301,7 +374,7 @@ def main(engine='chromium'):
             # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
             visit('/logon/%s' % layout_records[0])
             expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
-            bottom = page.locator('#ro-entry-pane .ro-primary-actions')
+            bottom = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')
             expect(bottom.locator('[data-save-record]')).to_be_visible()                 # Save, Accept, Discard in one row
             expect(page.locator('#ro-entry-pane textarea[name="reason"]')).to_be_visible()           # Reason above the buttons
             expect(bottom.get_by_role('button', name='Discard draft')).to_be_visible()
@@ -484,7 +557,7 @@ def main(engine='chromium'):
             expect(page.locator('.ro-who[data-who="member"]')).to_contain_text(member_no)       # tied to the member record
             expect(page.locator('.ro-who[data-who="member"]')).to_have_attribute('href', urlsplit(member_page).path)
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
-            bottoms = page.locator('#ro-entry-pane .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
+            bottoms = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
             expect(page.locator('#ro-entry-pane textarea')).to_have_count(1)                       # one notes box
             expect(page.locator('label[for="f-notes"]')).to_have_text('Notes')
@@ -496,7 +569,7 @@ def main(engine='chromium'):
             assert note_height() > three + 30, 'The Note box did not grow: %s -> %s' % (three, note_height())
             page.locator('#f-notes').fill('')
             expect(page.locator('#ro-entry-pane [placeholder]')).to_have_count(0)
-            expect(page.locator('#ro-entry-pane .ro-primary-actions')).not_to_contain_text('Logged on and watched')
+            expect(page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')).not_to_contain_text('Logged on and watched')
             expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
             watching = True
             page.locator('#f-pob').fill('')                                                     # a log on cannot lose POB

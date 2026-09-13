@@ -83,6 +83,11 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   The rego ties the log on to a vessel record when it names exactly one (the member's own vessels, else the
   public vessels). The log shows 👤 Member No. or 🌐 Public in the Member No. column; the log on page shows
   the member or public vessel it is tied to, linked. A number saved before members existed stays until changed.
+- **Member or public user** is the first row of the log on form (2026-09-14). Member: Quackit's shared search
+  picker finds the member, then one of their vessels (or No vessel, or New vessel for this member). Public user:
+  a public vessel, or New public vessel. Picks fill Member No., the vessel boxes and an empty mobile, and link the
+  record by `vesselId`; new vessels are saved from the page and picked at once. Typing over Member No., Vessel
+  Name or Rego drops the pick, and the rego decides again.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`. Migrated on port 80 through Database management on 2026-09-14. **8080 still needs the
   same migration before this is rolled out there.**
@@ -136,7 +141,9 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 ### Members follow-ups (not built)
 
 - [ ] Identity check and one-box search (`identity.py`) still read trip history only, not the member and vessel records.
-- [ ] Choosing a member does not fill their vessel onto the log on; the rego/name are still typed.
+- [ ] Values filled from a picked member or vessel are recorded as heard on the call (`Identifiers.source = 'call'`).
+      IDV-1 says a value applied from a record does not corroborate; they should be `profile`. Hidden while the
+      identity check is set aside.
 - [ ] Members and public vessels cannot be removed (only a member's contacts, vessels, trailers and cars can).
       The browser check therefore leaves one `Verify Member …` and one `PUBLIC-…` record on port 80 per run.
 - [ ] History tab covers the member's own details; changes to contacts, vessels, trailers and cars are in their

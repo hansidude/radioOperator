@@ -164,6 +164,26 @@ def vessel_for(cur, unit, registration, member_id):
     return found[0] if len(found) == 1 else None
 
 
+def member_item(m):
+    """A member as the shared search picker shows it ({id, primary, secondary}), with what the log on takes from it."""
+    return {'id': m['id'], 'primary': '%s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
+            'secondary': ' · '.join(x for x in (m.get('mobile'), m.get('vesselNames')) if x),
+            'memberNumber': m['memberNumber'], 'name': '%s %s' % (m['firstName'], m['lastName']), 'mobile': m.get('mobile')}
+
+
+def vessel_item(v):
+    """A vessel as the shared search picker shows it, with the log on boxes it fills."""
+    length = ('%sm' % v['length']) if v.get('length') else None
+    return {'id': v['id'], 'primary': v.get('vesselName') or v.get('registration'),
+            'secondary': ' · '.join(x for x in (v.get('registration') if v.get('vesselName') else None, length, v.get('hullColour'),
+                                                v.get('make'), v.get('model'), v.get('ownerName')) if x),
+            'fields': {f: v.get(f) for f in ('vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'ownerPhone')}}
+
+
+def member_vessels(cur, member_id, search=None):
+    return _search(children(cur, 'vessels', member_id), search, VESSEL_FIELDS)
+
+
 # ---------- writing ----------
 
 def _stamp(user, now):

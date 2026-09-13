@@ -236,6 +236,75 @@ class Members(unittest.TestCase):
         log = self.a.get('/logons').get_data(as_text=True)
         self.assertIn('Public OLD-77', log)
 
+    # ---- the log on's Member or public user question, through Quackit's shared search picker ----
+
+    def test_the_log_on_asks_member_or_public_user_through_the_shared_picker(self):
+        page = self.a.get('/logons/new').get_data(as_text=True)
+        self.assertIn('<label>Member or public user</label>', page)
+        self.assertIn('id="roPickMember"', page)
+        self.assertIn('id="roPickPublic"', page)
+        self.assertIn('id="searchPicker"', page)                                     # Quackit's shared picker, rendered once
+        self.assertEqual(page.count('id="searchPicker"'), 1)
+        self.assertIn("endpoint: '/api/logons/members'", page)
+        self.assertIn('id="roNewVesselPanel" hidden', page)
+        self.assertIn('id="roNewPublicPanel" hidden', page)
+        self.assertIn('data-ro-json', page)
+        self.assertNotIn('placeholder=', page)
+        self.assertIn('data-field="vesselId"', page)
+
+    def test_the_picker_endpoints_answer_in_its_shape(self):
+        m = self.member()
+        self.vessel(m)
+        self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public', 'ownerPhone': '0411222333'})
+        members = self.a.get('/api/logons/members?q=smith').json['items']
+        self.assertEqual([(i['id'], i['primary'], i['memberNumber']) for i in members], [(m, 'm00001 Jane Smith', 'm00001')])
+        self.assertEqual(members[0]['secondary'], '0412 345 678 · Sea Dog')
+        self.assertEqual(self.a.get('/api/logons/members?q=nobody').json['items'], [])
+        boats = self.a.get('/api/logons/vessels?member=%d' % m).json['items']
+        self.assertEqual([(b['primary'], b['fields']['registration']) for b in boats], [('Sea Dog', 'AB123Q')])
+        self.assertEqual(self.a.get('/api/logons/vessels?member=%d&q=zzz' % m).json['items'], [])
+        self.assertEqual(self.a.get('/api/logons/vessels').status_code, 400)
+        public = self.a.get('/api/logons/public-vessels?q=alex').json['items']
+        self.assertEqual([(p['primary'], p['fields']['ownerPhone']) for p in public], [('Blue Duck', '0411 222 333')])
+        self.assertIn('Alex Public', public[0]['secondary'])
+        self.assertEqual(self.b.get('/api/logons/vessels?member=%d' % m).status_code, 403)   # another unit's member
+        self.assertEqual(self.b.get('/api/logons/members').json['items'], [])
+
+    def test_new_vessels_save_from_the_log_on_page_and_come_back_as_a_pick(self):
+        m = self.member()
+        json = {'Accept': 'application/json'}
+        bad = self.a.post('/member/%d/vessels' % m, data={'length': 'six'}, headers=json)
+        self.assertEqual(bad.status_code, 400)
+        self.assertEqual(set(bad.json['fields']), {'vesselName', 'registration', 'length'})
+        good = self.a.post('/member/%d/vessels' % m, data={'vesselName': 'Sea Dog', 'registration': 'AB123Q'}, headers=json)
+        self.assertEqual(good.status_code, 200, good.data)
+        self.assertEqual((good.json['item']['id'], good.json['item']['primary']), (good.json['id'], 'Sea Dog'))
+        bad = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck'}, headers=json)
+        self.assertEqual((bad.status_code, set(bad.json['fields'])), (400, {'ownerName', 'ownerPhone'}))
+        good = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333'}, headers=json)
+        self.assertEqual(good.json['item']['fields']['ownerPhone'], '0411 222 333')
+
+    def test_a_picked_vessel_is_linked_and_must_belong_to_the_answer(self):
+        m, other = self.member(), self.member(firstName='Bob', lastName='Jones')
+        self.vessel(m, registration='')                                              # a name and no rego: only a pick can link it
+        self.vessel(other, vesselName='Other Boat', registration='OTH1')
+        cur = self.db()
+        own, theirs = M.children(cur, 'vessels', m)[0], M.children(cur, 'vessels', other)[0]
+        public = self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'ownerName': 'Alex', 'ownerPhone': '0411222333'},
+                             headers={'Accept': 'application/json'}).json['id']
+        r = self.logon(memberNumber='m00001', vesselName='Sea Dog', vesselId=str(own['id']))
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(L.get(self.db(), r.json['id'])['vesselId'], own['id'])
+        for member, vessel in (('m00001', theirs['id']), ('m00001', public), ('', own['id']), ('', 'x')):
+            r = self.logon(memberNumber=member, vesselId=str(vessel))
+            self.assertEqual(r.status_code, 400, (member, vessel))                   # never linked to the wrong record
+        r = self.logon(memberNumber='', vesselName='Blue Duck', vesselId=str(public))
+        self.assertEqual(L.get(self.db(), r.json['id'])['vesselId'], public)
+        page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
+        self.assertIn('id="f-vesselId" data-field="vesselId" value="%d"' % public, page)
+        check = self.a.post('/api/logon/%d' % r.json['id'], json={'check': True, 'fields': {'vesselId': str(theirs['id'])}})
+        self.assertEqual(check.status_code, 400)
+
 
 if __name__ == '__main__':
     unittest.main()

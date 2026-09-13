@@ -471,7 +471,8 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.data)
         self.assertIn('Member No.', r.json['filled'])
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
-        form = page[page.index('<form id="capture"'):page.index('</form>')]
+        start = page.index('<form id="capture"')
+        form = page[start:page.index('</form>', start)]
         self.assertIn('4471', form)
         self.assertNotIn('Facing Island', form)                                   # a past trip is not this trip
         cur = Connection(Path(self.tmp.name) / 'test.db').cursor()                    # IDV-1: the check says so plainly
