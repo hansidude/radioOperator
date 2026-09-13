@@ -442,6 +442,11 @@ def main(engine='chromium'):
             expect(history).to_contain_text('✅ loggedOff')
             expect(history.locator('.dc-history-field', has_text='POB').first).to_contain_text('👥')   # fields with the log's symbols
             page.screenshot(path=str(ARTIFACTS / ('radio-history-%s.png' % engine)), full_page=True)
+            widths = page.evaluate('''() => ({history: document.querySelector('#ro-history-pane .dc-history').getBoundingClientRect().width,
+                                               form: document.querySelector('#capture').getBoundingClientRect().width || innerWidth,
+                                               view: innerWidth,
+                                               cap: getComputedStyle(document.querySelector('#ro-history-pane .mySpacing')).maxWidth})''')
+            assert widths['history'] < widths['view'] - 300, 'History is not in the usual page width: %s' % widths
             assert not errors, '\n'.join(errors)
             print('PASS %s: explicit save, conflicts, search, cached-CSS upgrade, compact multi-row layouts, accept/logoff; fixture %s' % (engine, record))
         except Exception:

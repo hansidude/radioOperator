@@ -66,12 +66,15 @@
 </section>
 
 {% if not creating %}<section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
+  {# The entry form uses the whole screen; History reads at quackit's usual page width (layout's mySpacing). #}
+  <div class="container-fluid mySpacing px-0">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges with context %}
   {% set history_symbols = {} %}{% for field, symbol in ui.FIELD_SYMBOLS.items() %}{% set _ = history_symbols.update({column(field): symbol}) %}{% endfor %}
   {% set status_words = {} %}{% for key in ('draft', 'loggedOn', 'loggedOff', 'discarded') %}{% set _ = status_words.update({key: ui.STATES[key].symbol ~ ' ' ~ key}) %}{% endfor %}
   {{ dcFn_ShowHistoryChanges(history, dcKey_i='logon-history', dcTitle_i='Log on history', dcFieldLabelsDictionary_i=history_labels, dcSortControls_i=True, dcAdvancedSearch_i=True,
                              dcFieldSymbolsDictionary_i=history_symbols, dcValueLabelsDictionary_i={'watchStatus': status_words}) }}{% endif %}
+  </div>
 </section>
 {% endif %}
 <script>
