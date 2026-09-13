@@ -117,9 +117,16 @@ class Pages(unittest.TestCase):
         self.assertNotIn('data-record="%d"' % j, page)         # other records belong only on /logons
         self.assertIn('data-field="eta"', page)
         self.assertIn('type="date" class="ro-native-picker" data-picker-target="callDay"', page)
-        self.assertIn('type="time" class="ro-native-picker" data-picker-target="callTime"', page)
+        self.assertIn('data-now-for="callTime"', page)                 # the clock sets now: no browser time picker
+        self.assertNotIn('type="time"', page)
         self.assertIn('Still to ask', page)
-        self.assertIn('This is a draft, not a log on', page)
+        self.assertNotIn('This is a draft, not a log on', page)       # what stops acceptance is shown red, not written
+        self.assertIn('id="f-callTime" class="form-control" data-field="callTime" value="09', page)   # 09:0n reads back as 090n
+        for name in ('pob', 'departurePoint', 'destination', 'etaDay', 'eta', 'memberNumber', 'vesselName', 'registration'):
+            self.assertIn('id="f-%s" class="form-control is-invalid"' % name, page)
+        self.assertIn('id="f-mobile" class="form-control" data-field', page)              # heard, so not red
+        self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 2)         # Save in the navbar and beside Accept
+        self.assertIn('<label for="f-vesselName">Vessel Name</label>', page)
         r = self.a.post('/api/logon/%d' % i, json={'field': 'eta', 'value': '3pm', 'version': 0})
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.json['version'], 1)

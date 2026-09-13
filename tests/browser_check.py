@@ -83,9 +83,11 @@ def main(engine='chromium'):
             assert len(writes) == before, 'Invalid minimum attempted a write'
             for name, value in fields.items():
                 page.locator('#f-' + name).fill(value)
-            for name in ('callDay', 'callTime'):
-                page.locator('[data-picker-target="%s"]' % name).evaluate(
-                    '(el, value) => {el.value=value; el.dispatchEvent(new Event("change", {bubbles:true}));}', fields[name])
+            page.locator('[data-picker-target="callDay"]').evaluate(
+                '(el, value) => {el.value=value; el.dispatchEvent(new Event("change", {bubbles:true}));}', fields['callDay'])
+            page.locator('[data-now-for="callTime"]').click()           # a real click: sets now as 4-digit 24-hour
+            expect(page.locator('#f-callTime')).to_have_value(re.compile(r'^([01][0-9]|2[0-3])[0-5][0-9]$'))
+            page.locator('#f-callTime').fill(fields['callTime'])
             page.locator('[data-ro-tab="contact"]').click()
             expect(page.locator('#captureContact')).to_be_visible()
             page.locator('[data-ro-tab="entry"]').click()
@@ -107,8 +109,12 @@ def main(engine='chromium'):
             page.wait_for_url(re.compile('/logon/%s(?:#.*)?$' % record))
             assert len(writes) == before + 1, 'First Save was not one batched write'
             for name, value in fields.items():
-                if name not in ('callDay', 'etaDay'):
-                    expect(page.locator('#f-' + name)).to_have_value(value)
+                if name not in ('callDay', 'etaDay'):   # settled times read back 4-digit: 13:45 shows 1345
+                    expect(page.locator('#f-' + name)).to_have_value(value.replace(':', '') if name in ('callTime', 'eta') else value)
+            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(0)
+            actions = page.locator('#ro-entry-pane .ro-primary-actions')
+            expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save left of Accept
+            expect(actions.locator('form[action="/logon/%s/accept"] button' % record)).to_be_enabled()
             # Second operator saves first; stale browser must fail visibly.
             other = context.new_page()
             other.on('dialog', lambda dialog: dialog.accept())
@@ -197,6 +203,16 @@ def main(engine='chromium'):
                 response = context.request.post(URL + '/logons/new', data={'fields': fixture})
                 assert response.status == 200, response.text()
                 layout_records.append(response.json()['id'])
+            # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
+            visit('/logon/%s' % layout_records[0])
+            expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
+            expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-registration')).not_to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-callTime')).to_have_value('1400')
+            page.screenshot(path=str(ARTIFACTS / ('radio-draft-%s.png' % engine)))
+            page.locator('#f-pob').fill('2')
+            expect(page.locator('#f-pob')).not_to_have_class(re.compile('is-invalid'))
+            expect(page.locator('#f-destination')).to_have_class(re.compile('is-invalid'))
             visit('/logons?status=draft&day=' + today + '&q=' + token)
             expect(page.locator('.dc-record-grid-row')).to_have_count(4)
             for width in (2560, 1920, 1328, 1280, 1190, 1184, 1024, 960, 900, 768, 576, 390, 320):

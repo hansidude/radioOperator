@@ -5,6 +5,8 @@
 {% set draft = creating or logon.watchStatus not in ('watching', 'loggedoff', 'discarded', 'cancelled') %}
 {% block body_wrap_class %}container-fluid{% endblock %}
 {% block page_title %}<i class="bi bi-broadcast me-1"></i>{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
+{# Yellow as quackit's Update button (lists/editList.html): it changes the record. One button, shown twice. #}
+{% macro save_button(id='', size='') %}<button type="button" class="btn btn-warning {{ size }}"{% if id %} id="{{ id }}"{% endif %} data-save-record><i class="bi bi-floppy me-1"></i>Save</button>{% endmacro %}
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
@@ -18,12 +20,13 @@
     {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="identity" aria-controls="ro-identity-pane" aria-pressed="false"><i class="bi bi-person-check me-1"></i>Identity</button>
     <button type="button" class="btn btn-outline-secondary" data-ro-tab="record" aria-controls="ro-record-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>Record</button>{% endif %}
   </div>
-  {% if open %}<button type="button" class="btn btn-primary btn-sm" id="saveRecord"><i class="bi bi-floppy me-1"></i>Save</button>{% endif %}
+  {% if open %}{{ save_button('saveRecord', 'btn-sm') }}{% endif %}
   <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>
 </div>
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
+{% set needed_boxes = [] if creating or not draft else missing|map(attribute='boxes')|sum(start=[]) %}
 {% macro reopen_form() %}
 <form method="post" action="/logon/{{ logon.id }}/reopen" class="d-flex gap-1 mt-2" onsubmit="return confirm('Reopen: was this closure wrong?')">
   <input type="hidden" name="back" value="/logon/{{ logon.id }}"><input type="hidden" name="version" value="{{ logon.version }}">
@@ -33,10 +36,11 @@
 {% endmacro %}
 {% macro field(name, cols='col') %}
 {% set raw = box(logon, name) %}
+{% set needed = name in needed_boxes %}
 <div class="{{ cols }}{% if name in mandatory %} mandatory{% endif %}"><label for="f-{{ name }}">{{ labels[name] }}</label>
   {% if name == 'notes' %}<textarea id="f-{{ name }}" class="form-control" rows="2" data-field="{{ name }}" {% if not open %}disabled{% endif %}>{{ raw or '' }}</textarea>
   {% elif name == 'channel' %}<select id="f-{{ name }}" class="form-select" data-field="{{ name }}" {% if not open %}disabled{% endif %}><option value="">—</option>{% for c in channels %}<option value="{{ c }}" {% if raw == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
-  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime', 'eta', 'departureTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control" data-field="{{ name }}" value="{{ raw or '' }}" {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('registration', 'mobile') %}data-draft-identity{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name in ('callTime', 'eta', 'departureTime') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button><input type="time" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% endif %}</div>{% endif %}
+  {% else %}<div class="{% if name in ('callDay', 'etaDay', 'departureDay', 'callTime') %}input-group{% endif %}"><input id="f-{{ name }}" class="form-control{% if needed %} is-invalid{% endif %}" data-field="{{ name }}" value="{{ raw or '' }}" {% if needed %}data-needed aria-invalid="true"{% endif %} {% if name in ('callDay', 'callTime') %}required aria-required="true"{% endif %} {% if name in ('memberNumber', 'registration', 'mobile') %}data-draft-identity{% endif %} {% if not open %}disabled{% endif %}>{% if name in ('callDay', 'etaDay', 'departureDay') %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-picker-for="{{ name }}" title="Choose {{ labels[name] }}" aria-label="Choose {{ labels[name] }}" {% if not open %}disabled{% endif %}><i class="bi bi-calendar3"></i></button><input type="date" class="ro-native-picker" data-picker-target="{{ name }}" tabindex="-1" aria-hidden="true">{% elif name == 'callTime' %}<button type="button" class="btn btn-outline-secondary ro-picker-button" data-now-for="{{ name }}" title="Set {{ labels[name] }} to now" aria-label="Set {{ labels[name] }} to now" {% if not open %}disabled{% endif %}><i class="bi bi-clock"></i></button>{% endif %}</div>{% endif %}
 </div>
 {% endmacro %}
 {% if not creating %}<div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>{% endif %}
@@ -47,10 +51,7 @@
     <form id="capture" class="ro-primary-form" autocomplete="off" onsubmit="return false">
       <div class="capture-row row g-3">{{ field('callDay', 'col-12 col-md-6') }}{{ field('callTime', 'col-12 col-md-6') }}</div>
       <div class="capture-row row g-3">
-        <div class="col-12 col-lg-6 mandatory"><span class="group-label">Member No. or Vessel Name</span><div class="row g-2">
-          <div class="col-12 col-sm-5 paper-col"><input id="f-memberNumber" class="form-control" data-field="memberNumber" data-draft-identity value="{{ logon.memberNumber or '' }}" aria-label="Member No." {% if not open %}disabled{% endif %}></div>
-          <div class="col-12 col-sm-7 paper-col"><input id="f-vesselName" class="form-control" data-field="vesselName" value="{{ logon.vesselName or '' }}" aria-label="Vessel Name" {% if not open %}disabled{% endif %}></div>
-        </div></div>
+        <div class="col-12 col-lg-6"><div class="row g-2">{{ field('memberNumber', 'col-12 col-sm-5 paper-col') }}{{ field('vesselName', 'col-12 col-sm-7 paper-col') }}</div></div>
         {{ field('registration', 'col-6 col-lg-3') }}{{ field('mobile', 'col-6 col-lg-3') }}
       </div>
       <div class="capture-row row g-3">{{ field('length', 'col-6 col-lg-3') }}{{ field('hullColour', 'col-6 col-lg-3') }}{{ field('make', 'col-6 col-lg-3') }}{{ field('model', 'col-6 col-lg-3') }}</div>
@@ -59,12 +60,8 @@
     </form>
     {% if creating %}
     {% elif draft %}
-    <section class="ro-gate{{ ' ready' if not missing }}" aria-label="Acceptance">
-      {% if missing %}<strong>This is a draft, not a log on.</strong> Still needed: {{ missing|map(attribute='label')|join(' · ') }}.
-      {% else %}<strong>Everything needed is here.</strong> Accept the log on to take the watch.{% endif %}
-      {% if clash %}<div class="text-danger mt-1">{{ clash.registration or clash.vesselName }} is already logged on as <a href="/logon/{{ clash.id }}">{{ reference(clash) }}</a>. One vessel has one log on.</div>{% endif %}
-    </section>
-    <div class="ro-primary-actions"><form method="post" action="/logon/{{ logon.id }}/accept" onsubmit="return confirm('Accept the log on and take the watch? Tell the vessel it is logged on.')"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-primary" {% if missing or clash %}disabled title="Still needed: {{ missing|map(attribute='label')|join('; ') }}{% if clash %} · that vessel is already logged on{% endif %}"{% endif %}><i class="bi bi-check2-circle me-1"></i>Accept the log on</button></form></div>
+    {% if clash %}<div class="text-danger mt-2">{{ clash.registration or clash.vesselName }} is already logged on as <a href="/logon/{{ clash.id }}">{{ reference(clash) }}</a>. One vessel has one log on.</div>{% endif %}
+    <div class="ro-primary-actions">{{ save_button() }}<form method="post" action="/logon/{{ logon.id }}/accept" onsubmit="return confirm('Accept the log on and take the watch? Tell the vessel it is logged on.')"><input type="hidden" name="back" value="/logon/{{ logon.id }}"><button class="btn btn-primary" {% if missing or clash %}disabled title="Still needed: {{ missing|map(attribute='label')|join('; ') }}{% if clash %} · that vessel is already logged on{% endif %}"{% endif %}><i class="bi bi-check2-circle me-1"></i>Accept the log on</button></form></div>
     {% elif open %}
     <div class="ro-primary-actions"><strong>Logged on and watched</strong><select name="reason" form="logoffForm" class="form-select" style="width:auto">{% for key, label in close_reasons %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select><input id="logoffNote" name="note" form="logoffForm" class="form-control flex-grow-1" style="min-width:14rem" placeholder="Contact or evidence" maxlength="255"><button form="logoffForm" class="btn btn-success text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></div>
     <form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: end the watch on this log on?')"><input type="hidden" name="back" value="/logons"></form>
@@ -136,7 +133,8 @@
   var id = {{ 'null' if creating else logon.id }}, version = {{ logon.version }}, creating = {{ 'true' if creating else 'false' }};
   var open = {{ 'true' if open else 'false' }}, draft = {{ 'true' if draft else 'false' }}, dirty = false;
   var status = document.getElementById('saveStatus'), stale = document.getElementById('stale');
-  var saveButton = document.getElementById('saveRecord');
+  var saveButtons = Array.prototype.slice.call(document.querySelectorAll('[data-save-record]'));
+  function saving(on) { saveButtons.forEach(function (b) { b.disabled = on; }); }
   var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-field]'));
   function setStatus(text, cls) { status.textContent = text; status.className = 'small ' + cls; }
   function values() {
@@ -146,7 +144,8 @@
   }
   function mark(fields) {
     inputs.forEach(function (el) {
-      var bad = fields.indexOf(el.dataset.field) !== -1;
+      // data-needed: the server found this box stopping acceptance; it stays red until it is changed
+      var bad = fields.indexOf(el.dataset.field) !== -1 || (el.hasAttribute('data-needed') && el.value === el.defaultValue);
       el.classList.toggle('is-invalid', bad);
       el.setAttribute('aria-invalid', String(bad));
     });
@@ -183,22 +182,29 @@
     var missing = minimum();
     mark(missing);
     if (missing.length) { setStatus('Not saved', 'text-secondary'); return; }
-    saveButton.disabled = true;
+    saving(true);
     setStatus('Saving', 'text-secondary');
     fetch(creating ? '/logons/new' : '/api/logon/' + id,
           { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fields: values(), version: version }) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }, function () { return { ok: false, status: r.status, d: {} }; }); })
       .then(function (x) {
-        if (x.status === 409) { if (stale) stale.hidden = false; setStatus('Not saved', 'text-danger'); saveButton.disabled = false; return; }
-        if (!x.ok) { mark(x.d.fields || []); setStatus('Not saved', 'text-danger'); saveButton.disabled = false; return; }
+        if (x.status === 409) { if (stale) stale.hidden = false; setStatus('Not saved', 'text-danger'); saving(false); return; }
+        if (!x.ok) { mark(x.d.fields || []); setStatus('Not saved', 'text-danger'); saving(false); return; }
         mark(x.d.invalid || []);
         dirty = false;
         setStatus('Saved', 'text-success');
         window.location.replace('/logon/' + (creating ? x.d.id : id) + window.location.hash);
       })
-      .catch(function () { setStatus('Save failed', 'text-danger'); saveButton.disabled = false; });
+      .catch(function () { setStatus('Save failed', 'text-danger'); saving(false); });
   }
+  document.querySelectorAll('[data-now-for]').forEach(function (button) {
+    button.addEventListener('click', function () {             // 4-digit 24-hour, as the box reads back
+      var el = document.getElementById('f-' + button.dataset.nowFor), d = new Date();
+      el.value = String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
   document.querySelectorAll('[data-picker-for]').forEach(function (button) {
     button.addEventListener('click', function () {
       var picker = document.querySelector('[data-picker-target="' + button.dataset.pickerFor + '"]');
@@ -227,7 +233,7 @@
       }
     });
   });
-  if (saveButton) saveButton.addEventListener('click', save);
+  saveButtons.forEach(function (b) { b.addEventListener('click', save); });
   if (open && draft) mark(minimum());   // and from the moment the form opens
   window.addEventListener('beforeunload', function (ev) {
     if (!dirty) return;

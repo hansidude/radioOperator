@@ -222,6 +222,8 @@ class LogOns(unittest.TestCase):
         row = L.get(self.cur, i)
         self.assertEqual(row['etaDate'], date(2026, 9, 13))
         self.assertEqual(L.box(row, 'etaDay'), 'Sun 13/9')               # the box shows the date, not the word
+        self.assertEqual(L.box(row, 'eta'), '0600')                      # and the time as 4-digit 24-hour
+        self.assertEqual([m['boxes'] for m in L.missing(row) if m['field'] == 'eta'], [])
         self.assertEqual(row['etaDayRaw'], 'tomorrow')                   # the word is still what was heard
         # the next day, an unrelated edit must not re-read "tomorrow" as the day after
         out = L.set_field(self.cur, i, 'pob', '4', 'alice', T0 + timedelta(days=1))
@@ -239,6 +241,14 @@ class LogOns(unittest.TestCase):
         out = L.set_field(self.cur, j, 'eta', '14/9 0800', 'alice', T0)
         self.assertEqual(out['when'], datetime(2026, 9, 14, 8, 0))
         self.assertEqual(L.box(L.get(self.cur, j), 'etaDay'), 'Mon 14/9')
+        k = L.create(self.cur, 'alice', '', T0)                           # a time with no day yet: day box red, time as typed
+        L.set_field(self.cur, k, 'eta', '3pm', 'alice', T0)
+        row = L.get(self.cur, k)
+        self.assertEqual(L.box(row, 'eta'), '3pm')
+        self.assertEqual([m['boxes'] for m in L.missing(row) if m['field'] == 'eta'], [['etaDay']])
+        L.set_field(self.cur, k, 'etaDay', 'tomorrow', 'alice', T0)
+        L.set_field(self.cur, k, 'eta', 'soon', 'alice', T0)             # a day but a time that cannot be read: time box red
+        self.assertEqual([m['boxes'] for m in L.missing(L.get(self.cur, k)) if m['field'] == 'eta'], [['eta']])
 
     def test_call_time_is_the_reference_once_known(self):               # REC-6
         i = L.create(self.cur, 'alice', '', T0)

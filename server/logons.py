@@ -167,12 +167,15 @@ def resolved_day(row, field):
 
 
 def box(row, field):
-    """What the input shows. A day cell shows the date it settled on ('Sun 13/9'), so the relative
-    word the operator typed is never what anyone reads back; unresolved, it shows the words."""
+    """What the input shows. A day cell shows the date it settled on ('Sun 13/9') and a time cell the
+    time ('1400'), so the words the operator typed are never what anyone reads back; unresolved, it
+    shows the words."""
     if field in DAY_FIELDS:
         day = resolved_day(row, field)
         if day:
             return times.fmt_day(day, (row.get('createdAt') or datetime.now()).year)
+    if field in TIME_FIELDS and row.get(field):
+        return row[field].strftime('%H%M')      # a time it settled on reads back as 4-digit 24-hour: '929' shows 0929
     return row.get(column(field)) or ''
 
 
@@ -206,15 +209,21 @@ def missing(row):
     A draft is never refused for these; acceptance is the only thing withheld (ACC-8)."""
     have = [f for f in IDENTITY_SET if row.get(f)]
     out = []
+    # 'boxes' are the inputs the form turns red for each entry: the empty identity boxes, or the
+    # return day and/or time that has not settled into a deadline.
     if len(have) < IDENTITY_NEEDED:
         out.append({'field': 'identity', 'label': '%d more of Member No., Vessel Name, Rego or Mobile'
-                    % (IDENTITY_NEEDED - len(have)), 'got': have})
+                    % (IDENTITY_NEEDED - len(have)), 'got': have,
+                    'boxes': [f for f in IDENTITY_SET if f not in have]})
     for field in TRIP_SET:
         if field == 'eta':
             if not row.get('eta'):
-                out.append({'field': 'eta', 'label': 'A return day and time that reads as a deadline'})
+                boxes = [] if resolved_day(row, 'etaDay') else ['etaDay']
+                if boxes == [] or not present(row, 'eta'):
+                    boxes.append('eta')
+                out.append({'field': 'eta', 'label': 'A return day and time that reads as a deadline', 'boxes': boxes})
         elif not row.get(field):
-            out.append({'field': field, 'label': LABELS[field]})
+            out.append({'field': field, 'label': LABELS[field], 'boxes': [field]})
     return out
 
 
