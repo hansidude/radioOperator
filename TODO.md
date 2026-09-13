@@ -4,7 +4,7 @@ Current state and open work. Read Quackit's `DRY-CATALOG.md` and `DEVELOPMENT.md
 reuse, verification (`./verify`) and rollout. History lives in the commit log and
 `quackit/WORKLOG-radio.md`; superseded notes are not kept here.
 
-## Built (as of 2026-09-13)
+## Built (as of 2026-09-14)
 
 ### RadioLogs list (`/logons`)
 
@@ -89,8 +89,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   record by `vesselId`; new vessels are saved from the page and picked at once. Typing over Member No., Vessel
   Name or Rego drops the pick, and the rego decides again.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
-  `LogOns.vesselId`. Migrated on port 80 through Database management on 2026-09-14. **8080 still needs the
-  same migration before this is rolled out there.**
+  `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
+  8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's
+  output, its drops in the destructive file).
 
 ### Behind it
 
@@ -103,9 +104,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 - Deadline checker runs without a browser, raises and clears alerts, records delivery.
 - Radio data only through `Host`; the standalone shell loads Quackit's real shared templates and assets.
-- `./verify` covers Quackit and radio: Python tests, DOM tests, and the browser check on port 80 /
-  MariaDB in Chromium and Firefox (save, red boxes, conflicts, search, sort, layout 320–2560px,
-  accept, log off).
+- `./verify` covers Quackit and radio: Python tests, DOM tests (including the shared search picker), and the
+  browser check on port 80 / MariaDB in Chromium and Firefox (save, red boxes, conflicts, search, sort, layout
+  320–2560px, accept, log off; members with vessel and contact, public vessel, a Member No. that is not a member
+  kept in Notes, Member or public user picks and new vessels saved from the log on page).
 
 ## Open
 
@@ -118,9 +120,12 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
       2. Keep the badge, only no row colour of its own (as now)
 - [ ] **Failed save gives no reason.** A save refused for something other than a field (server error,
       too long, bad channel) shows only "Not saved"; `logon.html` save turns a non-JSON reply into `{}`.
-      That is a silent fallback. Owner, earlier: *"which field is it not happy about?"*
+      That is a silent fallback. Owner, earlier: *"which field is it not happy about?"* Also hit by a picked
+      vessel the server refuses ("That vessel is not one of this member's vessels").
       1. Show the server's reason beside "Not saved"
       2. Leave it
+- [ ] **Spec PDF is behind.** `vessel-logon-spec.pdf` has not been regenerated since the v1.1 changes (ACC-3,
+      state names, ACC-1, CAP-24, ACC-9); the Markdown is current. README "Updating the documents" has the steps.
 - [ ] **CAP-19 spec conflict.** `vessel-logon-spec.md` CAP-19 requires immediate durable creation; the
       owner chose explicit Save. Update CAP-19 and audit the ACC/WAT requirements that lean on it.
 - [ ] **Trip ID collisions.** `tripRef` is issued state-wide in the real system; this branch allocates its
@@ -145,7 +150,8 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
       IDV-1 says a value applied from a record does not corroborate; they should be `profile`. Hidden while the
       identity check is set aside.
 - [ ] Members and public vessels cannot be removed (only a member's contacts, vessels, trailers and cars can).
-      The browser check therefore leaves one `Verify Member …` and one `PUBLIC-…` record on port 80 per run.
+      The browser check therefore leaves per run on port 80: one `Verify Member …` with vessels `VERIFY-…` and
+      `NEWBOAT-…`, and public vessels `PUBLIC-…` and `NEWPUB-…`.
 - [ ] History tab covers the member's own details; changes to contacts, vessels, trailers and cars are in their
       history tables but not shown.
 
@@ -173,3 +179,5 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 
 - [ ] Consolidate the Quackit UI duplicates listed in `DRY-CATALOG.md` (compact toggles, context combo
       enhancement, old attachment macros). The catalog lists them; none is extracted yet.
+- [ ] The RadioLogs toolbar search uses Quackit's `search_controls`, which still writes "Search.." inside the box.
+      The owner's rule is a label on top (DRY-CATALOG.md "Owner's standing UI rules"); fix it on Quackit's owner.
