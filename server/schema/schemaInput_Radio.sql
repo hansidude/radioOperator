@@ -175,9 +175,11 @@ CREATE TABLE IF NOT EXISTS `Members` (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS `uniq_members_number` ON `Members`(`memberNumber`);
 
+-- A member's emergency contact (memberId), or a public vessel's (vesselId): for a public user the vessel is the record.
 CREATE TABLE IF NOT EXISTS `EmergencyContacts` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `memberId` INT NOT NULL,
+  `memberId` INT DEFAULT NULL,                                -- NOT NULL until 2026-09-14
+  `vesselId` INT DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
   `relationship` VARCHAR(64) DEFAULT NULL,
   `phone` VARCHAR(32) DEFAULT NULL,
@@ -188,9 +190,11 @@ CREATE TABLE IF NOT EXISTS `EmergencyContacts` (
   `updatedBy` VARCHAR(255) NOT NULL DEFAULT '',
   `updatedAt` DATETIME DEFAULT NOW(),
   `isActive` BOOL DEFAULT 1,
-  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`)
+  FOREIGN KEY (`memberId`) REFERENCES `Members`(`id`),
+  FOREIGN KEY (`vesselId`) REFERENCES `Vessels`(`id`)
 );
 CREATE INDEX IF NOT EXISTS `idx_contacts_member` ON `EmergencyContacts`(`memberId`, `isActive`);
+CREATE INDEX IF NOT EXISTS `idx_contacts_vessel` ON `EmergencyContacts`(`vesselId`, `isActive`);
 
 -- A member's vessel (memberId) or a public vessel (memberId NULL, owner details filled in).
 CREATE TABLE IF NOT EXISTS `Vessels` (
@@ -208,6 +212,7 @@ CREATE TABLE IF NOT EXISTS `Vessels` (
   `ownerName` VARCHAR(255) DEFAULT NULL,                      -- public vessel: the public user
   `ownerPhone` VARCHAR(32) DEFAULT NULL,
   `ownerEmail` VARCHAR(255) DEFAULT NULL,
+  `notes` TEXT DEFAULT NULL,
   `version` INT NOT NULL DEFAULT 0,
   `createdBy` VARCHAR(255) NOT NULL DEFAULT '',
   `createdAt` DATETIME DEFAULT NOW(),
