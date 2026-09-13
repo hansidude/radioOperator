@@ -18,11 +18,12 @@
 /* The card itself is the site's dc-record-card (border, radius, wrapping). Radio adds only the
    one thing that is its own: a left edge that says what state the record is in. */
 .ro-record-card{border-left:4px solid var(--bs-secondary);background:var(--bs-body-bg);line-height:1.3}
-.ro-record-card.draft{border-left-color:var(--bs-secondary)}
-.ro-record-card.overdue{border-left-color:var(--bs-danger)}
-.ro-record-card.approaching{border-left-color:var(--bs-warning)}
-.ro-record-card.watching{border-left-color:var(--bs-primary)}
-.ro-record-card.closed{border-left-color:var(--bs-success)}
+/* A faint tint per status so a row's state reads at a glance: draft orange, logged on green (due soon
+   is not a colour of its own), overdue red, closed near-black. */
+.ro-record-card.draft{border-left-color:var(--bs-orange);background:rgba(253,126,20,.1)}
+.ro-record-card.overdue{border-left-color:var(--bs-danger);background:rgba(var(--bs-danger-rgb),.14)}
+.ro-record-card.watching{border-left-color:var(--bs-success);background:rgba(var(--bs-success-rgb),.1)}
+.ro-record-card.closed{border-left-color:var(--bs-black);background:rgba(var(--bs-black-rgb),.3)}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 /* Layout comes from dc-record-toolbar; only the control widths are radio's. */
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
@@ -192,8 +193,8 @@
 {# DAT-6: paper field order remains radio's; Quackit owns headers, cells and cards. #}
 {% set COLUMNS = [
   {'key': 'number', 'label': 'No.', 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
-  {'key': 'day', 'label': 'Date', 'width': 'minmax(0,.9fr)'},
-  {'key': 'time', 'label': 'Time', 'width': 'minmax(0,.65fr)'},
+  {'key': 'day', 'label': 'Date', 'width': 'minmax(0,1.15fr)'},
+  {'key': 'time', 'label': 'Time', 'width': 'minmax(0,.5fr)'},
   {'key': 'identity', 'label': 'Member / Vessel', 'width': 'minmax(0,1.65fr)'},
   {'key': 'rego', 'label': 'Rego', 'width': 'minmax(0,.95fr)'},
   {'key': 'mobile', 'label': 'Mobile', 'width': 'minmax(0,1.1fr)'},
@@ -201,8 +202,8 @@
   {'key': 'pob', 'label': 'POB', 'width': 'minmax(0,.45fr)'},
   {'key': 'departure', 'label': 'Departure', 'width': 'minmax(0,1.1fr)'},
   {'key': 'destination', 'label': 'Going to', 'width': 'minmax(0,1.2fr)'},
-  {'key': 'returnDay', 'label': 'Return date', 'width': 'minmax(0,.9fr)'},
-  {'key': 'returnTime', 'label': 'Time', 'width': 'minmax(0,.65fr)'},
+  {'key': 'returnDay', 'label': 'Return date', 'width': 'minmax(0,1.15fr)'},
+  {'key': 'returnTime', 'label': 'Time', 'width': 'minmax(0,.5fr)'},
   {'key': 'trip', 'label': 'Trip ID No.', 'width': 'minmax(0,.9fr)'},
   {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}
 ] %}

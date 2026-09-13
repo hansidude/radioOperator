@@ -138,6 +138,7 @@ def main(engine='chromium'):
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
             row = page.locator('[data-record="%s"]' % record)
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
+            expect(row).to_have_css('background-color', 'rgba(253, 126, 20, 0.1)')      # drafts are tinted orange
             expect(row.get_by_role('img', name='Member number', exact=True)).to_be_visible()
             expect(row.get_by_role('img', name='Vessel name', exact=True)).to_be_visible()
             expect(row.locator('[data-column="identity"]')).to_contain_text(vessel)
@@ -260,6 +261,12 @@ def main(engine='chromium'):
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
                 assert page.locator('.dc-record-wide').evaluate('el => el.getBoundingClientRect().width <= 1920'), 'Width cap'
                 expect(row.locator('[data-column="identity"]')).to_be_visible()
+                if width >= 1328:                       # dates and times are never cut off on a desktop
+                    cut = page.locator('#radioRecords').evaluate("""el => [...el.querySelectorAll(
+                        '[data-column="day"] .dc-record-grid-value, [data-column="returnDay"] .dc-record-grid-value, '
+                        + '[data-column="time"] .dc-record-grid-value, [data-column="returnTime"] .dc-record-grid-value')]
+                        .filter(v => v.scrollWidth > v.clientWidth + 1).map(v => v.textContent)""")
+                    assert not cut, 'Date/time cut off at %spx: %s' % (width, cut)
                 if width in (1920, 1328, 960, 900, 390):
                     page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
             page.set_viewport_size({'width': 1920, 'height': 1080})
@@ -274,6 +281,7 @@ def main(engine='chromium'):
             visit('/logons?status=loggedon&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
             expect(row.get_by_role('img', name='Logged on', exact=True)).to_be_visible()
+            expect(row).to_have_css('background-color', 'rgba(25, 135, 84, 0.1)')         # logged on: faint green
             visit('/logon/%s' % record)
             page.locator('#logoffNote').fill('Verification complete ' + token)
             page.locator('button[form="logoffForm"]').click()
@@ -282,6 +290,7 @@ def main(engine='chromium'):
             visit('/logons?status=closed&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
             expect(row.get_by_role('img', name='Logged off', exact=True)).to_be_visible()
+            expect(row).to_have_css('background-color', 'rgba(0, 0, 0, 0.3)')              # closed: near-black
             visit('/logon/%s#record' % record)
             expect(page.locator('#saveStatus')).to_have_text('Closed: read only')
             expect(page.locator('#ro-record-pane')).to_contain_text('Verification complete ' + token)
