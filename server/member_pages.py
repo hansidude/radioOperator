@@ -89,7 +89,7 @@ def members_page():
     q = (request.args.get('q') or '').strip()
     rows = M.members(cur, h.unit(), q)
     cur.close()
-    return _list_response('members.html', members=rows, search=q)
+    return _list_response('members.html', members=rows, search=q, matched=M.list_matched('members', rows, q))
 
 
 def _member_page(cur, h, member, failed=None, status=200):
@@ -357,7 +357,7 @@ def vessels_page():
     q = (request.args.get('q') or '').strip()
     rows = M.public_vessels(cur, h.unit(), q)
     cur.close()
-    return _list_response('vessels.html', vessels=rows, search=q)
+    return _list_response('vessels.html', vessels=rows, search=q, matched=M.list_matched('public', rows, q))
 
 
 def _vessel_context(cur, h, vessel, failed=None):

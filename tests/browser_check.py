@@ -395,6 +395,8 @@ def main(engine='chromium'):
             expect(page.locator('#roFoundPanel')).to_be_visible()
             page.locator('#roFindAll').fill(token)
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # refreshed with the search
+            visit('/radio/search?q=' + token)
+            expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()
             # Lines (cards only): each field of a card on one line of its own.
             lines = page.locator('[data-dc-record-view="lines"]:visible')
             expect(lines).to_be_disabled()
@@ -574,6 +576,28 @@ def main(engine='chromium'):
                 response = context.request.post(URL + '/logons/new', data={'fields': fixture})
                 assert response.status == 200, response.text()
                 layout_records.append(response.json()['id'])
+            # The same panel on the log, Members and Public vessels: closed until opened, remembered, refreshed with the rows.
+            for path, search_box, panel_id, gid, rows_id, answer in (('/logons', '#roSearch', '#roLogPanel', 'logons', '#roLiveRecords', '/logons/rows?'),
+                                                                      ('/members', '#roMemberSearch', '#roMemberPanel', 'members', '#roMemberRows', '/members?'),
+                                                                      ('/vessels', '#roVesselSearch', '#roVesselPanel', 'public', '#roVesselRows', '/vessels?')):
+                visit(path)
+                expect(page.locator(panel_id)).to_be_hidden()
+                page.locator('[data-dc-record-panel]:visible').click()
+                expect(page.locator(panel_id)).to_be_visible()
+                with page.expect_response(lambda r: answer in r.url and 'q=' + token in r.url):          # the search's own answer
+                    page.locator(search_box).fill(token)
+                section = page.locator('%s [data-matched="%s"]' % (panel_id, gid))
+                expect(section).to_be_visible()
+                rows = page.locator('%s .dc-record-grid-row' % rows_id)
+                expect(rows.first).to_be_visible()
+                expect(section.locator('.dc-record-panel-badge-heading')).to_have_attribute('title', re.compile(r': %d$' % rows.count()))   # the panel counts the rows shown
+                badge = section.locator('[data-matched-field]').first
+                expect(badge).to_be_visible()
+                assert badge.evaluate('b => b.tagName') == 'SPAN', 'A badge with nothing to open should be plain'
+                page.reload()
+                expect(page.locator(panel_id)).to_be_visible()
+                page.locator('[data-dc-record-panel]:visible').click()                          # closed again for the next run
+                expect(page.locator(panel_id)).to_be_hidden()
             # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
             visit('/logon/%s' % layout_records[0])
             expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
@@ -844,7 +868,8 @@ def main(engine='chromium'):
             visit('/logons')
             notice = page.locator('#roLiveAlerts .ro-alert', has=page.locator('a[href="/logon/%d"]' % overdue_record))
             expect(notice).to_be_visible(timeout=80000)
-            expect(page).to_have_title(re.compile(r'^\(\d+\) OVERDUE'), timeout=5000)
+            # The title flashes every second; expect's own polling settles at 1 s and can keep landing on the plain half.
+            page.wait_for_function("() => /^\\(\\d+\\) OVERDUE/.test(document.title)", polling=100, timeout=5000)
             visit('/logon/%d' % overdue_record)
             page.locator('button[form="logoffForm"]').click()
             page.wait_for_url(re.compile('/logons$'))

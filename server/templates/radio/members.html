@@ -16,10 +16,10 @@
 {{ ui.styles() }}
 {# The search is the server's, as on the log: typing swaps in the matching rows (DRY-CATALOG, htmx). #}
 <form id="roMemberFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Members filters" method="get" action="/members"
-      hx-get="/members" hx-target="#roMemberRows" hx-select="#roMemberRows" hx-swap="outerHTML"
+      hx-get="/members" hx-target="#roMemberRows" hx-select="#roMemberRows" hx-select-oob="#roMemberMatched" hx-swap="outerHTML"
       hx-trigger="input from:#roMemberSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roMemberView') }}
+  {{ view_controls('roMemberView', panel='roMemberPanel') }}
   {{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
-<div id="roMemberView"><div id="roMemberRows">{{ ui.members_grid(members, 'radioMembers') }}</div></div>
+<div id="roMemberView">{% call records_ui.record_panel('roMemberPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roMemberMatched', search, [('members', ui.WHO.member.symbol, 'Members', members, matched)]) }}{% endcall %}<div id="roMemberRows">{{ ui.members_grid(members, 'radioMembers') }}</div></div>
 {% endblock %}

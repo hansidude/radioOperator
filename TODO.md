@@ -119,6 +119,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
 - Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page) and
   Lines for cards (each field on one line of its own).
+- The log, Members and Public vessels have the same panel (starts closed, remembered per page, refreshed with the rows
+  and on the log's 30 s refresh; `_ui.matched_panel`, `members.list_matched`, `logons.matched_fields`).
 - Search has the shared side panel (panel button beside the view buttons): for each kind found, badges of the fields
   the search matched with how many records (`members.matched`, `logons.matched_fields`, the search's own matching;
   'Held by' and 'Across fields' too); a badge opens and scrolls to its kind.

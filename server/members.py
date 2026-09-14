@@ -114,13 +114,29 @@ def members(cur, unit, search=None):
     for r in rows:
         r['vessels'] = boats.get(r['id'], [])
         r['vesselNames'] = ', '.join(v['vesselName'] or v['registration'] for v in r['vessels'])
-    return _search(rows, search, ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'vesselNames'),
-                   extra=lambda r: ' '.join(v['registration'] or '' for v in r['vessels']))
+    fields, extra, _ = LIST_SEARCH['members']
+    return _search(rows, search, fields, extra=extra)
 
 
 def public_vessels(cur, unit, search=None):
     rows = _vessels(cur, unit, {}, public_only=True)
-    return _search(rows, search, VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'))
+    fields, extra, _ = LIST_SEARCH['public']
+    return _search(rows, search, fields, extra=extra)
+
+
+# What the Members and Public vessels pages search: (fields, extra text, the field the extra counts as in the panel).
+LIST_SEARCH = {'members': (('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'vesselNames'),
+                           lambda r: ' '.join(v['registration'] or '' for v in r['vessels']), 'vesselRegos'),
+               'public': (VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'), None, None)}
+
+
+def list_matched(kind, rows, q):
+    """For the Members or Public vessels page's panel: [(field, label, records)], what `q` matched in the rows
+    members() or public_vessels() found."""
+    if not (q or '').strip():
+        return []
+    fields, extra, extra_field = LIST_SEARCH[kind]
+    return [(f, MATCH_LABELS[f], n) for f, n in _matched_fields(rows, q, fields, extra, extra_field)]
 
 
 # ---------- one search over every radio record (the Search page and the log on's Vessel and Mobile pickers) ----------
@@ -166,7 +182,7 @@ def _held(cur, kind, by_member, by_vessel):
 
 
 HOLDER, ACROSS = 'holder', 'across'
-MATCH_LABELS = dict(LABELS, vesselNames='Vessels', holder='Held by', across='Across fields')
+MATCH_LABELS = dict(LABELS, vesselNames='Vessels', vesselRegos='Vessel regos', holder='Held by', across='Across fields')
 SEARCH = {'members': ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'address', 'notes', 'vesselNames'),
           'contacts': ('name', 'relationship', 'phone', 'email'),
           'vessels': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail', 'notes'),
@@ -260,16 +276,17 @@ def _search(rows, search, fields, extra=None):
     return [r for r in rows if hit(' '.join(str(r[f]) for f in fields if r.get(f)) + ' ' + (extra(r) if extra else ''))]
 
 
-def _matched_fields(rows, search, fields, extra=None):
+def _matched_fields(rows, search, fields, extra=None, extra_field=None):
     """What `search` matched in rows _search found with the same fields: [(field, records)] in `fields` order, then
-    'holder' (the holder's name) and 'across' (a record matched only by text running across its fields, a first
-    and last name together)."""
+    `extra_field` for the extra text (by default 'holder', the holder's name) and 'across' (a record matched only by
+    text running across its fields, a first and last name together)."""
+    extra_field = extra_field or HOLDER
     hit, counts = _matcher(search), {}
     for r in rows:
-        own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([HOLDER] if extra and hit(extra(r)) else [])
+        own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([extra_field] if extra and hit(extra(r)) else [])
         for f in own or [ACROSS]:
             counts[f] = counts.get(f, 0) + 1
-    return [(f, counts[f]) for f in fields + (HOLDER, ACROSS) if f in counts]
+    return [(f, counts[f]) for f in fields + (extra_field, ACROSS) if f in counts]
 
 
 def children(cur, kind, owner_id, owner='member'):

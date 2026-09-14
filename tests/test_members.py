@@ -535,6 +535,28 @@ class Members(unittest.TestCase):
         self.assertIn('title="Across fields: 1"', panel(found('Jane Smith')))                          # first and last name together
         self.assertIn('title="Notes: 1"  data-grp-key="radioSearch" data-grp-jump="logons" data-matched-field="notes"', panel(found('ramp')))   # log ons too
 
+    def test_the_log_members_and_public_vessels_panels_show_what_matched(self):
+        m = self.member(firstName='Jane', lastName='Smith')
+        self.vessel(m, vesselName='Sea Dog', registration='AB123Q')
+        self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public', 'ownerPhone': '0411222333'})
+        self.logon(registration='AB123Q', notes='Called from the ramp')
+        get = lambda url: self.a.get(url).get_data(as_text=True)
+        cases = [('/logons', 'roLogPanel', 'roMatched', 'q=ab123', 'logons', 'registration', 'Vessel Rego. No.'),
+                 ('/members', 'roMemberPanel', 'roMemberMatched', 'q=ab123', 'members', 'vesselRegos', 'Vessel regos'),
+                 ('/vessels', 'roVesselPanel', 'roVesselMatched', 'q=0411222333', 'public', 'ownerPhone', 'Owner phone')]
+        for url, panel_id, body_id, query, gid, field, label in cases:
+            page = get(url)
+            self.assertIn('data-dc-record-panel aria-controls="%s"' % panel_id, page)                    # the panel button
+            self.assertIn('id="%s" class="dc-record-panel" aria-label="What the search matched" data-open="0"' % panel_id, page)   # starts closed
+            self.assertIn('The fields a search matches show here.', page)
+            self.assertIn('#%s' % body_id, page)                                                         # refreshed with the rows (hx-select-oob)
+            found = get(url + '?' + query)
+            badge = '<span class="dc-record-panel-badge" title="%s: 1"  data-matched-field="%s">' % (label, field)   # plain: no group to open
+            self.assertIn('data-matched="%s"' % gid, found)
+            self.assertIn(badge, found)
+        self.assertIn('data-matched-field="registration"', get('/logons/rows?partial=1&q=ab123'))          # and on the log's 30s refresh
+        self.assertIn('0 records match “zzzz”', get('/members?q=zzzz'))
+
     def test_the_search_panel_counts_each_field_the_way_the_search_matches(self):
         rows = [{'firstName': 'Jane', 'lastName': 'Smith', 'mobile': '0412 345 678', 'holder': {'name': 'm1 Jane Smith'}},
                 {'firstName': 'Janet', 'lastName': 'Jones', 'mobile': '', 'holder': {'name': 'Blue Duck'}}]

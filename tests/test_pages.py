@@ -251,7 +251,8 @@ class Pages(unittest.TestCase):
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
             self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
         self.assertIn('data-dc-record-width aria-controls="roRecordView"', page)                    # shared page width button
-        self.assertIn('<div id="roRecordView"><div id="roLiveRecords">', page)
+        self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="What the search matched" data-open="0">', page)
+        self.assertIn('</aside><div id="roLiveRecords">', page)
         self.assertIn('data-navbar-controls="RadioLogs filters"', page)                             # lives in the navbar                    # outside what refreshes replace
         self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
         self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)
@@ -528,7 +529,7 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logons').get_data(as_text=True)
         self.assertRegex(page, r'<div id="roLiveAlerts">\s*<div class="ro-alerts">')
         self.assertIn('<a href="/logon/%d" class="fw-semibold">' % i, page)
-        self.assertIn('hx-select-oob="#roLiveAlerts"', page)                          # the 30 s refresh brings the strip too
+        self.assertIn('hx-select-oob="#roLiveAlerts,#roMatched"', page)                          # the 30 s refresh brings the strip too
         self.assertEqual(page.count("querySelectorAll('#roLiveAlerts .ro-alert.unseen')"), 1)   # one alarm, reading the strip
         rows = self.a.get('/logons/rows?partial=1').get_data(as_text=True)
         self.assertIn('<a href="/logon/%d" class="fw-semibold">' % i, rows)

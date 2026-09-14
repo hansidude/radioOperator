@@ -15,10 +15,10 @@
 {% block body %}
 {{ ui.styles() }}
 <form id="roVesselFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Public vessel filters" method="get" action="/vessels"
-      hx-get="/vessels" hx-target="#roVesselRows" hx-select="#roVesselRows" hx-swap="outerHTML"
+      hx-get="/vessels" hx-target="#roVesselRows" hx-select="#roVesselRows" hx-select-oob="#roVesselMatched" hx-swap="outerHTML"
       hx-trigger="input from:#roVesselSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roVesselView') }}
+  {{ view_controls('roVesselView', panel='roVesselPanel') }}
   {{ search_controls('roVesselSearch', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
-<div id="roVesselView"><div id="roVesselRows">{{ ui.vessels_grid(vessels, 'radioVessels', '0 public vessels') }}</div></div>
+<div id="roVesselView">{% call records_ui.record_panel('roVesselPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roVesselMatched', search, [('public', ui.WHO.public.symbol, 'Public vessels', vessels, matched)]) }}{% endcall %}<div id="roVesselRows">{{ ui.vessels_grid(vessels, 'radioVessels', '0 public vessels') }}</div></div>
 {% endblock %}

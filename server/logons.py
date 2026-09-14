@@ -340,7 +340,10 @@ def _search_hit(search):
 
 
 def matched_fields(rows, search):
-    """For the Search page's panel: [(field, label, records)], what `search` matched in log ons records() found."""
+    """For the log's and the Search page's panel: [(field, label, records)], what `search` matched in the log ons
+    records() found."""
+    if not (search or '').strip():
+        return []
     hit = _search_hit(search)
     counts = [(f, SEARCH_LABELS[f], sum(1 for r in rows if hit(r, f))) for f in SEARCH_FIELDS]
     return [c for c in counts if c[2]]

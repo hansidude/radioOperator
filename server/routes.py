@@ -141,7 +141,7 @@ def logons_page():
                      search=f['search'], sort=f['sort'])
     alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('logons.html', records=rows, filters=f, alerts=alerts, health=health,
+    return _page('logons.html', records=rows, filters=f, alerts=alerts, health=health, matched=L.matched_fields(rows, f['search']),
                  window=h.approaching_minutes, reference=L.reference)
 
 
@@ -162,6 +162,7 @@ def logons_rows():
     alerts, health = _alerts(cur, h)
     cur.close()
     response = make_response(_page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,
+                                   matched=L.matched_fields(rows, f['search']),
                                    current=request.args.get('current', type=int), window=h.approaching_minutes,
                                    reference=L.reference))
     view = urlencode([(k, v) for k, v in request.args.items(multi=True) if k not in ('partial', 'current')])
