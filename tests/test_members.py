@@ -652,11 +652,11 @@ class Members(unittest.TestCase):
         boat = self.a.get('/member/%d/vessels/new' % m).get_data(as_text=True)
         for name, emoji in (('hullColour', '🎨'), ('vesselType', '⛵'), ('make', '🏭'), ('model', '🏷️'), ('ais', '📡')):
             self.assertIn('<span class="ro-field-symbol" aria-hidden="true">%s</span>' % emoji, boat)
-        self.assertIn('<span title="Relationship"><span class="dc-record-grid-symbol">🤝</span> Relationship</span>', page)   # list headings
+        self.assertIn('<span title="Relationship"><span class="dc-record-grid-symbol">🤝</span> <span class="dc-record-word">Relationship</span></span>', page)   # list headings
         logon = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('<label for="f-channel"><span class="ro-field-symbol" aria-hidden="true">📻</span> How they logged on</label>', logon)
         self.assertIn('<label for="f-hullColour"><span class="ro-field-symbol" aria-hidden="true">🎨</span> Hull colour</label>', logon)
-        self.assertIn('<span title="Email"><span class="dc-record-grid-symbol">✉️</span> Email</span>', self.a.get('/members').get_data(as_text=True))
+        self.assertIn('<span title="Email"><span class="dc-record-grid-symbol">✉️</span> <span class="dc-record-word">Email</span></span>', self.a.get('/members').get_data(as_text=True))
 
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history

@@ -268,10 +268,10 @@ class Pages(unittest.TestCase):
         # The paper log's columns: # (the list's own count) and the status lead, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
         head = page[page.index('class="dc-record-grid-head"'):page.index('</div>', page.index('class="dc-record-grid-head"'))]
-        self.assertEqual([h.split('</span> ')[-1].split('</span>')[0] for h in head.split('<span title=')[1:]],
+        self.assertEqual([re.sub(r'<[^>]+>', '', h.split('</span> ', 1)[-1]) for h in head.split('<span title=')[1:]],   # words as record_grid's word spans
                          ['Status', 'Date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
                           'Departure', 'Going to', 'Return date', 'Time', 'Trip ID No.'])
-        self.assertIn('<span title="Member No."><span class="dc-record-grid-symbol">👤</span> Member No.</span>', head)
+        self.assertIn('<span title="Member No."><span class="dc-record-grid-symbol">👤</span> <span class="dc-record-word">Member</span> <span class="dc-record-word">No.</span></span>', head)
         self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)

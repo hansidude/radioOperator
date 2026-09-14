@@ -749,7 +749,24 @@ def main(engine='chromium'):
                     if (mobile) nodes.push(...el.querySelectorAll('.dc-record-grid-value'));
                     // A value cut off with … on purpose (Lines) hides its overflow; anything else spilling is a fault.
                     const spills = n => n.clientWidth && n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).overflowX === 'visible';
-                    return {mobile, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
+                    // A word is never split across lines (record_grid's words, no overflow-wrap: anywhere).
+                    const split = [];
+                    for (const v of el.querySelectorAll('.dc-record-grid-value, .dc-record-grid-head > span')) {
+                        const walk = document.createTreeWalker(v, NodeFilter.SHOW_TEXT);
+                        for (let t; (t = walk.nextNode());) for (const w of t.data.matchAll(/\S+/g)) {
+                            const r = document.createRange(); r.setStart(t, w.index); r.setEnd(t, w.index + w[0].length);
+                            if (new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1) split.push(w[0]);
+                        }
+                    }
+                    // Cards instead of rows only because the rows' columns, each at least its longest word, do not fit.
+                    const stacked = el.classList.contains('dc-record-grid-stacked');
+                    let rowsWouldOverflow = null;
+                    if (stacked) {
+                        el.classList.remove('dc-record-grid-stacked');
+                        rowsWouldOverflow = el.scrollWidth > el.clientWidth + 1;
+                        el.classList.add('dc-record-grid-stacked');
+                    }
+                    return {mobile, stacked, rowsWouldOverflow, split, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
                         heights: rows.map(r => r.getBoundingClientRect().height),
                         overflow: nodes.some(spills),
                         lines: !mobile || [...el.querySelectorAll('.dc-record-grid-value')].every(v => getComputedStyle(v).whiteSpace === 'nowrap'),
@@ -759,10 +776,16 @@ def main(engine='chromium'):
                 }""")
                 assert metrics['grid'], 'Shared grid stylesheet is missing: %s' % metrics
                 assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
-                if width >= 768:
-                    assert not metrics['mobile'], 'Desktop/tablet unexpectedly switched to cards at %spx' % width
+                assert not metrics['split'], 'Words split across lines at %spx: %s' % (width, metrics['split'])
+                if width >= 1328:
+                    assert not metrics['mobile'], 'Desktop unexpectedly switched to cards at %spx' % width
+                if width >= 768 and not metrics['stacked']:
+                    assert not metrics['mobile'], 'Tablet switched to cards without the rows overflowing at %spx' % width
                     # Row heights are not capped here: the table opens with Paragraphs on, so long values wrap.
                     assert metrics['aligned'], 'Headers and row columns do not align at %spx' % width
+                elif width >= 768:
+                    assert metrics['rowsWouldOverflow'], 'Cards chosen at %spx although the rows fit: %s' % (width, metrics)
+                    assert metrics['lines'], 'Cards for rows that did not fit are not one line per field at %spx' % width
                 else:
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
                     assert metrics['lines'], 'Phone cards are not one line per field by default at %spx' % width

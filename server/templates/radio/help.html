@@ -59,12 +59,12 @@
 <p>Every list (the log, Members, Public vessels, Search, a member's tabs) has the same view buttons beside its search. Try them on this sample:</p>
 <div class="ro-help-demo">
   <div id="roHelpToolbar" class="dc-record-toolbar ro-toolbar">{{ records_ui.view_controls('roHelpView', panel='roHelpPanel') }}</div>
-  {% set columns = [{'key': 'status', 'label': 'Status', 'symbol': ui.FIELD_SYMBOLS.watchStatus, 'width': 'minmax(2.5rem,.4fr)', 'kind': 'index'},
-                    {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.2fr)'},
-                    {'key': 'registration', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration, 'width': 'minmax(0,.8fr)'},
-                    {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
-                    {'key': 'destination', 'label': 'Going to', 'symbol': ui.FIELD_SYMBOLS.destination, 'width': 'minmax(0,1.6fr)'},
-                    {'key': 'notes', 'label': 'Notes', 'symbol': ui.FIELD_SYMBOLS.notes, 'width': 'minmax(0,1.6fr)'}] %}
+  {% set columns = [{'key': 'status', 'label': 'Status', 'symbol': ui.FIELD_SYMBOLS.watchStatus, 'kind': 'index'},
+                    {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName},
+                    {'key': 'registration', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration},
+                    {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile},
+                    {'key': 'destination', 'label': 'Going to', 'symbol': ui.FIELD_SYMBOLS.destination},
+                    {'key': 'notes', 'label': 'Notes', 'symbol': ui.FIELD_SYMBOLS.notes}] %}
   {% set rows = [{'id': 1, 'cells': {'status': ui.STATES.loggedOn.symbol, 'vesselName': 'Sample Sea Dog', 'registration': 'SAMPLE1', 'mobile': '0400 000 000', 'destination': 'Sample bay', 'notes': 'A sample row, not a record'}},
                  {'id': 2, 'cells': {'status': ui.STATES.draft.symbol, 'vesselName': 'Sample vessel with a long name to show truncation', 'registration': 'SAMPLE2', 'mobile': '0400 000 001', 'destination': 'A long sample destination beyond the harbour entrance and around the point', 'notes': 'Long values end in … on one line; hover shows all of it'}}] %}
   <div id="roHelpView">

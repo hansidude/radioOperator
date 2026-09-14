@@ -251,20 +251,20 @@
 <label for="{{ for_id }}">{% if FIELD_SYMBOLS.get(name) %}<span class="ro-field-symbol" aria-hidden="true">{{ FIELD_SYMBOLS[name] }}</span> {% endif %}{{ label }}</label>
 {%- endmacro %}
 {% set COLUMNS = [
-  {'key': 'status', 'label': 'Status', 'symbol': FIELD_SYMBOLS.watchStatus, 'width': 'minmax(5rem,.5fr)', 'kind': 'index'},
-  {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay, 'width': 'minmax(0,1.15fr)'},
-  {'key': 'time', 'label': 'Time', 'symbol': FIELD_SYMBOLS.callTime, 'width': 'minmax(0,.5fr)'},
-  {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'width': 'minmax(0,.8fr)'},
-  {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.2fr)'},
-  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration, 'width': 'minmax(0,.95fr)'},
-  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1.1fr)'},
-  {'key': 'vessel', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails, 'width': 'minmax(0,1.35fr)'},
-  {'key': 'pob', 'label': 'POB', 'symbol': FIELD_SYMBOLS.pob, 'width': 'minmax(0,.45fr)'},
-  {'key': 'departure', 'label': 'Departure', 'symbol': FIELD_SYMBOLS.departurePoint, 'width': 'minmax(0,1.1fr)'},
-  {'key': 'destination', 'label': 'Going to', 'symbol': FIELD_SYMBOLS.destination, 'width': 'minmax(0,1.2fr)'},
-  {'key': 'returnDay', 'label': 'Return date', 'symbol': FIELD_SYMBOLS.etaDay, 'width': 'minmax(0,1.15fr)'},
-  {'key': 'returnTime', 'label': 'Time', 'symbol': FIELD_SYMBOLS.eta, 'width': 'minmax(0,.5fr)'},
-  {'key': 'trip', 'label': 'Trip ID No.', 'symbol': FIELD_SYMBOLS.tripRef, 'width': 'minmax(0,.9fr)'},
+  {'key': 'status', 'label': 'Status', 'symbol': FIELD_SYMBOLS.watchStatus, 'kind': 'index'},
+  {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay},
+  {'key': 'time', 'label': 'Time', 'symbol': FIELD_SYMBOLS.callTime},
+  {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber},
+  {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName},
+  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration},
+  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile},
+  {'key': 'vessel', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails},
+  {'key': 'pob', 'label': 'POB', 'symbol': FIELD_SYMBOLS.pob},
+  {'key': 'departure', 'label': 'Departure', 'symbol': FIELD_SYMBOLS.departurePoint},
+  {'key': 'destination', 'label': 'Going to', 'symbol': FIELD_SYMBOLS.destination},
+  {'key': 'returnDay', 'label': 'Return date', 'symbol': FIELD_SYMBOLS.etaDay},
+  {'key': 'returnTime', 'label': 'Time', 'symbol': FIELD_SYMBOLS.eta},
+  {'key': 'trip', 'label': 'Trip ID No.', 'symbol': FIELD_SYMBOLS.tripRef},
   {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}
 ] %}
 {# The form box behind each column that logons.missing can name: a draft's still-needed values show as ? #}
@@ -449,9 +449,8 @@
 {# holders: rows from different members / public vessels (the Search page): a Held by column, and each row's own url. #}
 {% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False, holders=False) %}
 {% set grid = namespace(columns=[], rows=[]) %}
-{% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, ''),
-                                                               'width': 'minmax(0,1.3fr)' if loop.first else 'minmax(0,1fr)'}] %}{% endfor %}
-{% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'width': 'minmax(0,1.3fr)'}] %}{% endif %}
+{% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, '')}] %}{% endfor %}
+{% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by'}] %}{% endif %}
 {% set grid.columns = grid.columns + [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
@@ -480,12 +479,12 @@
                                                                 'email': m.email or '', 'vessels': m.vesselNames, 'action': action}}] %}
 {% endfor %}
 {{ records_ui.record_grid(display.rows, [
-  {'key': 'number', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'width': 'minmax(6rem,.7fr)', 'kind': 'index'},
-  {'key': 'firstName', 'label': 'First name', 'symbol': FIELD_SYMBOLS.firstName, 'width': 'minmax(0,1fr)'},
-  {'key': 'lastName', 'label': 'Last name', 'symbol': FIELD_SYMBOLS.lastName, 'width': 'minmax(0,1fr)'},
-  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
-  {'key': 'email', 'label': 'Email', 'symbol': FIELD_SYMBOLS.email, 'width': 'minmax(0,1.3fr)'},
-  {'key': 'vessels', 'label': 'Vessels', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.5fr)'},
+  {'key': 'number', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'kind': 'index'},
+  {'key': 'firstName', 'label': 'First name', 'symbol': FIELD_SYMBOLS.firstName},
+  {'key': 'lastName', 'label': 'Last name', 'symbol': FIELD_SYMBOLS.lastName},
+  {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile},
+  {'key': 'email', 'label': 'Email', 'symbol': FIELD_SYMBOLS.email},
+  {'key': 'vessels', 'label': 'Vessels', 'symbol': FIELD_SYMBOLS.vesselName},
   {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], key, empty) }}
 {% endmacro %}
 
@@ -501,12 +500,12 @@
                                                                 'details': vessel_summary(v, ''), 'action': action}}] %}
 {% endfor %}
 {{ records_ui.record_grid(display.rows, [
-  {'key': 'name', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.3fr)', 'kind': 'index'},
-  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration, 'width': 'minmax(0,.9fr)'},
-  {'key': 'holder', 'label': 'Held by', 'width': 'minmax(0,1.3fr)'},
-  {'key': 'owner', 'label': 'Owner', 'symbol': FIELD_SYMBOLS.ownerName, 'width': 'minmax(0,1.1fr)'},
-  {'key': 'phone', 'label': 'Owner phone', 'symbol': FIELD_SYMBOLS.ownerPhone, 'width': 'minmax(0,1fr)'},
-  {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails, 'width': 'minmax(0,1.4fr)'},
+  {'key': 'name', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'kind': 'index'},
+  {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration},
+  {'key': 'holder', 'label': 'Held by'},
+  {'key': 'owner', 'label': 'Owner', 'symbol': FIELD_SYMBOLS.ownerName},
+  {'key': 'phone', 'label': 'Owner phone', 'symbol': FIELD_SYMBOLS.ownerPhone},
+  {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails},
   {'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}], key, empty) }}
 {% endmacro %}
 
