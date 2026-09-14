@@ -328,6 +328,24 @@ SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registra
                  'departurePoint', 'notes')
 
 
+SEARCH_LABELS = dict(LABELS, tripRef='Trip ID No.', dayNumber='Day No.')
+
+
+def _search_hit(search):
+    """Whether a record's field holds what was searched: the words typed, a mobile also without its spaces."""
+    needle = str(search).strip().lower()
+    spaceless = re.sub(r'\s+', '', needle)          # 0412345678 finds 0412 345 678
+    return lambda r, field: r.get(field) is not None and (
+        needle in str(r[field]).lower() or (field == 'mobile' and spaceless in re.sub(r'\s+', '', str(r[field]))))
+
+
+def matched_fields(rows, search):
+    """For the Search page's panel: [(field, label, records)], what `search` matched in log ons records() found."""
+    hit = _search_hit(search)
+    counts = [(f, SEARCH_LABELS[f], sum(1 for r in rows if hit(r, f))) for f in SEARCH_FIELDS]
+    return [c for c in counts if c[2]]
+
+
 SORTS = ('newest', 'oldest', 'due')
 
 
@@ -354,11 +372,8 @@ def records(cur, unit, now, approaching_minutes, status=None, day=None, search=N
     if status == 'overdue':
         rows = [r for r in rows if r['condition'] == 'overdue']
     if search:
-        needle = str(search).strip().lower()
-        spaceless = re.sub(r'\s+', '', needle)          # 0412345678 finds 0412 345 678
-        rows = [r for r in rows
-                if any(needle in str(r[field]).lower() or (field == 'mobile' and spaceless in re.sub(r'\s+', '', str(r[field])))
-                       for field in SEARCH_FIELDS if r.get(field) is not None)]
+        hit = _search_hit(search)
+        rows = [r for r in rows if any(hit(r, field) for field in SEARCH_FIELDS)]
     rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=sort != 'oldest')
     return due_first(rows) if sort == 'due' else rows
 

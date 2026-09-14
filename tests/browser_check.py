@@ -373,6 +373,44 @@ def main(engine='chromium'):
             usual_width('#roFoundView', 'Search back in its container')
             page.locator('#roFindAll').fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
+            # The panel (view_controls + record_panel): what the search matched, as badges beside the results.
+            panel = page.locator('#roFoundPanel')
+            expect(panel).to_be_visible()
+            contact_names = page.locator('#roMatched [data-matched="contacts"] [data-matched-field="name"]')
+            expect(contact_names).to_be_visible()
+            expect(contact_names).to_have_attribute('title', re.compile(r'^Name: [0-9]+$'))
+            expect(contact_names.locator('[role="img"]')).to_have_text('🆘')
+            assert panel.bounding_box()['x'] + panel.bounding_box()['width'] <= page.locator('#roFound').bounding_box()['x'], 'The panel is not beside the results'
+            page.locator('[data-found="contacts"] > .grp-header').click()
+            expect(page.locator('#radioFoundContacts')).to_be_hidden()
+            contact_names.click()                                                                  # a badge opens its kind
+            expect(page.locator('#radioFoundContacts')).to_be_visible()
+            panel_button = page.locator('[data-dc-record-panel]:visible')
+            expect(panel_button).to_have_attribute('title', 'Hide panel')
+            panel_button.click()
+            expect(panel).to_be_hidden()
+            page.reload()                                                                          # remembered
+            expect(page.locator('#roFoundPanel')).to_be_hidden()
+            page.locator('[data-dc-record-panel]:visible').click()
+            expect(page.locator('#roFoundPanel')).to_be_visible()
+            page.locator('#roFindAll').fill(token)
+            expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # refreshed with the search
+            # Lines (cards only): each field of a card on one line of its own.
+            lines = page.locator('[data-dc-record-view="lines"]:visible')
+            expect(lines).to_be_disabled()
+            page.locator('[data-dc-record-view="cards"]:visible').click()
+            expect(lines).to_be_enabled()
+            lines.click()
+            expect(lines).to_have_attribute('aria-pressed', 'true')
+            cells = page.evaluate('''() => [...document.querySelector('#radioFoundMembers .dc-record-grid-row').querySelectorAll('.dc-record-grid-cell:not(.dc-record-grid-action)')]
+                .filter(c => c.offsetParent !== null && getComputedStyle(c).display !== 'none')
+                .map(c => ({top: c.getBoundingClientRect().top, height: c.getBoundingClientRect().height,
+                            wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace}))''')
+            assert len(cells) >= 3 and all(b['top'] >= a['top'] + a['height'] - 1 for a, b in zip(cells, cells[1:])), 'Lines: fields are not a line each: %s' % cells
+            assert all(c['height'] < 32 and c['wrap'] == 'nowrap' for c in cells), 'Lines: a field runs past one line: %s' % cells
+            lines.click()
+            page.locator('[data-dc-record-view="cards"]:visible').click()
+            expect(lines).to_be_disabled()
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
             toggle_all.click()

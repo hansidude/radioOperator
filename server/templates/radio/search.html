@@ -2,6 +2,7 @@
 {% import 'radio/_ui.html' as ui %}
 {% import 'myMacro_entity_nav.html' as entity_nav %}
 {% import 'myMacro_groups.html' as grp %}
+{% import 'myMacro_record_view.html' as records_ui %}
 {% from 'myMacro_filters.html' import search_controls %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-search me-1"></i>Search{% endblock %}
@@ -17,14 +18,40 @@
 {# One box over every radio record: log ons, members, emergency contacts, vessels, trailers and cars, in any field,
    notes included. Each kind is the same list its own page shows, and each row opens its record. The server searches
    (members.find, logons.records); typing swaps the results in, as on the log. #}
+{# Each kind: its group id, emoji and name, for its group and its section in the panel. #}
+{% set SHOWN = [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', logons), ('members', ui.WHO.member.symbol, 'Members', found.members),
+                ('contacts', ui.FIELD_SYMBOLS.name, 'Emergency contacts', found.contacts), ('vessels', ui.FIELD_SYMBOLS.vesselName, 'Vessels', found.vessels),
+                ('trailers', '🚚', 'Trailers', found.trailers), ('cars', '🚗', 'Cars', found.cars)] %}
+{% set SYMBOL = {} %}{% for gid, symbol, label, rows in SHOWN %}{% set _ = SYMBOL.update({gid: (symbol, label)}) %}{% endfor %}
 <form id="roSearchForm" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Search controls" method="get" action="/radio/search"
-      hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-swap="outerHTML"
+      hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-select-oob="#roMatched" hx-swap="outerHTML"
       hx-trigger="input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roFoundView') }}
+  {{ view_controls('roFoundView', panel='roFoundPanel') }}
   {{ grp.collapseAllButton('radioSearch', 'kinds') }}
   {{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}) }}
 </form>
-<div id="roFoundView"><div id="roFound">
+<div id="roFoundView">
+{# The panel: for each kind found, what the search matched in which field (members.matched, logons.matched_fields),
+   as badges; a badge opens and scrolls to its kind. Swapped in with the results. #}
+{% call records_ui.record_panel('roFoundPanel', 'What the search matched') %}
+<div id="roMatched">
+{% if search|length < 2 %}<div class="dc-record-empty">The fields a search matches show here.</div>
+{% else %}
+  {% for gid, symbol, label, rows in SHOWN if rows %}
+  <section class="dc-record-panel-section" data-matched="{{ gid }}">
+    {{ records_ui.panel_badge(symbol, label, rows|length, {'data-grp-key': 'radioSearch', 'data-grp-jump': gid}, heading=True) }}
+    <div class="dc-record-panel-badges">
+    {% for field, field_label, count in matched[gid] %}
+      {{ records_ui.panel_badge(ui.FIELD_SYMBOLS[field], field_label, count, {'data-grp-key': 'radioSearch', 'data-grp-jump': gid, 'data-matched-field': field}) }}
+    {% endfor %}
+    </div>
+  </section>
+  {% else %}<div class="dc-record-empty">0 records match “{{ search }}”</div>
+  {% endfor %}
+{% endif %}
+</div>
+{% endcall %}
+<div id="roFound">
 {% if search|length < 2 %}
   <div class="dc-record-empty">Type two or more characters: a name, number, rego, phone, email, place or anything in notes.</div>
 {% else %}
@@ -32,19 +59,19 @@
   {% if not total %}<div class="dc-record-empty ro-zero">0 records match “{{ search }}”</div>{% endif %}
   {# Each kind is a collapsible group (Quackit's myMacro_groups): the blue header with its count; a group collapsed
      stays collapsed for the next search in this browser. #}
-  {% macro found_group(gid, symbol, label, rows) %}
+  {% macro found_group(gid, shown, rows) %}
   {% set body = caller() %}
   {% call grp.group('radioSearch', gid, extra_attrs='data-found="' ~ gid ~ '"') %}
-  {{ grp.groupHeader('', symbol ~ ' ' ~ label, count=rows|length) }}
+  {{ grp.groupHeader('', shown[0] ~ ' ' ~ shown[1], count=rows|length) }}
   <div>{{ body }}</div>
   {% endcall %}
   {% endmacro %}
-  {% if logons %}{% call found_group('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', logons) %}{{ ui.record_list(logons, now, reference) }}{% endcall %}{% endif %}
-  {% if found.members %}{% call found_group('members', ui.WHO.member.symbol, 'Members', found.members) %}{{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endcall %}{% endif %}
-  {% if found.contacts %}{% call found_group('contacts', ui.FIELD_SYMBOLS.name, 'Emergency contacts', found.contacts) %}{{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endcall %}{% endif %}
-  {% if found.vessels %}{% call found_group('vessels', ui.FIELD_SYMBOLS.vesselName, 'Vessels', found.vessels) %}{{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endcall %}{% endif %}
-  {% if found.trailers %}{% call found_group('trailers', '🚚', 'Trailers', found.trailers) %}{{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endcall %}{% endif %}
-  {% if found.cars %}{% call found_group('cars', '🚗', 'Cars', found.cars) %}{{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endcall %}{% endif %}
+  {% if logons %}{% call found_group('logons', SYMBOL.logons, logons) %}{{ ui.record_list(logons, now, reference) }}{% endcall %}{% endif %}
+  {% if found.members %}{% call found_group('members', SYMBOL.members, found.members) %}{{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endcall %}{% endif %}
+  {% if found.contacts %}{% call found_group('contacts', SYMBOL.contacts, found.contacts) %}{{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endcall %}{% endif %}
+  {% if found.vessels %}{% call found_group('vessels', SYMBOL.vessels, found.vessels) %}{{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endcall %}{% endif %}
+  {% if found.trailers %}{% call found_group('trailers', SYMBOL.trailers, found.trailers) %}{{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endcall %}{% endif %}
+  {% if found.cars %}{% call found_group('cars', SYMBOL.cars, found.cars) %}{{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endcall %}{% endif %}
 {% endif %}
 </div></div>
 {{ grp.groupStyles() }}

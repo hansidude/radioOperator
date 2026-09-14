@@ -165,6 +165,8 @@ def _held(cur, kind, by_member, by_vessel):
     return rows
 
 
+HOLDER, ACROSS = 'holder', 'across'
+MATCH_LABELS = dict(LABELS, vesselNames='Vessels', holder='Held by', across='Across fields')
 SEARCH = {'members': ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'address', 'notes', 'vesselNames'),
           'contacts': ('name', 'relationship', 'phone', 'email'),
           'vessels': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail', 'notes'),
@@ -183,12 +185,21 @@ def find(cur, unit, q):
     by_member = {m['id']: m for m in everyone}
     vessels = _vessels(cur, unit, by_member)
     by_vessel = {v['id']: v for v in vessels}
-    holder_name = lambda r: r['holder']['name']
-    return {'members': _search(everyone, q, SEARCH['members']),
-            'contacts': _search(_held(cur, 'contacts', by_member, by_vessel), q, SEARCH['contacts'], extra=holder_name),
-            'vessels': _search(vessels, q, SEARCH['vessels'], extra=holder_name),
-            'trailers': _search(_held(cur, 'trailers', by_member, by_vessel), q, SEARCH['trailers'], extra=holder_name),
-            'cars': _search(_held(cur, 'cars', by_member, by_vessel), q, SEARCH['cars'], extra=holder_name)}
+    rows = {'members': everyone, 'vessels': vessels}
+    for kind in ('contacts', 'trailers', 'cars'):
+        rows[kind] = _held(cur, kind, by_member, by_vessel)
+    return {kind: _search(rows[kind], q, SEARCH[kind], extra=_found_extra(kind)) for kind in SEARCH}
+
+
+def _found_extra(kind):
+    """Beyond its own fields, find matches what a held record's holder is called."""
+    return None if kind == 'members' else (lambda r: r['holder']['name'])
+
+
+def matched(found, q):
+    """For the Search page's panel: {kind: [(field, label, records)]}, what find's `q` matched in each kind."""
+    return {kind: [(f, MATCH_LABELS[f], n) for f, n in _matched_fields(rows, q, SEARCH[kind], _found_extra(kind))]
+            for kind, rows in found.items()}
 
 
 def vessel_picks(cur, unit, q):
@@ -235,17 +246,30 @@ def mobile_picks(cur, unit, q):
     return out
 
 
-def _search(rows, search, fields, extra=None):
+def _matcher(search):
+    """How a search reads a piece of text: the words typed, or the same without spaces and dashes."""
     needle = (search or '').strip().lower()
-    if not needle:
-        return rows
     loose = re.sub(r'[\s\-]', '', needle)           # 0412345678 finds 0412 345 678, ab-123 finds AB123
-    out = []
+    return lambda text: needle in text.lower() or bool(loose and loose in re.sub(r'[\s\-]', '', text.lower()))
+
+
+def _search(rows, search, fields, extra=None):
+    if not (search or '').strip():
+        return rows
+    hit = _matcher(search)
+    return [r for r in rows if hit(' '.join(str(r[f]) for f in fields if r.get(f)) + ' ' + (extra(r) if extra else ''))]
+
+
+def _matched_fields(rows, search, fields, extra=None):
+    """What `search` matched in rows _search found with the same fields: [(field, records)] in `fields` order, then
+    'holder' (the holder's name) and 'across' (a record matched only by text running across its fields, a first
+    and last name together)."""
+    hit, counts = _matcher(search), {}
     for r in rows:
-        text = ' '.join(str(r[f]) for f in fields if r.get(f)) + ' ' + (extra(r) if extra else '')
-        if needle in text.lower() or (loose and loose in re.sub(r'[\s\-]', '', text.lower())):
-            out.append(r)
-    return out
+        own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([HOLDER] if extra and hit(extra(r)) else [])
+        for f in own or [ACROSS]:
+            counts[f] = counts.get(f, 0) + 1
+    return [(f, counts[f]) for f in fields + (HOLDER, ACROSS) if f in counts]
 
 
 def children(cur, kind, owner_id, owner='member'):

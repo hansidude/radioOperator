@@ -328,8 +328,9 @@ def search_page():
     found = M.find(cur, h.unit(), q)
     logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q) if len(q) >= 2 else []
     cur.close()
-    return _list_response('search.html', search=q, found=found, logons=logons, kinds=M.KINDS, labels=M.LABELS,
-                          reference=L.reference)
+    matched = dict(M.matched(found, q), logons=L.matched_fields(logons, q))
+    return _list_response('search.html', search=q, found=found, logons=logons, matched=matched, kinds=M.KINDS,
+                          labels=M.LABELS, reference=L.reference)
 
 
 @bp.route('/logons/who')

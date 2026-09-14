@@ -523,6 +523,34 @@ class Members(unittest.TestCase):
         self.assertIn('data-found="logons"', found('Tangalooma'))
         self.assertIn('0 records match', found('zzzz-nothing'))
         self.assertIn('0 records match', self.b.get('/radio/search?q=Jane').get_data(as_text=True))                    # own unit only
+        panel = lambda html: html[html.index('<div id="roMatched">'):html.index('<div id="roFound">')]
+        self.assertIn('data-dc-record-panel aria-controls="roFoundPanel"', page)                          # the panel button
+        self.assertIn('hx-select-oob="#roMatched"', page)                                                 # refreshed with each search
+        matched = panel(contacts)                                                                     # what matched, as badges
+        self.assertIn('data-matched="contacts"', matched)
+        self.assertIn('data-grp-jump="contacts" data-matched-field="phone"', matched)
+        self.assertIn('title="Phone: 1"', matched)
+        self.assertIn('<span role="img" aria-hidden="true">📱</span>', matched)
+        self.assertIn('title="Held by: ', panel(found('Jane Smith')))                                  # a holder's name
+        self.assertIn('title="Across fields: 1"', panel(found('Jane Smith')))                          # first and last name together
+        self.assertIn('title="Notes: 1"  data-grp-key="radioSearch" data-grp-jump="logons" data-matched-field="notes"', panel(found('ramp')))   # log ons too
+
+    def test_the_search_panel_counts_each_field_the_way_the_search_matches(self):
+        rows = [{'firstName': 'Jane', 'lastName': 'Smith', 'mobile': '0412 345 678', 'holder': {'name': 'm1 Jane Smith'}},
+                {'firstName': 'Janet', 'lastName': 'Jones', 'mobile': '', 'holder': {'name': 'Blue Duck'}}]
+        fields = ('firstName', 'lastName', 'mobile')
+        self.assertEqual(M._matched_fields(rows, 'jane', fields), [('firstName', 2)])
+        self.assertEqual(M._matched_fields(rows[:1], '0412345678', fields), [('mobile', 1)])             # spaces ignored, as the search does
+        self.assertEqual(M._matched_fields(rows[:1], 'jane smith', fields), [('across', 1)])
+        self.assertEqual(M._matched_fields(rows[1:], 'duck', fields, extra=lambda r: r['holder']['name']), [('holder', 1)])
+        self.assertEqual(M.matched({'members': rows}, 'jane'), {'members': [('firstName', 'First name', 2)]})
+        logons = [{'registration': 'AB123', 'mobile': '0412 345 678', 'notes': 'ab123 rack', 'tripRef': None}]
+        self.assertEqual(L.matched_fields(logons, 'ab123'), [('registration', 'Vessel Rego. No.', 1), ('notes', 'Notes', 1)])
+        self.assertEqual(L.matched_fields(logons, '0412345678'), [('mobile', 'Mobile Phone Number', 1)])
+        symbols = self.app.jinja_env.get_template('radio/_ui.html').module.FIELD_SYMBOLS                  # every badge has its emoji
+        for field in set(sum(M.SEARCH.values(), ())) | set(L.SEARCH_FIELDS) | {M.HOLDER, M.ACROSS}:
+            self.assertTrue(symbols.get(field), field)
+            self.assertIn(field, dict(M.MATCH_LABELS, **L.SEARCH_LABELS))
 
     def test_the_vessel_and_mobile_pickers_bring_their_member_or_public_vessel(self):
         m = self.member(mobile='0412000111')
