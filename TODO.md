@@ -6,10 +6,36 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ## Built (as of 2026-09-14)
 
-### RadioLogs list (`/logons`)
+### Radio Logs as its own program
 
-- Named **RadioLogs**: Quackit navbar link, page title, browser tab (`Host.brand`), and the green
-  `parent_link` button on a log on.
+- Quackit's menu keeps its **RadioLogs** link; every radio page then uses `radio/_layout.html` (Quackit's page shell
+  with the Radio Logs menu: the 📻 brand is the log, New log on, Members, Public vessels, Search, Help, Log out).
+  Browser tab and brand "Radio Logs" (`Host.brand`). No link back to Quackit (owner). The standalone shell draws the
+  same menu (`_ui.radio_menu`). Page links the menu covers are gone.
+- **Help** (`/radio/help`): the menu, the log, every view button (the real controls on sample rows), status symbols,
+  a log on, members and public vessels, Search and every field emoji.
+- Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History,
+  pickers): one map, `_ui.FIELD_SYMBOLS`.
+
+### Shared list views (every table/card list: the log, Members, Public vessels, Search, member tabs)
+
+- Quackit's `record_grid` with `view_controls`: **Cards** (at any width), **Paragraphs** (a line per field on cards,
+  wrapped values in rows), **Lines** (on by default: whenever records show as cards, chosen or on a narrow screen,
+  each field on one line of its own), text size A− / A+ / reset (remembered), **width** (usual ~1200px container or
+  full width, remembered per page) and, where a page has one, the **panel** button (remembered per page).
+- Every list numbers its records from 1 (# column, or the card's corner), numbered again after a row search.
+- The side **panel** sits left of the list, in the page margin when there is room (the list does not move), and shows
+  what the search matched in which field as badges with counts. On Search it starts open and a badge filters the
+  results (yellow **Filter applied** bar, Clear filter); on the log, Members and Public vessels it starts closed and
+  the badges are plain (`_ui.matched_panel`, `members.matched` / `list_matched` / `narrow`, `logons.matched_fields` /
+  `matched_rows`).
+- **🔎 Search** (`/radio/search`): one box over log ons, members, emergency contacts, vessels, trailers and cars, any
+  field including notes, each kind a collapsible group (collapse / expand all; remembered), usual ~1200px width; rows
+  open their record (`members.find`, `logons.records`).
+- The member, public vessel and contact / vessel / trailer / car pages (new and edit) are at the usual ~1200px width.
+
+### The log (`/logons`)
+
 - One collection through Quackit's shared `record_grid`: compact aligned rows on desktop/tablet,
   labelled cards at phone width, paper-log column order, width capped at 1920px.
 - Toolbar: status (All, Drafts, Logged on, Overdue, Closed; default All), call date (default today,
@@ -18,19 +44,16 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   Quackit's htmx; state kept in the URL; 30s refresh.
 - Due first: overdue, then by return time; drafts and closed after, newest call first. One rule,
   `logons.due_first`, also used by `queue()`.
-- Status symbol after the daily number (emoji with accessible name). Member No. and Vessel Name are separate
-  columns. Every column heading carries its symbol beside the word (📅 Date, 👤 Member No., 🛥️ Vessel Name,
+- Columns: #, 🚦 Status (the status symbol, with its accessible name), the call's details, 🎫 Trip ID No. last.
+  Member No. and Vessel Name are separate columns. Every column heading carries its symbol beside the word (📅 Date, 👤 Member No., 🛥️ Vessel Name,
   🔖 Rego …) so operators learn them; one-line cards show the symbol alone, the word in its tooltip.
-- View buttons (Quackit's shared `record_grid` `view_controls`): **Cards** at any width, fields on one
-  line; **Paragraphs**, a line per field (or wrapped row values). The table opens with Paragraphs on
-  (values wrap in full); cards open with it off (one line). Each view keeps its own choice. Kept across refreshes, not across
-  page loads. Text size buttons (A−, 100–200%, A+, reset) grow the list's text, symbols and icons;
-  remembered in this browser.
+- The table opens with Paragraphs on (values wrap in full). View choices survive the 30 s refresh.
 - Draft rows show what still blocks Accept as an orange `?` (after its symbol on cards, in the cell on rows);
   other empty fields stay blank. Logged-on and closed rows show no `?`.
 - Rows tinted faintly by status: draft orange, logged on green, overdue red, closed near-black.
 - Dates always carry a 2-digit year (`Sun 13/9/26`); times always 4-digit 24-hour (`1400`).
-- Daily `No.` counts from 1 per call date; `Trip ID No.` (`T-00042`) is the record's key.
+- **No daily number** (spec 1.1 REC-9, owner 2026-09-14): a log on is named by its `Trip ID No.` (`T-00042`)
+  everywhere (titles, alerts, links). `dayNumber` / `dayDate` are gone from the schema, dropped on port 80.
 - Overdue alerts on the page: pulse, count in the blinking tab title and beep until **Seen** is
   pressed. The owner decided this stays (Seen stops it). An alert goes the moment its cause does: a log off, discard or save resolves
   that log on's alerts (`watch.settle`, the checker's own rule), and the 30 s refresh swaps the alert strip too, so a
@@ -39,7 +62,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 ### Log on form (`/logon/<id>`, `/logons/new`)
 
 - The page shows the record's status large, with the log's symbol and word (📝 Draft, 👀 Logged on,
-  🚨 Overdue, ✅ Logged off, 🏠 Never departed, 🗑️ Discarded). Tabs: Log on and History only.
+  🚨 Overdue, ✅ Logged off, 🏠 Never departed, 🗑️ Discarded). Tabs: Log on, the 👤 Member / 🌐 Public vessel tab once
+  one is picked, History.
 - Five paper rows on the Log on tab: Date | Time; Member No. | Vessel Name | Rego | Mobile;
   Length | Hull colour | Make | Model; POB | Departure | Going to; Return day | Time. Then Notes (three lines,
   grows), back on the form since 2026-09-14: the only notes box. Log off saves what is in it; the separate
@@ -53,6 +77,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - A log on cannot lose its mandatory set: a save that would empty or make unreadable POB, departure,
   going to, the return day/time or the second ID is refused, nothing written, those boxes red (ACC-1, WAT-10).
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
+- **Log off** and **Discard draft** ask first in Quackit's confirm box, naming the log on and vessel (Cancel focused).
+  A logged-off log on or discarded draft has **Reopen** with a reason (§3.3, AC-36; `logons.reopen`), also confirmed:
+  back on the watch (deadline checked at once) or back to a draft; the closure stays in History.
 - Mobile: exactly 10 digits, saved and shown as `0412 345 678` (spaces while typing are fine); anything else
   is kept as typed and red. Search finds it with or without spaces.
 - Orange boxes: with Member No. or Vessel Name heard, the other empty one turns orange (worth asking for,
@@ -68,7 +95,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Members and public vessels (`/members`, `/member/<id>`, `/vessels`, `/vessel/<id>`)
 
-- Reached from the RadioLogs navbar (Members, Public vessels); neither list links to the other. Lists through
+- Reached from the Radio Logs menu. Lists through
   Quackit's `record_grid`, server search swapped in by htmx like the log.
 - A member: Member No. issued automatically as `m00001`, first name and last name (both required), Mobile Phone
   Number (the log on's rule: 10 digits, shown `0412 345 678`), email, address, notes (a text box that grows). Listed by last name. Tabs (Quackit's
@@ -111,34 +138,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - The "Member or public user" row also has **🛥️ Vessel** (every vessel, a member's or public: a member's vessel brings its
   member), **📱 Mobile** (members' mobiles, public vessel owners' phones and emergency contacts' phones; picks the member or
   public vessel the number belongs to and fills an empty Mobile) and **🔎 Search** (the Search page in a new tab).
-- **🔎 Search** page (`/radio/search`, on the RadioLogs navbar): one box over log ons, members, emergency contacts,
-  vessels, trailers and cars, in any field including notes, grouped by kind as each kind's own list; each kind
-  collapses from its header, and myTimes' collapse / expand all button does every kind (Quackit's `myMacro_groups`,
-  remembered in this browser across searches); the page is Quackit's usual ~1200px width (`mySpacing`), as are the member, public vessel and
-  contact / vessel / trailer / car pages (new and edit); rows open their
-  record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
-- Radio Logs is its own program inside Quackit: `radio/_layout.html` (Quackit's shell, Radio Logs menu: New log on,
-  Members, Public vessels, Search, Help, Log out; the brand is the log; title "Radio Logs"). Quackit's RadioLogs link
-  stays. Per-page links the menu covers are gone. Help page `/radio/help` explains every feature with the real
-  controls on a sample.
-- Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page) and
-  Lines for cards (each field on one line of its own; on by default, for chosen and narrow-screen cards alike).
-- Every table/card list numbers its records from 1 (# column / card corner), renumbered after a row search.
-- The log on's pickers show emoji: 👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile (rows 👤 / 🌐 / 🆘 by whose number).
-- Log off and Discard draft ask first in Quackit's confirm box, naming the log on and vessel. A closed log on (or
-  discarded draft) has Reopen with a reason (§3.3, AC-36; `logons.reopen`), also confirmed.
-- No daily number (spec 1.1 REC-9): a log on is named by its Trip ID No. everywhere; the log's columns are #, Status,
-  … Trip ID No. last. `dayNumber` / `dayDate` removed from the schema and dropped on port 80 (8080 is the owner's to migrate; its
-  destructive file will also drop the old tables/columns listed in the worklog).
-- The log, Members and Public vessels have the same panel (starts closed, remembered per page, refreshed with the rows
-  and on the log's 30 s refresh; `_ui.matched_panel`, `members.list_matched`, `logons.matched_fields`).
-- Search has the shared side panel (panel button beside the view buttons): for each kind found, badges of the fields
-  the search matched with how many records (`members.matched`, `logons.matched_fields`, the search's own matching;
-  'Held by' and 'Across fields' too). Clicking a badge filters the results to that kind (or that kind's records matched
-  in that field; `kind`/`field` in the address, `members.narrow`, `logons.matched_rows`), shown by a yellow Filter
-  applied bar with Clear filter; the same badge again or a new search takes it off.
-- Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
-  one map, `_ui.FIELD_SYMBOLS`.
+  The log's own search matches departure point and notes too.
+- The log on's pickers (Quackit's SearchPicker) show emoji in the title, steps, label and rows: 👤 Member, 🌐 Public
+  user, 🛥️ Vessel, 📱 Mobile (rows 👤 / 🌐 / 🆘 by whose number).
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
   8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's
@@ -164,6 +166,16 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Decisions waiting on the owner
 
+- [ ] **8080 is behind.** The last `myUpdate` (started 2026-09-14, detached) pulled what was on origin then; later
+      commits (the Status column and Trip ID No. naming, the confirm box and Reopen, picker emoji) need another
+      `. myUpdate` in `~/personalDb`. 8080's own migrations are the owner's: members' name/mobile, notes, emergency
+      contacts on public vessels, and dropping `dayNumber` / `dayDate`. Read 8080's generated destructive file before
+      executing: on port 80 it also dropped old leftovers (tables `DocumentAttachments`, `AttachmentsNP`; columns
+      `LogOns.captureStatus`, `Members_history.name` / `phone`, six `Attachments` columns) and made five columns NOT NULL.
+- [ ] **Leftover index.** `uniq_logons_daynumber` stays on `LogOns`, now on `unit` only: the migration manager never
+      drops an index a schema stops declaring.
+      1. Extend the migration manager to propose dropping such indexes (destructive file)
+      2. Leave it (harmless)
 
 - [ ] **"Due soon".** Owner, 2026-09-13: *"i dont want due soon"*. A logged-on record within 30 minutes
       of its return still shows a yellow `Due in n min` badge (`_ui.html` `cond`), and the watcher still
@@ -177,7 +189,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
       1. Show the server's reason beside "Not saved"
       2. Leave it
 - [ ] **Spec PDF is behind.** `vessel-logon-spec.pdf` has not been regenerated since the v1.1 changes (ACC-3,
-      state names, ACC-1, CAP-24, ACC-9); the Markdown is current. README "Updating the documents" has the steps.
+      state names, ACC-1, CAP-24, ACC-9, REC-9 Trip ID No.); the Markdown is current. README "Updating the documents" has the steps.
 - [ ] **CAP-19 spec conflict.** `vessel-logon-spec.md` CAP-19 requires immediate durable creation; the
       owner chose explicit Save. Update CAP-19 and audit the ACC/WAT requirements that lean on it.
 - [ ] **Trip ID collisions.** `tripRef` is issued state-wide in the real system; this branch allocates its
@@ -201,6 +213,8 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Values filled from a picked member or vessel are recorded as heard on the call (`Identifiers.source = 'call'`).
       IDV-1 says a value applied from a record does not corroborate; they should be `profile`. Hidden while the
       identity check is set aside.
+- [ ] Removing a contact / vessel / trailer / car still asks with the browser's own "Remove this?" box, not Quackit's
+      confirm box (`logon.html` / member tabs, `data-ro-remove`).
 - [ ] Members and public vessels cannot be removed (only a member's contacts, vessels, trailers and cars can).
       The browser check therefore leaves per run on port 80: one `Verify Member …` with vessels `VERIFY-…` and
       `NEWBOAT-…`, and public vessels `PUBLIC-…` and `NEWPUB-…`.
@@ -214,8 +228,8 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
       tabs (owner: *"all these fields are shit"*). Out of sight until then: departure, radio
       channel, contact, AIS, vessel type/details (values kept, not editable); Find and apply an
       earlier trip; the identity check's evidence, including IDV-1's "applied, so it does not corroborate"
-      (still computed, shown nowhere); Still to ask; the Heard list; reopening a closed record (route kept,
-      no button); the log off reason (always "returned"). `_ui.html` find, find_script and verification
+      (still computed, shown nowhere); Still to ask; the Heard list; the log off reason (always "returned").
+      (Reopening a closed record is back, with its own button, since 2026-09-14.) `_ui.html` find, find_script and verification
       macros and the page route's gaps/identifiers/verified values are unused until then.
 
 - [ ] Remove `logons.rename_statuses` and `STATUS_RENAMES` once 8080 and every other database has been
@@ -229,5 +243,7 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 
 - [ ] Consolidate the Quackit UI duplicates listed in `DRY-CATALOG.md` (compact toggles, context combo
       enhancement, old attachment macros). The catalog lists them; none is extracted yet.
-- [ ] The RadioLogs toolbar search uses Quackit's `search_controls`, which still writes "Search.." inside the box.
+- [ ] Move the hand-copied collapse / expand all toggles (`myMacro_listitems.html` days and weeks, the Assets timeline)
+      onto `myMacro_groups.collapseAllButton`, and Listboard's own sidebar onto `record_panel` (Quackit).
+- [ ] The log's toolbar search (and every list's) uses Quackit's `search_controls`, which still writes "Search.." inside the box.
       The owner's rule is a label on top (DRY-CATALOG.md "Owner's standing UI rules"); fix it on Quackit's owner.
