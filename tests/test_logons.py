@@ -41,6 +41,16 @@ class LogOns(unittest.TestCase):
         L.accept(self.cur, i, 'alice', at)
         return i
 
+    def test_statuses_stored_under_the_old_words_are_renamed_once(self):   # owner, 2026-09-13
+        on, off, draft = self.accepted(rego='AA1'), self.accepted(rego='BB2', member='2'), L.create(self.cur, 'alice', '', T0)
+        L.log_off(self.cur, off, 'alice', T0, 'back')
+        self.cur.execute("UPDATE LogOns SET watchStatus = 'watching' WHERE id = %s", (on,))       # as written before the rename
+        self.cur.execute("UPDATE LogOns SET watchStatus = 'loggedoff' WHERE id = %s", (off,))
+        self.assertEqual(L.rename_statuses(self.cur), 2)
+        self.assertEqual([L.get(self.cur, i)['watchStatus'] for i in (on, off, draft)], ['loggedOn', 'loggedOff', 'draft'])
+        self.assertEqual(L.rename_statuses(self.cur), 0)                                          # nothing left to do
+        self.assertEqual(L.queue(self.cur, '', T0, 30)[0]['id'], on)                               # watched again under the new word
+
     def test_an_empty_draft_persists_owned_and_is_not_watched(self):  # AC-1, CAP-1, CAP-2, ACC-2
         i = L.create(self.cur, 'alice', 'unitA', T0)
         row = L.get(self.cur, i)

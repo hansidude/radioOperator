@@ -283,8 +283,14 @@
   {% set gaps = namespace(keys=[]) %}
   {% if state(r)|trim == 'draft' %}{% for m in r.missing %}{% for b in m.boxes %}{% set gaps.keys = gaps.keys + [BOX_COLUMNS[b]] %}{% endfor %}{% endfor %}{% endif %}
   {% set action %}<a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open record {{ reference(r) }}" aria-label="Open record {{ reference(r) }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
+  {# Owner, issue l: navigate by the record IDs already tied to the log on, never guess from its written values.
+     Removed member vessels remain on the member's Vessels tab; their edit route no longer opens. #}
+  {% set member_url = '/member/' ~ r.memberId if r.memberId else none %}
+  {% set vessel_url = ((member_url ~ '#vessels') if r.vesselGone else (member_url ~ '/vessels/' ~ r.vesselId)) if member_url and r.vesselId else ('/vessel/' ~ r.vesselId if r.vesselId and not r.vesselGone else none) %}
   {% set display.rows = display.rows + [{
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''), 'missing': gaps.keys,
+    'links': {'member': member_url or vessel_url, 'vesselName': vessel_url, 'rego': vessel_url,
+              'mobile': member_url or vessel_url, 'vessel': vessel_url},
     'cells': {'status': state_label(r), 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
               'member': member_cell(r, 'member' in gaps.keys), 'vesselName': not_current(r.vesselName, r.vesselGone),
               'rego': not_current(r.registration, r.vesselGone), 'mobile': not_current(r.mobileBox, r.mobileGone),

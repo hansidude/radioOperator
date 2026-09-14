@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from server import logons as L
 from server import members as M
@@ -187,6 +188,35 @@ class Members(unittest.TestCase):
         self.assertTrue(self.a.get('/vessel/%d' % own['id']).location.endswith('/member/%d#vessels' % m))
 
     # ---- a log on is a member's or a public user's ----
+
+    def test_log_identity_fields_link_to_related_records_in_log_refresh_and_search(self):
+        m = self.member()
+        self.vessel(m)
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        logon = self.logon(memberNumber='m00001', vesselId=str(vessel['id'])).json['id']
+        destinations = {'member': '/member/%d' % m, 'mobile': '/member/%d' % m,
+                        'vesselName': '/member/%d/vessels/%d' % (m, vessel['id']),
+                        'rego': '/member/%d/vessels/%d' % (m, vessel['id'])}
+        for path in ('/logons?status=all', '/logons/rows?partial=1&f=1&status=all', '/radio/search?q=AB123Q'):
+            soup = BeautifulSoup(self.a.get(path).data, 'html.parser')
+            for column, destination in destinations.items():
+                cell = soup.select_one('#radioRecords [data-record="%d"] [data-column="%s"]' % (logon, column))
+                self.assertEqual(cell.name, 'a', (path, column))
+                self.assertEqual(cell['href'], destination)
+                self.assertIsNotNone(cell.select_one('.dc-record-grid-value-symbol, .dc-record-symbol'))
+                self.assertEqual(self.a.get(destination).status_code, 200)
+
+        public = self.a.post('/vessels/new', data={'vesselName': 'Public boat', 'registration': 'PB123',
+                                                  'ownerName': 'Alex', 'ownerPhone': '0411222333'})
+        public_id = int(public.location.rsplit('/', 1)[1])
+        public_log = self.logon(vesselId=str(public_id)).json['id']
+        unlinked = self.logon(vesselName='Unlinked', registration='UNK01').json['id']
+        soup = BeautifulSoup(self.a.get('/logons?status=all').data, 'html.parser')
+        for column in ('member', 'mobile', 'vesselName', 'rego'):
+            cell = soup.select_one('#radioRecords [data-record="%d"] [data-column="%s"]' % (public_log, column))
+            self.assertEqual(cell['href'], '/vessel/%d' % public_id)
+            cell = soup.select_one('#radioRecords [data-record="%d"] [data-column="%s"]' % (unlinked, column))
+            self.assertEqual(cell.name, 'div')
 
     def test_a_member_number_that_is_a_member_ties_the_log_on_to_that_member(self):
         m = self.member()
@@ -429,6 +459,9 @@ class Members(unittest.TestCase):
             self.assertEqual(html.count('<span class="ro-not-current" title="%s">' % gone_vessel), 2, page)   # Vessel Name and Rego
             self.assertIn('<span class="ro-not-current" title="%s">' % gone_mobile, html)
             self.assertIn('<span class="ro-not-current-value"><span class="dc-record-word">Sea</span> <span class="dc-record-word">Dog</span></span>', html)
+            soup = BeautifulSoup(html, 'html.parser')
+            for column in ('vesselName', 'rego'):
+                self.assertEqual(soup.select_one('#radioRecords [data-column="%s"]' % column)['href'], '/member/%d#vessels' % m)
         self.assertIn(gone_vessel, self.a.get('/logons/rows?partial=1&f=1&status=all').get_data(as_text=True))           # and the refresh
 
         # the log on page: the removed vessel still shown, marked, and a note under each box

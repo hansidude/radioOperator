@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import os
 from pathlib import Path
 import re
+import time
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 from playwright.sync_api import sync_playwright, expect
@@ -16,6 +17,8 @@ ARTIFACTS = Path('/artifacts')
 
 
 def main(engine='chromium'):
+    started = time.monotonic()
+    print('RUN %s radio browser checks' % engine, flush=True)
     token = uuid4().hex[:10].upper()
     vessel = 'VERIFY-' + token
     today = date.today().isoformat()
@@ -84,7 +87,9 @@ def main(engine='chromium'):
             page.goto(URL + '/login')
             page.locator('input[name=username]').fill(os.environ.get('RADIO_USER', 'test'))
             page.locator('input[name=password]').fill(os.environ.get('RADIO_PASS', 'test'))
-            page.locator('button[type=submit], input[type=submit]').first.click()
+            # Submit from the focused password box so first-load layout movement cannot make
+            # the mouse miss Login (Firefox once completed its click without a form POST).
+            page.locator('input[name=password]').press('Enter')
             # Let the post-login page finish loading: navigating away mid-load leaves Firefox running
             # htmx's start-up on a document that has no body yet, reported as a page error.
             page.wait_for_url(lambda url: '/login' not in url, wait_until='load')
@@ -693,7 +698,7 @@ def main(engine='chromium'):
             poll.goto(URL + '/logons?status=draft&day=' + today + '&q=' + vessel)
             expect(poll.locator('[data-record="%s"]' % record)).to_have_count(1)
             with poll.expect_response(rows_for(q=vessel)):
-                poll.clock.run_for(30000)
+                poll.clock.fast_forward(30000)
             expect(poll.locator('[data-record="%s"]' % record).get_by_role('img', name='Draft', exact=True)).to_be_visible()
             poll.close()
             # Review density with sparse and populated rows, like the owner's
@@ -1068,6 +1073,24 @@ def main(engine='chromium'):
                 callDay=today, callTime='06:10', memberNumber=member_no, vesselId=str(kept_id), mobile='0412345678')})
             assert old_logon.status == 200 and not old_logon.json()['accepted'], old_logon.text()
             layout_records.append(old_logon.json()['id'])                                       # a draft: discarded at the end
+            # Owner, issue l: each identity field's emoji and words open its actual member or vessel.
+            member_href = urlsplit(member_page).path
+            vessel_href = member_href + '/vessels/' + str(kept_id)
+            for width in (1920, 390):
+                page.set_viewport_size({'width': width, 'height': 1080})
+                for column, target in (('member', member_href), ('vesselName', vessel_href),
+                                       ('rego', vessel_href), ('mobile', member_href)):
+                    visit('/logons?f=1&status=all&dayOn=0&q=' + token)
+                    linked_row = page.locator('[data-record="%s"]' % old_logon.json()['id'])
+                    field = linked_row.locator('[data-column="%s"]' % column)
+                    expect(field).to_have_attribute('href', target)
+                    symbol = '.dc-record-grid-symbol' if width == 390 else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value-symbol')
+                    field.locator(symbol).click()
+                    page.wait_for_url(re.compile(re.escape(target) + r'(?:#details)?$'))
+                visit('/logons?f=1&status=all&dayOn=0&q=' + token)
+                page.locator('[data-record="%s"]' % old_logon.json()['id']).screenshot(path=str(ARTIFACTS / ('radio-linked-fields-%s-%s.png' % (width, engine))))
+            page.set_viewport_size({'width': 1920, 'height': 1080})
+            page.goto(URL + member_href + '#vessels')
             kept.locator('a[title="Open vessel"]').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/%d$' % kept_id))           # its confirm: the page's accept-all handler
             page.get_by_role('button', name='Remove').click()
@@ -1077,7 +1100,7 @@ def main(engine='chromium'):
             page.locator('#ro-member-details button.btn-warning').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+#details$'))
             expect(page.locator('#member-mobile')).to_have_value('0499 000 222')                 # saved: written back formatted
-            visit('/logons?status=all')
+            visit('/logons?status=all&q=' + token)
             old_row = page.locator('[data-record="%s"]' % old_logon.json()['id'])
             expect(old_row.locator('[data-column="vesselName"] .ro-not-current')).to_have_attribute('title', re.compile(r'^Not current: Vessel removed from %s on \w{3} ' % member_no))
             expect(old_row.locator('[data-column="vesselName"]')).to_contain_text('⚠️')
@@ -1086,29 +1109,34 @@ def main(engine='chromium'):
             expect(old_row.locator('[data-column="mobile"] .ro-not-current')).to_have_attribute('title', "Not current: %s's mobile is now 0499 000 222" % member_no)
             assert float(old_row.locator('[data-column="mobile"] .ro-not-current-value').evaluate('e => getComputedStyle(e).opacity')) < 1, 'Not current value is not faded'
             old_row.screenshot(path=str(ARTIFACTS / ('radio-not-current-%s.png' % engine)))       # the row: the whole log is too tall
+            expect(old_row.locator('[data-column="vesselName"]')).to_have_attribute('href', member_href + '#vessels')
+            old_row.locator('[data-column="vesselName"] .dc-record-grid-value-symbol').click()
+            page.wait_for_url(re.compile(re.escape(member_href) + r'#vessels$'))
+            expect(page.locator('#radioMemberVessels .ro-removed').filter(has_text=kept_name)).to_have_count(1)
             visit('/logon/%s' % old_logon.json()['id'])
             expect(page.locator('#roWhoNow [data-who="vessel"].ro-removed')).to_contain_text('Removed')
             expect(page.locator('[data-not-current="vesselName"]')).to_contain_text('Vessel removed from ' + member_no)
             expect(page.locator('[data-not-current="mobile"]')).to_contain_text("%s's mobile is now 0499 000 222" % member_no)
-            # An overdue notice: raised by the real checker, brought onto an open page by the 30 s refresh (no reload),
-            # and gone the moment its log on is logged off.
-            overdue = context.request.post(URL + '/logons/new', data={'fields': dict(
-                callDay=today, callTime='00:05', registration='OVERDUE-' + token, mobile='0499000111', pob='1',
-                departurePoint='Marina', destination='Verification overdue', eta='12:00',
-                etaDay=(date.today() - timedelta(days=1)).isoformat())})
-            assert overdue.status == 200 and overdue.json()['accepted'], overdue.text()
-            overdue_record = overdue.json()['id']
-            visit('/logons')
-            notice = page.locator('#roLiveAlerts .ro-alert', has=page.locator('a[href="/logon/%d"]' % overdue_record))
-            expect(notice).to_be_visible(timeout=80000)
-            # The title flashes every second; expect's own polling settles at 1 s and can keep landing on the plain half.
-            page.wait_for_function("() => /^\\(\\d+\\) OVERDUE/.test(document.title)", polling=100, timeout=5000)
-            visit('/logon/%d' % overdue_record)
-            page.locator('button[form="logoffForm"]').click()
-            page.locator('#qcOk').click()
-            page.wait_for_url(re.compile('/logons$'))
-            expect(page.locator('#roLiveAlerts a[href="/logon/%d"]' % overdue_record)).to_have_count(0)
-            overdue_record = None
+            if os.environ.get('RADIO_TEST_ALERTS') == '1':
+                # An overdue notice: raised by the real checker, brought onto an open page by the 30 s refresh (no reload),
+                # and gone the moment its log on is logged off.
+                overdue = context.request.post(URL + '/logons/new', data={'fields': dict(
+                    callDay=today, callTime='00:05', registration='OVERDUE-' + token, mobile='0499000111', pob='1',
+                    departurePoint='Marina', destination='Verification overdue', eta='12:00',
+                    etaDay=(date.today() - timedelta(days=1)).isoformat())})
+                assert overdue.status == 200 and overdue.json()['accepted'], overdue.text()
+                overdue_record = overdue.json()['id']
+                visit('/logons')
+                notice = page.locator('#roLiveAlerts .ro-alert', has=page.locator('a[href="/logon/%d"]' % overdue_record))
+                expect(notice).to_be_visible(timeout=80000)
+                # The title flashes every second; expect's own polling settles at 1 s and can keep landing on the plain half.
+                page.wait_for_function("() => /^\\(\\d+\\) OVERDUE/.test(document.title)", polling=100, timeout=5000)
+                visit('/logon/%d' % overdue_record)
+                page.locator('button[form="logoffForm"]').click()
+                page.locator('#qcOk').click()
+                page.wait_for_url(re.compile('/logons$'))
+                expect(page.locator('#roLiveAlerts a[href="/logon/%d"]' % overdue_record)).to_have_count(0)
+                overdue_record = None
             assert not errors, '\n'.join(errors)
             print('PASS %s: explicit save, conflicts, search, cached-CSS upgrade, compact multi-row layouts, accept/logoff; fixture %s' % (engine, record))
         except Exception:
@@ -1132,6 +1160,7 @@ def main(engine='chromium'):
                     print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (fixture_id, response.status))
             context.tracing.stop(path=str(ARTIFACTS / ('radio-trace-%s.zip' % engine)))
             browser.close()
+            print('%s browser finished in %.1fs' % (engine, time.monotonic() - started), flush=True)
 
 
 if __name__ == '__main__':

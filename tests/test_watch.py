@@ -4,6 +4,7 @@ These run the sweep directly rather than the thread, because a timer is not the 
 The interesting part is that an alert exists as a row before anyone looks at a page (ACC-5, WAT-3).
 """
 import logging
+import os
 import sys
 import tempfile
 import unittest
@@ -22,6 +23,7 @@ T0 = datetime(2026, 9, 12, 14, 32)
 FOLLOWUP = 15
 
 
+@unittest.skipUnless(os.environ.get('RADIO_TEST_ALERTS') == '1', 'Optional alerts: ./verify radio --alerts')
 class Watching(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -47,16 +49,6 @@ class Watching(unittest.TestCase):
             L.set_field(self.cur, i, field, value, 'alice', at)
         L.accept(self.cur, i, 'alice', at)
         return i
-
-    def test_statuses_stored_under_the_old_words_are_renamed_once(self):   # owner, 2026-09-13
-        on, off, draft = self.accepted(rego='AA1'), self.accepted(rego='BB2', member='2'), L.create(self.cur, 'alice', '', T0)
-        L.log_off(self.cur, off, 'alice', T0, 'back')
-        self.cur.execute("UPDATE LogOns SET watchStatus = 'watching' WHERE id = %s", (on,))       # as written before the rename
-        self.cur.execute("UPDATE LogOns SET watchStatus = 'loggedoff' WHERE id = %s", (off,))
-        self.assertEqual(L.rename_statuses(self.cur), 2)
-        self.assertEqual([L.get(self.cur, i)['watchStatus'] for i in (on, off, draft)], ['loggedOn', 'loggedOff', 'draft'])
-        self.assertEqual(L.rename_statuses(self.cur), 0)                                          # nothing left to do
-        self.assertEqual(L.queue(self.cur, '', T0, 30)[0]['id'], on)                               # watched again under the new word
 
     def open_kinds(self):
         return sorted((a['kind'], a['logOnId']) for a in W.open_alerts(self.cur))
@@ -180,6 +172,7 @@ if __name__ == '__main__':
     unittest.main()
 
 
+@unittest.skipUnless(os.environ.get('RADIO_TEST_ALERTS') == '1', 'Optional alerts: ./verify radio --alerts')
 class Delivery(unittest.TestCase):
     """Getting it in front of someone who is not looking at the screen, and knowing when that failed."""
 
