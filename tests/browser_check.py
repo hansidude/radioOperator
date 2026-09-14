@@ -163,13 +163,16 @@ def main(engine='chromium'):
             rows = page.locator('#radioMemberVessels .dc-record-grid-row')
             expect(rows).to_have_count(2)
             expect(page.locator('#radioMemberVessels .dc-record-grid-head')).to_contain_text('Vessel Name')
+            expect(rows.nth(1).locator('.dc-record-count')).to_have_text('2')                     # rows numbered from 1, like Quackit's lists
             page.locator('#ro-member-vessels .dc-search-input').first.fill('second-')             # the shared row search
             expect(rows.filter(has_text='SECOND-' + token)).to_be_visible()
             expect(rows.filter(has_text='SECOND-' + token)).to_have_count(1)
             expect(page.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)
+            expect(rows.filter(has_text='SECOND-' + token).locator('.dc-record-count')).to_have_text('1')   # what is left is numbered again
             page.locator('#ro-member-vessels .dc-search-reset').first.click()
             expect(rows).to_have_count(2)
             expect(rows.nth(0)).to_be_visible()
+            expect(rows.nth(1).locator('.dc-record-count')).to_have_text('2')
             page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()                 # the shared view buttons
             expect(page.locator('#radioMemberVesselsView')).to_have_class(re.compile(r'\bdc-record-cards\b'))
             page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()
@@ -464,7 +467,7 @@ def main(engine='chromium'):
             lines = page.locator('[data-dc-record-view="lines"]:visible')
             expect(lines).to_have_attribute('aria-pressed', 'true')
             page.locator('[data-dc-record-view="cards"]:visible').click()
-            cells = page.evaluate('''() => [...document.querySelector('#radioFoundMembers .dc-record-grid-row').querySelectorAll('.dc-record-grid-cell:not(.dc-record-grid-action)')]
+            cells = page.evaluate('''() => [...document.querySelector('#radioFoundMembers .dc-record-grid-row').querySelectorAll('.dc-record-grid-cell:not(.dc-record-grid-action):not(.dc-record-grid-count)')]
                 .filter(c => c.offsetParent !== null && getComputedStyle(c).display !== 'none')
                 .map(c => ({top: c.getBoundingClientRect().top, height: c.getBoundingClientRect().height,
                             wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace}))''')

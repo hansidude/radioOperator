@@ -251,6 +251,8 @@ class Pages(unittest.TestCase):
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
             self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
         self.assertIn('data-dc-record-width aria-controls="roRecordView"', page)                    # shared page width button
+        self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
+        self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)
         self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="What the search matched" data-open="0">', page)
         self.assertIn('</aside><div id="roLiveRecords">', page)
         self.assertIn('<title>Radio Logs</title>', page)                                           # the program's own menu
