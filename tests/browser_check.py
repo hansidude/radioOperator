@@ -55,6 +55,12 @@ def main(engine='chromium'):
             assert response and response.status == 200, 'GET %s: HTTP %s' % (path, response.status if response else 'none')
             assert '/login' not in page.url, 'Sample login failed'
 
+        def list_beside_panel(panel, listed, what):
+            # An open panel sits left of the list, outside its container: the list keeps the usual ~1200px width.
+            p, l = page.locator(panel).bounding_box(), page.locator(listed).bounding_box()
+            assert 900 < l['width'] < 1300, '%s is not at the usual ~1200px width beside its panel: %s' % (what, l['width'])
+            assert p['x'] + p['width'] <= l['x'], '%s: the panel is not left of the list' % what
+
         def usual_width(inside, what):
             # Quackit's usual ~1200px page width (layout's mySpacing), measured at the 1920px viewport.
             width = page.evaluate("s => document.querySelector(s).closest('.container-fluid.mySpacing').getBoundingClientRect().width", inside)
@@ -380,7 +386,7 @@ def main(engine='chromium'):
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
-            usual_width('#roFoundView', 'Search')
+            list_beside_panel('#roFoundPanel', '#roFound', 'Search')
             width_button = page.locator('[data-dc-record-width]:visible')                          # contained or full width, remembered
             expect(width_button).to_have_attribute('title', 'Full width')
             width_button.click()
@@ -388,10 +394,11 @@ def main(engine='chromium'):
             expect(width_button.locator('i')).to_have_class('bi bi-arrows-angle-contract')
             full = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid.mySpacing').getBoundingClientRect().width")
             assert full > 1700, 'Full width did not widen Search: %s' % full
+            assert page.locator('#roFoundPanel').bounding_box()['x'] < 60, 'Full width: the panel is not at the left edge'
             page.reload()
             expect(page.locator('[data-dc-record-width]:visible')).to_have_attribute('title', 'Usual page width')
             page.locator('[data-dc-record-width]:visible').click()
-            usual_width('#roFoundView', 'Search back in its container')
+            list_beside_panel('#roFoundPanel', '#roFound', 'Search back in its container')
             page.locator('#roFindAll').fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
             # The panel (view_controls + record_panel): what the search matched, as badges beside the results.
@@ -410,6 +417,7 @@ def main(engine='chromium'):
             expect(panel_button).to_have_attribute('title', 'Hide panel')
             panel_button.click()
             expect(panel).to_be_hidden()
+            usual_width('#roFoundView', 'Search with its panel closed')                              # the page goes back to the usual width
             page.reload()                                                                          # remembered
             expect(page.locator('#roFoundPanel')).to_be_hidden()
             page.locator('[data-dc-record-panel]:visible').click()
