@@ -124,6 +124,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page) and
   Lines for cards (each field on one line of its own; on by default, for chosen and narrow-screen cards alike).
 - Every table/card list numbers its records from 1 (# column / card corner), renumbered after a row search.
+- The log on's pickers show emoji: 👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile (rows 👤 / 🌐 / 🆘 by whose number).
 - Log off and Discard draft ask first in Quackit's confirm box, naming the log on and vessel. A closed log on (or
   discarded draft) has Reopen with a reason (§3.3, AC-36; `logons.reopen`), also confirmed.
 - No daily number (spec 1.1 REC-9): a log on is named by its Trip ID No. everywhere; the log's columns are #, Status,

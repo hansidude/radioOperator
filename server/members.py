@@ -252,7 +252,8 @@ def vessel_picks(cur, unit, q):
 
 def mobile_picks(cur, unit, q):
     """The log on's 📱 Mobile picker: members' mobiles, public vessel owners' phones and emergency contacts' phones
-    matching the digits typed. Each says whose number it is and brings the member or public vessel it belongs to."""
+    matching the digits typed. Each says whose number it is (`kind`: member, public or contact, for the picker's
+    emoji) and brings the member or public vessel it belongs to."""
     digits = re.sub(r'\D', '', q or '')
     everyone = members(cur, unit)
     by_member = {m['id']: m for m in everyone}
@@ -262,18 +263,18 @@ def mobile_picks(cur, unit, q):
     out = []
     for m in everyone:
         if matches(m.get('mobile')):
-            out.append({'id': 'member-%d' % m['id'], 'primary': m['mobile'], 'secondary': 'Member %s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
+            out.append({'id': 'member-%d' % m['id'], 'kind': 'member', 'primary': m['mobile'], 'secondary': 'Member %s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
                         'phone': m['mobile'], 'member': member_item(m), 'vessel': None})
     for v in vessels:
         if not v['memberId'] and matches(v.get('ownerPhone')):
-            out.append({'id': 'owner-%d' % v['id'], 'primary': v['ownerPhone'],
+            out.append({'id': 'owner-%d' % v['id'], 'kind': 'public', 'primary': v['ownerPhone'],
                         'secondary': '%s, owner of public vessel %s' % (v.get('ownerName') or 'Owner', v.get('vesselName') or v.get('registration')),
                         'phone': v['ownerPhone'], 'member': None, 'vessel': vessel_item(v)})
     for c in _held(cur, 'contacts', by_member, by_vessel):
         if matches(c.get('phone')):
             member = by_member.get(c.get('memberId'))
             vessel = by_vessel.get(c.get('vesselId'))
-            out.append({'id': 'contact-%d' % c['id'], 'primary': c['phone'],
+            out.append({'id': 'contact-%d' % c['id'], 'kind': 'contact', 'primary': c['phone'],
                         'secondary': '%s, emergency contact of %s' % (c['name'], c['holder']['name']),
                         'phone': c['phone'], 'member': member_item(member) if member else None,
                         'vessel': None if member else vessel_item(vessel)})

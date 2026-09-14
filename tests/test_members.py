@@ -630,6 +630,7 @@ class Members(unittest.TestCase):
         self.assertEqual((contact['member']['id'], contact['phone']), (m, '0499 888 777'))
         owner = numbers('0411222')['Alex, owner of public vessel Blue Duck']
         self.assertEqual((owner['member'], owner['vessel']['id']), (None, pub))
+        self.assertEqual((contact['kind'], owner['kind'], numbers('0412 000')['Member m00001 Jane Smith']['kind']), ('contact', 'public', 'member'))
         public_contact = numbers('0433')['Pat Public, emergency contact of Blue Duck']
         self.assertEqual(public_contact['vessel']['id'], pub)
         self.assertEqual(self.a.get('/api/logons/mobiles?q=').json['items'], [])                    # no digits, nothing

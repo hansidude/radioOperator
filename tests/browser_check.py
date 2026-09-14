@@ -239,11 +239,13 @@ def main(engine='chromium'):
                 page.locator('#spResults [data-pick]', has_text=text).first.click()
             page.locator('#roPickMember').click()
             expect(page.locator('#searchPicker')).to_be_visible()
-            expect(page.locator('label[for="spInput"]')).to_have_text('Member: number, name or mobile')
+            expect(page.locator('label[for="spInput"]')).to_have_text('👤 Member: number, name or mobile')   # with the emoji
+            expect(page.locator('#spTitle')).to_have_text('👤Member')
+            expect(page.locator('#spCrumb')).to_contain_text('👤 member: choosing')
             expect(page.locator('#searchPicker [placeholder]')).to_have_count(0)                # a label on top, nothing inside
             page.locator('#spInput').fill(token)
             pick(member_no)
-            expect(page.locator('#spLabel')).to_have_text("Member's vessel: name or rego")
+            expect(page.locator('#spLabel')).to_have_text("🛥️ Member's vessel: name or rego")
             expect(page.locator('#spFilter')).to_contain_text('No vessel')
             pick(vessel)
             expect(page.locator('#searchPicker')).to_be_hidden()
@@ -288,7 +290,7 @@ def main(engine='chromium'):
             expect(page.locator('#f-memberNumber')).to_have_value(member_no)
             expect(page.locator('#roWhoNow [data-who="vessel"]')).to_have_count(0)
             page.locator('#roWhoNow [data-ro-pick-vessel]').click()                               # pick one of theirs again
-            expect(page.locator('#spLabel')).to_have_text("Member's vessel: name or rego")
+            expect(page.locator('#spLabel')).to_have_text("🛥️ Member's vessel: name or rego")
             pick(vessel)
             expect(page.locator('#f-vesselName')).to_have_value(vessel)
             expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
@@ -315,7 +317,7 @@ def main(engine='chromium'):
             expect(page.locator('#f-registration')).to_have_value('NB-' + token)
             expect(page.locator('#f-vesselId')).not_to_have_value(first_pick)
             page.locator('#roPickPublic').click()                                                 # a public user's known vessel
-            expect(page.locator('#spLabel')).to_have_text('Public vessel: name, rego or owner')
+            expect(page.locator('#spLabel')).to_have_text('🌐 Public vessel: name, rego or owner')
             page.locator('#spInput').fill('PUBLIC-' + token)
             pick('PUBLIC-' + token)
             expect(page.locator('#f-memberNumber')).to_have_value('')
@@ -354,7 +356,7 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile('/logons/new(#[a-z]+)?$'))                       # never left the page
             page.screenshot(path=str(ARTIFACTS / ('radio-who-%s.png' % engine)), full_page=True)
             page.locator('#roPickAnyVessel').click()                                               # 🛥️ Vessel: any vessel
-            expect(page.locator('#spLabel')).to_have_text('Vessel: name, rego, owner or member')
+            expect(page.locator('#spLabel')).to_have_text('🛥️ Vessel: name, rego, owner or member')
             page.locator('#spInput').fill(vessel)
             pick(vessel)
             expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # a member's vessel brings its member
@@ -362,6 +364,7 @@ def main(engine='chromium'):
             page.locator('#roWhoNow [data-ro-clear="member"]').click()
             page.locator('#roPickMobile').click()                                                  # 📱 Mobile: an emergency contact's phone
             page.locator('#spInput').fill('0499888777')
+            expect(page.locator('#spResults [data-pick]', has_text='Verify Contact ' + token).first.locator('span').first).to_have_text('🆘')   # a contact's number
             pick('Verify Contact ' + token)
             expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # brings the member it belongs to
             expect(page.locator('#roWhoNow [data-ro-pick-vessel]')).to_be_visible()
