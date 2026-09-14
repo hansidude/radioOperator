@@ -21,7 +21,7 @@ class Help(unittest.TestCase):
         page = self.a.get('/radio/help').get_data(as_text=True)
         for section in ('menu', 'log', 'views', 'status', 'logon', 'members', 'search', 'fields'):
             self.assertIn('id="%s"' % section, page)
-        for control in ('data-dc-record-view="cards"', 'data-dc-record-view="paragraphs"', 'data-dc-record-view="lines"',
+        for control in ('data-dc-record-view="cards"', 'data-dc-record-view="paragraphs"',
                         'data-dc-record-panel aria-controls="roHelpPanel"', 'data-dc-record-size="larger"', 'data-dc-record-width',
                         'data-grp-toggle-all="radioHelp"'):
             self.assertIn(control, page)                                          # the demonstration is the real controls

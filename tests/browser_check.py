@@ -476,20 +476,16 @@ def main(engine='chromium'):
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # refreshed with the search
             visit('/radio/search?q=' + token)
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()
-            # Lines, on by default: chosen cards give each field a line of its own.
-            lines = page.locator('[data-dc-record-view="lines"]:visible')
-            expect(lines).to_have_attribute('aria-pressed', 'true')
+            # Cards give each field a line of its own, its name on one line (there is no other card layout).
+            expect(page.locator('[data-dc-record-view="lines"]')).to_have_count(0)
             page.locator('[data-dc-record-view="cards"]:visible').click()
             cells = page.evaluate('''() => [...document.querySelector('#radioFoundMembers .dc-record-grid-row').querySelectorAll('.dc-record-grid-cell:not(.dc-record-grid-action):not(.dc-record-grid-count)')]
                 .filter(c => c.offsetParent !== null && getComputedStyle(c).display !== 'none')
                 .map(c => ({top: c.getBoundingClientRect().top, height: c.getBoundingClientRect().height,
-                            wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace}))''')
-            assert len(cells) >= 3 and all(b['top'] >= a['top'] + a['height'] - 1 for a, b in zip(cells, cells[1:])), 'Lines: fields are not a line each: %s' % cells
-            assert all(c['height'] < 32 and c['wrap'] == 'nowrap' for c in cells), 'Lines: a field runs past one line: %s' % cells
-            lines.click()                                                                           # off: fields flow along the card again
-            expect(lines).to_have_attribute('aria-pressed', 'false')
-            expect(page.locator('#radioFoundMembers .dc-record-grid-row').first).to_have_css('display', 'flex')
-            lines.click()
+                            wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace,
+                            label: getComputedStyle(c.querySelector('.dc-record-grid-label')).whiteSpace}))''')
+            assert len(cells) >= 3 and all(b['top'] >= a['top'] + a['height'] - 1 for a, b in zip(cells, cells[1:])), 'Cards: fields are not a line each: %s' % cells
+            assert all(c['height'] < 32 and c['wrap'] == 'nowrap' and c['label'] == 'nowrap' for c in cells), 'Cards: a field runs past one line: %s' % cells
             page.locator('[data-dc-record-view="cards"]:visible').click()
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
@@ -747,7 +743,7 @@ def main(engine='chromium'):
                     const mobile = getComputedStyle(head).display === 'none';
                     const nodes = [el, ...el.querySelectorAll('.dc-record-grid-row, .dc-record-grid-cell')];
                     if (mobile) nodes.push(...el.querySelectorAll('.dc-record-grid-value'));
-                    // A value cut off with … on purpose (Lines) hides its overflow; anything else spilling is a fault.
+                    // A value cut off with … on purpose (cards, rows) hides its overflow; anything else spilling is a fault.
                     const spills = n => n.clientWidth && n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).overflowX === 'visible';
                     // A word is never split across lines (record_grid's words, no overflow-wrap: anywhere).
                     const split = [];
@@ -766,7 +762,11 @@ def main(engine='chromium'):
                         rowsWouldOverflow = el.scrollWidth > el.clientWidth + 1;
                         el.classList.add('dc-record-grid-stacked');
                     }
-                    return {mobile, stacked, rowsWouldOverflow, split, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
+                    // A column name is one line: a row heading's words, or a card's label's words, all on the same line.
+                    const names = mobile ? [...el.querySelectorAll('.dc-record-grid-row:first-of-type .dc-record-grid-label')] : [...head.children];
+                    const twoLineNames = names.filter(n => new Set([...n.querySelectorAll('.dc-record-word')]
+                        .map(w => Math.round(w.getBoundingClientRect().top))).size > 1).map(n => n.textContent.trim());
+                    return {mobile, stacked, rowsWouldOverflow, split, twoLineNames, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
                         heights: rows.map(r => r.getBoundingClientRect().height),
                         overflow: nodes.some(spills),
                         lines: !mobile || [...el.querySelectorAll('.dc-record-grid-value')].every(v => getComputedStyle(v).whiteSpace === 'nowrap'),
@@ -777,6 +777,7 @@ def main(engine='chromium'):
                 assert metrics['grid'], 'Shared grid stylesheet is missing: %s' % metrics
                 assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
                 assert not metrics['split'], 'Words split across lines at %spx: %s' % (width, metrics['split'])
+                assert not metrics['twoLineNames'], 'Column names on two lines at %spx: %s' % (width, metrics['twoLineNames'])
                 if width >= 1328:
                     assert not metrics['mobile'], 'Desktop unexpectedly switched to cards at %spx' % width
                 if width >= 768 and not metrics['stacked']:
@@ -823,16 +824,15 @@ def main(engine='chromium'):
             expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
             expect(page.locator('[data-dc-record-view="cards"]')).to_have_attribute('aria-pressed', 'true')
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_hidden()
-            expect(grid_rows.first).to_have_css('display', 'grid')                           # Lines on by default: a line per field
-            expect(page.locator('[data-dc-record-view="lines"]')).to_have_attribute('aria-pressed', 'true')
-            page.locator('[data-dc-record-view="lines"]').click()                            # off: the fields flow along one line
-            expect(grid_rows.first).to_have_css('display', 'flex')
-            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'false')   # cards keep their own: one line
+            expect(grid_rows.first).to_have_css('display', 'grid')                           # a line per field
             got = heights()
-            assert min(got) <= 40 and max(got) <= 64, 'Cards are not compact at 1920px: %s' % got
+            assert min(got) > 64, 'Cards do not give each field a line: %s' % got
+            names = grid_rows.first.evaluate('''row => [...row.querySelectorAll('.dc-record-grid-label')].filter(l => l.offsetParent)
+                .map(l => ({text: l.textContent, lines: new Set([...l.querySelectorAll('.dc-record-word')].map(w => Math.round(w.getBoundingClientRect().top))).size}))''')
+            assert names and all(n['lines'] == 1 for n in names), 'A column name on a card takes more than one line: %s' % names
             label = grid_rows.first.locator('[data-column="member"] .dc-record-grid-label')
-            expect(label.locator('.dc-record-grid-symbol')).to_be_visible()                 # symbol instead of the word
-            expect(label.locator('.dc-record-grid-label-text')).to_have_css('position', 'absolute')
+            expect(label.locator('.dc-record-grid-symbol')).to_be_visible()                 # the symbol and the word
+            expect(label.locator('.dc-record-grid-label-text')).to_have_css('position', 'static')
             expect(label).to_have_attribute('title', 'Member No.')
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-%s.png' % engine)), full_page=True)
             gap = page.locator('[data-record="%s"] [data-column="pob"]' % layout_records[0])      # the sparse draft
@@ -842,12 +842,7 @@ def main(engine='chromium'):
                 page.select_option('#roSort', 'oldest')
             expect(grid_rows).to_have_count(4)
             expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
-            expect(grid_rows.first).to_have_css('display', 'flex')                        # the swapped list is still cards
-            page.locator('[data-dc-record-view="paragraphs"]').click()
-            expect(grid_rows.first).to_have_css('display', 'grid')
-            got = heights()
-            assert min(got) > 64, 'Paragraph cards do not give each field a line: %s' % got
-            page.screenshot(path=str(ARTIFACTS / ('radio-paragraphs-%s.png' % engine)), full_page=True)
+            expect(grid_rows.first).to_have_css('display', 'grid')                        # the swapped list is still cards
             page.locator('[data-dc-record-view="cards"]').click()                          # rows again, their own Paragraphs still on
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_visible()
             expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'true')
@@ -857,7 +852,7 @@ def main(engine='chromium'):
             expect(value).to_have_css('white-space', 'nowrap')
             got = heights()                                                                 # Paragraphs off: the paper's one-line rows
             assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
-            expect(view).to_have_class('')                                                    # (Lines off, Cards off, Paragraphs off)
+            expect(view).to_have_class('')                                                    # (Cards off, Paragraphs off)
             # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
             readout = page.locator('[data-dc-record-size-readout]')
             larger = page.get_by_role('button', name='Larger text')
