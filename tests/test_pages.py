@@ -515,6 +515,11 @@ class Pages(unittest.TestCase):
     def test_a_closure_made_in_error_is_corrected_not_erased(self):       # §3.3 Correct mistaken closure
         i = self.accepted(time='0001')                                                # a return time long past
         self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'notes': 'thought it was back'}).status_code, 302)
+        closed_page = self.a.get('/logon/%d' % i).get_data(as_text=True)                      # Reopen, asked first
+        self.assertIn('<form id="reopenForm" method="post" action="/logon/%d/reopen" data-confirm-title="Reopen %s' % (i, L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)['tripRef']), closed_page)
+        self.assertIn('data-confirm-label="Reopen" data-confirm-tone="warning"', closed_page)
+        self.assertIn('name="reason" form="reopenForm"', closed_page)
+        self.assertIn('id="qcConfirm"', closed_page)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': ''}).status_code, 400)
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'wrong boat'}).status_code, 302)
         row = L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)          # History shows these on quackit
@@ -523,6 +528,15 @@ class Pages(unittest.TestCase):
         reopened = self.a.get('/logons?f=1&status=all').get_data(as_text=True)
         self.assertIn('data-record="%d"' % i, reopened)
         self.assertIn('OVERDUE', reopened)                                            # time did not stop
+        open_page = self.a.get('/logon/%d' % i).get_data(as_text=True)                        # watched again: Log off, asked first
+        self.assertIn('data-confirm-title="Log off %s' % row['tripRef'], open_page)
+        self.assertIn('data-confirm-label="Log off" data-confirm-tone="success"', open_page)
+        self.assertNotIn('onsubmit="return confirm(', open_page)
+        draft = self.new()                                                              # a discarded draft reopens as a draft
+        self.assertEqual(self.a.post('/logon/%d/discard' % draft, data={'reason': 'wrong one'}).status_code, 302)
+        self.assertIn('It goes back as a draft.', self.a.get('/logon/%d' % draft).get_data(as_text=True))
+        self.assertEqual(self.a.post('/logon/%d/reopen' % draft, data={'reason': 'discarded the wrong draft'}).status_code, 302)
+        self.assertEqual(L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), draft)['watchStatus'], 'draft')
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)
         self.assertEqual(self.a.post('/api/logon/%d' % i, json={'field': 'pob', 'value': '2'}).status_code, 200)
         self.assertEqual(self.a.post('/logon/%d/logoff' % i,

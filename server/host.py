@@ -22,7 +22,7 @@ def install_standalone_ui(app):
     templates = Path(os.environ.get('RADIO_SHARED_TEMPLATES') or
                      Path(__file__).resolve().parents[2] / 'dflask' / 'templates')
     for name in ('myMacro_record_view.html', 'myMacro_filters.html', 'myMacro_entity_nav.html', 'myMacro_search_picker.html',
-                 'myMacro_groups.html',
+                 'myMacro_groups.html', 'myMacro_confirm.html',
                  '../static/css/record_views.css', '../static/css/navbar_controls.css',
                  '../static/css/search_controls.css', '../static/js/search_controls.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js',

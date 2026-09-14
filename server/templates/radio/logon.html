@@ -78,17 +78,26 @@
       <div class="ro-notes-row row g-3">{{ field('notes', 'col-12') }}</div>
       <input type="hidden" id="f-vesselId" data-field="vesselId" value="{{ logon.vesselId if logon.vesselId is not none else '' }}">
     </form>
-    {# Save is at the bottom of every editable pane, first in the row, as well as in the navbar. #}
+    {# Save is at the bottom of every editable pane, first in the row, as well as in the navbar. Log off, Discard and
+       Reopen ask first, naming the log on (Quackit's confirm box): the wrong vessel logged off is the accident to catch. #}
+    {% set who = [logon.vesselName, logon.registration]|select|join(' · ') if not creating else '' %}
     {% if creating %}
     <div class="ro-primary-actions">{{ save_button() }}</div>
     {% elif draft %}
     {% if clash %}<div class="text-danger mt-2">{{ clash.registration or clash.vesselName }} is already logged on as <a href="/logon/{{ clash.id }}">{{ reference(clash) }}</a>. One vessel has one log on.</div>{% endif %}
-    <form id="discardForm" method="post" action="/logon/{{ logon.id }}/discard" onsubmit="return confirm('Discard: this was never a log on?')"><input type="hidden" name="back" value="/logons"></form>
+    <form id="discardForm" method="post" action="/logon/{{ logon.id }}/discard" data-confirm-title="Discard draft {{ reference(logon) }}{{ ' · ' ~ who if who }}?" data-confirm-body="Only for a call that was never a log on. If it was a mistake, Reopen on this page brings the draft back." data-confirm-label="Discard draft" data-confirm-tone="danger"><input type="hidden" name="back" value="/logons"></form>
     <div class="ro-action-text"><label for="discardReason">Reason</label><textarea id="discardReason" name="reason" form="discardForm" class="form-control" rows="3" data-auto-grow maxlength="255" required></textarea></div>
     <div class="ro-primary-actions">{{ save_button() }}<button form="discardForm" class="btn btn-outline-danger text-nowrap"><i class="bi bi-trash me-1"></i>Discard draft</button></div>
     {% elif open %}
     <div class="ro-primary-actions">{{ save_button() }}<button form="logoffForm" class="btn btn-success text-nowrap"><i class="bi bi-box-arrow-right me-1"></i>Log off</button></div>
-    <form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" onsubmit="return confirm('Log off: end the watch on this log on?')"><input type="hidden" name="back" value="/logons"></form>
+    <form id="logoffForm" method="post" action="/logon/{{ logon.id }}/logoff" data-confirm-title="Log off {{ reference(logon) }}{{ ' · ' ~ who if who }}?" data-confirm-body="The watch on this vessel ends. Check it is the right vessel. If it was a mistake, Reopen on this log on brings it back." data-confirm-label="Log off" data-confirm-tone="success"><input type="hidden" name="back" value="/logons"></form>
+    {% else %}
+    {# Closed by mistake (§3.3, AC-36): Reopen, with the reason. The closure stays in History; a log on is watched again at
+       once (a passed return time is overdue straight away), a discarded draft comes back as a draft. #}
+    {% set back_to = 'a draft' if logon.watchStatus == 'discarded' else 'on the watch' %}
+    <form id="reopenForm" method="post" action="/logon/{{ logon.id }}/reopen" data-confirm-title="Reopen {{ reference(logon) }}{{ ' · ' ~ who if who }}?" data-confirm-body="It goes back {{ 'as a draft' if logon.watchStatus == 'discarded' else 'on the watch now, and its return time is checked straight away' }}. The {{ 'discard' if logon.watchStatus == 'discarded' else 'log off' }} stays in its History." data-confirm-label="Reopen" data-confirm-tone="warning"><input type="hidden" name="version" value="{{ logon.version }}"></form>
+    <div class="ro-action-text"><label for="reopenReason">Reason to reopen (what was wrong with the {{ 'discard' if logon.watchStatus == 'discarded' else 'log off' }})</label><textarea id="reopenReason" name="reason" form="reopenForm" class="form-control" rows="3" data-auto-grow maxlength="255" required></textarea></div>
+    <div class="ro-primary-actions"><button form="reopenForm" class="btn btn-warning text-nowrap"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button> <span class="text-secondary">Back to {{ back_to }}.</span></div>
     {% endif %}
   </div>
 </section>
@@ -484,4 +493,6 @@
 </script>
 {% import 'myMacro_search_picker.html' as picker %}
 {{ picker.searchPickerModal() }}
+{% import 'myMacro_confirm.html' as confirm_box %}
+{{ confirm_box.confirmModal() }}
 {% endblock %}

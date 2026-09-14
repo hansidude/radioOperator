@@ -897,9 +897,30 @@ def main(engine='chromium'):
             seen = lambda dialog: leave_warnings.append(dialog.type)          # the page's accept-all handler answers it
             page.on('dialog', seen)
             page.locator('button[form="logoffForm"]').click()
+            box = page.locator('#qcConfirm')                                                    # asked first, naming the log on
+            expect(box).to_be_visible()
+            expect(page.locator('#qcTitle')).to_contain_text('Log off T-')
+            expect(page.locator('#qcTitle')).to_contain_text(vessel)
+            page.locator('#qcCancel').click()                                                   # Cancel: nothing happens
+            expect(box).to_be_hidden()
+            assert page.url.endswith('/logon/%s' % record) or '/logon/%s#' % record in page.url, page.url
+            page.locator('button[form="logoffForm"]').click()
+            page.locator('#qcOk').click()
             page.wait_for_url(re.compile('/logons$'))
             page.remove_listener('dialog', seen)
-            assert leave_warnings == ['confirm'], 'Log off with only Notes typed warned about unsaved work: %s' % leave_warnings
+            assert leave_warnings == [], 'Log off with only Notes typed warned about unsaved work: %s' % leave_warnings
+            closed = True
+            visit('/logon/%s' % record)                                                          # logged off by mistake: Reopen
+            page.locator('#reopenReason').fill('Logged off the wrong vessel ' + token)
+            page.locator('button[form="reopenForm"]').click()
+            expect(page.locator('#qcTitle')).to_contain_text('Reopen T-')
+            page.locator('#qcOk').click()
+            page.wait_for_url(re.compile('/logon/%s$' % record))
+            expect(page.locator('.ro-status-now')).to_contain_text('Logged on')
+            closed = False
+            page.locator('button[form="logoffForm"]').click()                                   # and off again, for real
+            page.locator('#qcOk').click()
+            page.wait_for_url(re.compile('/logons$'))
             closed = True
             visit('/logons?status=closed&day=' + today + '&q=' + vessel)
             expect(page.locator('[data-record="%s"]' % record)).to_have_count(1)
@@ -944,6 +965,7 @@ def main(engine='chromium'):
             page.wait_for_function("() => /^\\(\\d+\\) OVERDUE/.test(document.title)", polling=100, timeout=5000)
             visit('/logon/%d' % overdue_record)
             page.locator('button[form="logoffForm"]').click()
+            page.locator('#qcOk').click()
             page.wait_for_url(re.compile('/logons$'))
             expect(page.locator('#roLiveAlerts a[href="/logon/%d"]' % overdue_record)).to_have_count(0)
             overdue_record = None
