@@ -321,7 +321,8 @@ STATUS_WHERE = {
     'draft': NOT_CLOSED,
     'loggedon': "watchStatus = 'loggedOn'",
     'overdue': "watchStatus = 'loggedOn'",
-    'closed': 'watchStatus IN (' + ', '.join("'%s'" % state for state in CLOSED) + ')',
+    'closed': "watchStatus = 'loggedOff'",
+    'discarded': "watchStatus IN ('discarded', 'cancelled')",       # trashed is not closed (owner, 2026-09-15)
 }
 # What Find searches. The trip reference and the day number are how an operator refers to a record
 # out loud, so both have to be findable alongside the vessel's identifying values.

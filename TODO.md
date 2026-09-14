@@ -156,7 +156,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   `_ui.mobiles_grid`). Every row value has its field's emoji before it and headings are words only (owner, issues A and E: record_grid
   `symbol`); rows tight from the left; a public vessel's person is 🧑 Contact / 📱 Phone / ✉️ Email, never
   Owner (owner, issue F: the caller need not own it); Search's Clear filter is at the top of its side panel, above the
-  kinds (issue G); the log's status column has no heading word, Date is Logon date, Return date 🏁. Emoji in the title, step and label
+  kinds (issue G); an Emoji only view button hides column names; Discarded is its own status filter, never Closed; the log's status column has no heading word, Date is Logon date, Return date 🏁. Emoji in the title, step and label
   (👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile). The box is a contained page wide (120ch) and 80% of the screen tall.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.

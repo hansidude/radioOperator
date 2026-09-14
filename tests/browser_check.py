@@ -877,6 +877,21 @@ def main(engine='chromium'):
             expect(label.locator('.dc-record-grid-label-text')).to_have_css('position', 'static')
             expect(label).to_have_attribute('title', 'Member No.')
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-%s.png' % engine)), full_page=True)
+            names_button = page.locator('[data-dc-record-names][aria-controls="roRecordView"]')     # emoji only
+            names_button.click()
+            expect(view).to_have_class(re.compile(r'\bdc-record-names-off\b'))
+            expect(names_button).to_have_attribute('aria-pressed', 'true')
+            expect(label.locator('.dc-record-grid-label-text')).to_be_hidden()
+            expect(label.locator('.dc-record-grid-symbol')).to_be_visible()
+            expect(grid_rows.first.locator('[data-column="member"] .dc-record-grid-value')).to_be_visible()
+            assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") == '0', 'Emoji only is not remembered'
+            page.screenshot(path=str(ARTIFACTS / ('radio-cards-emoji-%s.png' % engine)), full_page=True)
+            page.locator('[data-dc-record-view="cards"]').click()                                 # rows: no heading of names
+            expect(page.locator('#radioRecords .dc-record-grid-head')).to_have_css('position', 'absolute')
+            page.locator('[data-dc-record-view="cards"]').click()
+            names_button.click()                                                                   # names back
+            expect(label.locator('.dc-record-grid-label-text')).to_be_visible()
+            assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") is None
             gap = page.locator('[data-record="%s"] [data-column="pob"]' % layout_records[0])      # the sparse draft
             expect(gap.locator('.dc-record-grid-missing')).to_have_text('?')                     # symbol and ?, not gone
             expect(gap.locator('.dc-record-grid-symbol')).to_be_visible()

@@ -441,7 +441,10 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % d).get_data(as_text=True)
         self.assertIn('data-status="discarded"', page)
         self.assertEqual(L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), d)['discardReason'], 'hit New by mistake')
-        self.assertIn('Discarded', self.a.get('/logons?f=1&status=closed').get_data(as_text=True))
+        rows = lambda status: self.a.get('/logons?f=1&status=' + status).get_data(as_text=True).split('id="radioRecords"')[1]
+        self.assertIn('aria-label="Discarded"', rows('discarded'))                             # trashed has its own filter
+        self.assertIn('ro-record-card discarded', rows('discarded'))
+        self.assertNotIn('aria-label="Discarded"', rows('closed'))                              # and is never Closed
         self.assertEqual(self.a.post('/api/logon/%d' % d, json={'field': 'pob', 'value': '1'}).status_code, 400)
         i = self.accepted(rego='CD456R', member='9001')
         r = self.a.post('/logon/%d/discard' % i, data={'reason': 'tidying'})

@@ -23,6 +23,7 @@
 .ro-record-card.overdue{border-left-color:var(--bs-danger);background:rgba(var(--bs-danger-rgb),.14)}
 .ro-record-card.loggedOn{border-left-color:var(--bs-success);background:rgba(var(--bs-success-rgb),.1)}
 .ro-record-card.closed{border-left-color:var(--bs-black);background:rgba(var(--bs-black-rgb),.3)}
+.ro-record-card.discarded{border-left-color:var(--bs-secondary);border-left-style:dashed;opacity:.6}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 /* Layout comes from dc-record-toolbar; only the control widths are radio's. */
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
@@ -164,9 +165,9 @@
    the host record_grid draws headers, values and the same labelled cells at every width. #}
 {# Exact wording for an empty result: '0 drafts', not 'Nothing at sea'. One map, because the page
    and the refresh partial must say the same thing. #}
-{% set EMPTY_LABELS = {'all': 'records', 'draft': 'drafts', 'loggedon': 'logged on', 'overdue': 'overdue', 'closed': 'closed'} %}
+{% set EMPTY_LABELS = {'all': 'records', 'draft': 'drafts', 'loggedon': 'logged on', 'overdue': 'overdue', 'closed': 'closed', 'discarded': 'discarded'} %}
 
-{% macro state(r) %}{% if r.watchStatus in ('loggedOff', 'discarded', 'cancelled') %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'loggedOn' %}loggedOn{% else %}draft{% endif %}{% endmacro %}
+{% macro state(r) %}{% if r.watchStatus in ('discarded', 'cancelled') %}discarded{% elif r.watchStatus == 'loggedOff' %}closed{% elif r.condition == 'overdue' %}overdue{% elif r.watchStatus == 'loggedOn' %}loggedOn{% else %}draft{% endif %}{% endmacro %}
 
 {# Radio owns the status vocabulary; shared presentation only receives metadata. #}
 {% set STATES = {
@@ -182,7 +183,7 @@
 } %}
 {% set FILTERS = [('all', 'all', 'All'), ('draft', 'draft', 'Drafts'),
                   ('loggedon', 'loggedOn', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
-                  ('closed', 'closed', 'Closed')] %}
+                  ('closed', 'closed', 'Closed'), ('discarded', 'discarded', 'Discarded')] %}
 
 {# The STATES key a record is shown under, the same on the log and on its own page. #}
 {% macro state_key(r) -%}
