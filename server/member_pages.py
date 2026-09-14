@@ -6,7 +6,7 @@ record_grid, and each opens on its own page, like a log on from the log. Plain f
 refusal renders the same page again with the values typed and the boxes that stopped it red (400), or
 with the reason when someone else saved first (409); a save goes back to the member on that tab.
 """
-from flask import abort, jsonify, make_response, redirect, request
+from flask import abort, get_template_attribute, jsonify, make_response, redirect, request
 
 from . import logons as L
 from . import members as M
@@ -274,12 +274,20 @@ def child_remove(owner, owner_id, kind, child_id):
 
 # ---------- what the log on's shared search picker asks (myMacro_search_picker.html) ----------
 
+def _picker(items, grid, *args, **kwargs):
+    """The picker's answer: the items the log on takes from a pick, and the same records as the pages list them
+    (_ui.<grid>, without their open buttons: a click picks), under how many were found."""
+    rows = get_template_attribute('radio/_ui.html', grid)(*args, key='spGrid', **kwargs)
+    results = get_template_attribute('myMacro_search_picker.html', 'results')
+    return jsonify({'items': items, 'html': str(results(rows, len(items)))})
+
+
 @bp.route('/api/logons/members')
 def api_members():
     h, (conn, cur) = _open()
-    items = [M.member_item(m) for m in M.members(cur, h.unit(), request.args.get('q'))]
+    found = M.members(cur, h.unit(), request.args.get('q'))
     cur.close()
-    return jsonify({'items': items})
+    return _picker([M.member_item(m) for m in found], 'members_grid', found, open=False)
 
 
 @bp.route('/api/logons/vessels')
@@ -289,26 +297,27 @@ def api_member_vessels(member_id=None):
     for the member already picked (/members/<id>/vessels)."""
     h, (conn, cur) = _open()
     member = _member(cur, h, member_id or request.args.get('member', type=int) or abort(400))
-    items = [M.vessel_item(v) for v in M.member_vessels(cur, member['id'], request.args.get('q'))]
+    found = M.member_vessels(cur, member['id'], request.args.get('q'))
     cur.close()
-    return jsonify({'items': items})
+    return _picker([M.vessel_item(v) for v in found], 'children_grid', '/member/%d' % member['id'], 'vessels', M.KINDS['vessels'],
+                   M.LABELS, found, open=False)
 
 
 @bp.route('/api/logons/public-vessels')
 def api_public_vessels():
     h, (conn, cur) = _open()
-    items = [M.vessel_item(v) for v in M.public_vessels(cur, h.unit(), request.args.get('q'))]
+    found = M.public_vessels(cur, h.unit(), request.args.get('q'))
     cur.close()
-    return jsonify({'items': items})
+    return _picker([M.vessel_item(v) for v in found], 'vessels_grid', found, open=False)
 
 
 @bp.route('/api/logons/all-vessels')
 def api_all_vessels():
     """The log on's 🛥️ Vessel picker: every vessel, a member's or public."""
     h, (conn, cur) = _open()
-    items = M.vessel_picks(cur, h.unit(), request.args.get('q'))
+    vessels, items = M.vessel_picks(cur, h.unit(), request.args.get('q'))
     cur.close()
-    return jsonify({'items': items})
+    return _picker(items, 'vessels_grid', vessels, open=False)
 
 
 @bp.route('/api/logons/mobiles')
@@ -317,7 +326,7 @@ def api_mobiles():
     h, (conn, cur) = _open()
     items = M.mobile_picks(cur, h.unit(), request.args.get('q'))
     cur.close()
-    return jsonify({'items': items})
+    return _picker(items, 'mobiles_grid', items)
 
 
 @bp.route('/radio/search')

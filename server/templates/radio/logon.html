@@ -288,8 +288,7 @@
   var HEARD = {{ heard_note_pattern|tojson }};
   // The pickers' emoji, from radio's one map (_ui.WHO / FIELD_SYMBOLS): beside each title, stage and result row.
   var SYM = {{ {'member': ui.WHO.member.symbol, 'public': ui.WHO.public.symbol, 'vessel': ui.FIELD_SYMBOLS.vesselName,
-                'mobile': ui.FIELD_SYMBOLS.mobile, 'contact': ui.FIELD_SYMBOLS.name}|tojson }};
-  var FIELD_SYMBOLS = {{ ui.FIELD_SYMBOLS|tojson }};   // the emoji in member and vessel rows' second line
+                'mobile': ui.FIELD_SYMBOLS.mobile}|tojson }};
   var currentMember = {{ member_item|tojson if pick_locked else 'null' }}, currentVessel = {{ vessel_item|tojson if pick_locked else 'null' }};
   function box(name) { return document.getElementById('f-' + name); }
   function put(name, value) {
@@ -371,7 +370,7 @@
   function pickMemberVessel() {
     SearchPicker.open({
       title: 'Vessel for ' + currentMember.primary, symbol: SYM.vessel,
-      stages: [{ key: 'vessel', symbol: SYM.vessel, fieldSymbols: FIELD_SYMBOLS, endpoint: '/api/logons/members/' + currentMember.id + '/vessels', label: "Member's vessel: name or rego",
+      stages: [{ key: 'vessel', symbol: SYM.vessel, endpoint: '/api/logons/members/' + currentMember.id + '/vessels', label: "Member's vessel: name or rego",
                  create: { label: 'New vessel for this member', onCreate: function (typed) { openPanel('vessels', currentMember, typed); } } }],
       onConfirm: function (id, picks) { chosen(currentMember, picks.vessel.item); }
     });
@@ -433,7 +432,7 @@
     SearchPicker.open({
       title: 'Member', symbol: SYM.member,
       stages: [
-        { key: 'member', symbol: SYM.member, fieldSymbols: FIELD_SYMBOLS, endpoint: '/api/logons/members', label: 'Member: number, name or mobile',
+        { key: 'member', symbol: SYM.member, endpoint: '/api/logons/members', label: 'Member: number, name or mobile',
           create: { label: 'Not a member: note it', onCreate: function (typed) {   // CAP-24: what was heard goes in Notes
             if (!typed) return;
             var notes = box('notes'), line = HEARD.replace('{number}', typed);
@@ -442,7 +441,7 @@
               notes.dispatchEvent(new Event('input', { bubbles: true }));
             }
           } } },
-        { key: 'vessel', symbol: SYM.vessel, fieldSymbols: FIELD_SYMBOLS, endpoint: '/api/logons/vessels', label: "Member's vessel: name or rego",
+        { key: 'vessel', symbol: SYM.vessel, endpoint: '/api/logons/vessels', label: "Member's vessel: name or rego",
           scopeFrom: 'member', scopeParam: 'member', optional: true, skipLabel: 'No vessel',
           create: { label: 'New vessel for this member', onCreate: function (typed, picks) {
             chosen(picks.member.item, null);
@@ -457,7 +456,7 @@
   if (pickAnyVessel) pickAnyVessel.addEventListener('click', function () {
     SearchPicker.open({
       title: 'Vessel', symbol: SYM.vessel,
-      stages: [{ key: 'vessel', symbol: SYM.vessel, fieldSymbols: FIELD_SYMBOLS, endpoint: '/api/logons/all-vessels', label: 'Vessel: name, rego, owner or member' }],
+      stages: [{ key: 'vessel', symbol: SYM.vessel, endpoint: '/api/logons/all-vessels', label: 'Vessel: name, rego, owner or member' }],
       onConfirm: function (id, picks) { chosen(picks.vessel.item.member, picks.vessel.item); }
     });
   });
@@ -466,8 +465,7 @@
   if (pickMobile) pickMobile.addEventListener('click', function () {
     SearchPicker.open({
       title: 'Mobile', symbol: SYM.mobile,
-      stages: [{ key: 'mobile', symbol: SYM.mobile, symbols: { member: SYM.member, public: SYM.public, contact: SYM.contact },
-                 endpoint: '/api/logons/mobiles', label: 'Mobile: a member, an owner or an emergency contact' }],
+      stages: [{ key: 'mobile', symbol: SYM.mobile, endpoint: '/api/logons/mobiles', label: 'Mobile: a member, an owner or an emergency contact' }],
       onConfirm: function (id, picks) {
         var item = picks.mobile.item;
         if (!box('mobile').value.trim()) put('mobile', item.phone);
@@ -479,7 +477,7 @@
     SearchPicker.open({
       title: 'Public user', symbol: SYM.public,
       stages: [
-        { key: 'vessel', symbol: SYM.public, fieldSymbols: FIELD_SYMBOLS, endpoint: '/api/logons/public-vessels', label: 'Public vessel: name, rego or owner',
+        { key: 'vessel', symbol: SYM.public, endpoint: '/api/logons/public-vessels', label: 'Public vessel: name, rego or owner',
           create: { label: 'New public vessel', onCreate: function (typed) {
             chosen(null, null);
             openPanel('public', null, typed);

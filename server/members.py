@@ -237,23 +237,24 @@ def matched(found, q):
 
 
 def vessel_picks(cur, unit, q):
-    """Every vessel, a member's or public, for the log on's 🛥️ Vessel picker: a member's vessel brings its member."""
+    """Every vessel, a member's or public, for the log on's 🛥️ Vessel picker: (the vessels, as vessels_grid lists them
+    with who holds each, and their items, a member's vessel bringing its member)."""
     everyone = members(cur, unit)
     by_member = {m['id']: m for m in everyone}
-    out = []
-    for v in _search(_vessels(cur, unit, by_member), q, SEARCH['vessels'], extra=lambda r: r['holder']['name']):
+    vessels = _search(_vessels(cur, unit, by_member), q, SEARCH['vessels'], extra=lambda r: r['holder']['name'])
+    items = []
+    for v in vessels:
         item = vessel_item(v)
         member = by_member.get(v['memberId'])
         item['member'] = member_item(member) if member else None
-        item['meta'] = v['holder']['name'] if member else 'Public'
-        out.append(item)
-    return out
+        items.append(item)
+    return vessels, items
 
 
 def mobile_picks(cur, unit, q):
     """The log on's 📱 Mobile picker: members' mobiles, public vessel owners' phones and emergency contacts' phones
-    matching the digits typed. Each says whose number it is (`kind`: member, public or contact, for the picker's
-    emoji) and brings the member or public vessel it belongs to."""
+    matching the digits typed. Each says whose number it is (`kind`: member, public or contact; `name`) and who holds
+    that record (`holder`), for _ui.mobiles_grid, and brings the member or public vessel it belongs to."""
     digits = re.sub(r'\D', '', q or '')
     everyone = members(cur, unit)
     by_member = {m['id']: m for m in everyone}
@@ -263,20 +264,18 @@ def mobile_picks(cur, unit, q):
     out = []
     for m in everyone:
         if matches(m.get('mobile')):
-            out.append({'id': 'member-%d' % m['id'], 'kind': 'member', 'primary': m['mobile'], 'secondary': 'Member %s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
-                        'phone': m['mobile'], 'member': member_item(m), 'vessel': None})
+            out.append({'id': 'member-%d' % m['id'], 'kind': 'member', 'primary': m['mobile'], 'name': _holder(member=m)['name'],
+                        'holder': None, 'phone': m['mobile'], 'member': member_item(m), 'vessel': None})
     for v in vessels:
         if not v['memberId'] and matches(v.get('ownerPhone')):
-            out.append({'id': 'owner-%d' % v['id'], 'kind': 'public', 'primary': v['ownerPhone'],
-                        'secondary': '%s, owner of public vessel %s' % (v.get('ownerName') or 'Owner', v.get('vesselName') or v.get('registration')),
-                        'phone': v['ownerPhone'], 'member': None, 'vessel': vessel_item(v)})
+            out.append({'id': 'owner-%d' % v['id'], 'kind': 'public', 'primary': v['ownerPhone'], 'name': v.get('ownerName') or '',
+                        'holder': _holder(vessel=v), 'phone': v['ownerPhone'], 'member': None, 'vessel': vessel_item(v)})
     for c in _held(cur, 'contacts', by_member, by_vessel):
         if matches(c.get('phone')):
             member = by_member.get(c.get('memberId'))
             vessel = by_vessel.get(c.get('vesselId'))
-            out.append({'id': 'contact-%d' % c['id'], 'kind': 'contact', 'primary': c['phone'],
-                        'secondary': '%s, emergency contact of %s' % (c['name'], c['holder']['name']),
-                        'phone': c['phone'], 'member': member_item(member) if member else None,
+            out.append({'id': 'contact-%d' % c['id'], 'kind': 'contact', 'primary': c['phone'], 'name': c['name'],
+                        'holder': c['holder'], 'phone': c['phone'], 'member': member_item(member) if member else None,
                         'vessel': None if member else vessel_item(vessel)})
     return out
 
@@ -349,27 +348,17 @@ def vessel_for(cur, unit, registration, member_id):
     return found[0] if len(found) == 1 else None
 
 
-def _picker_fields(*pairs):
-    """A picker row's second line as [field, text] pairs, each shown after its field's emoji (the stage's
-    fieldSymbols, _ui.FIELD_SYMBOLS); empty values left out."""
-    return [[field, text] for field, text in pairs if text]
-
-
 def member_item(m):
-    """A member as the shared search picker shows it ({id, primary, secondary}), with what the log on takes from it:
-    📱 mobile, then 🛥️ each vessel (🔖 its rego when it has no name)."""
+    """A member as the log on takes it from a pick: `primary` names the pick; the picker lists members with
+    _ui.members_grid."""
     return {'id': m['id'], 'primary': '%s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
-            'secondary': _picker_fields(('mobile', m.get('mobile')), *(('vesselName', v['vesselName']) if v['vesselName'] else
-                                                                        ('registration', v['registration']) for v in m.get('vessels', ()))),
             'memberNumber': m['memberNumber'], 'name': '%s %s' % (m['firstName'], m['lastName']), 'mobile': m.get('mobile')}
 
 
 def vessel_item(v):
-    """A vessel as the shared search picker shows it, with the log on boxes it fills."""
-    length = ('%sm' % v['length']) if v.get('length') else None
+    """A vessel as the log on takes it from a pick, with the log on boxes it fills; the picker lists vessels with
+    _ui.vessels_grid or children_grid."""
     return {'id': v['id'], 'primary': v.get('vesselName') or v.get('registration'),
-            'secondary': _picker_fields(('registration', v.get('registration') if v.get('vesselName') else None), ('length', length),
-                                        *((f, v.get(f)) for f in ('hullColour', 'make', 'model', 'ownerName'))),
             'fields': {f: v.get(f) for f in ('vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'ownerPhone')}}
 
 

@@ -281,9 +281,15 @@ class Members(unittest.TestCase):
         m = self.member()
         self.vessel(m)
         self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public', 'ownerPhone': '0411222333'})
-        members = self.a.get('/api/logons/members?q=smith').json['items']
+        answer = self.a.get('/api/logons/members?q=smith').json
+        members = answer['items']
         self.assertEqual([(i['id'], i['primary'], i['memberNumber']) for i in members], [(m, 'm00001 Jane Smith', 'm00001')])
-        self.assertEqual(members[0]['secondary'], [['mobile', '0412 345 678'], ['vesselName', 'Sea Dog']])   # 📱 and 🛥️ in the picker
+        html = answer['html']                                                          # the Members page's list, under a count
+        self.assertIn('<div class="dc-record-found small text-muted mb-1" data-sp-count>1 found</div>', html)
+        self.assertIn('data-record="%d"' % m, html)
+        for heading in ('👤', '📱', '🛥️'):
+            self.assertIn('<span class="dc-record-grid-symbol">%s</span>' % heading, html)
+        self.assertNotIn('href="/member/%d"' % m, html)                                   # no open button: a click picks
         self.assertEqual(self.a.get('/api/logons/members?q=nobody').json['items'], [])
         boats = self.a.get('/api/logons/vessels?member=%d' % m).json['items']
         self.assertEqual([(b['primary'], b['fields']['registration']) for b in boats], [('Sea Dog', 'AB123Q')])
@@ -291,8 +297,8 @@ class Members(unittest.TestCase):
         self.assertEqual(self.a.get('/api/logons/vessels').status_code, 400)
         public = self.a.get('/api/logons/public-vessels?q=alex').json['items']
         self.assertEqual([(p['primary'], p['fields']['ownerPhone']) for p in public], [('Blue Duck', '0411 222 333')])
-        self.assertIn(['ownerName', 'Alex Public'], public[0]['secondary'])
-        self.assertEqual(boats[0]['secondary'][0], ['registration', 'AB123Q'])
+        self.assertIn('Alex Public', self.a.get('/api/logons/public-vessels?q=alex').json['html'])
+        self.assertIn('AB123Q', self.a.get('/api/logons/vessels?member=%d' % m).json['html'])
         self.assertEqual(self.b.get('/api/logons/vessels?member=%d' % m).status_code, 403)   # another unit's member
         self.assertEqual(self.b.get('/api/logons/members').json['items'], [])
 
@@ -625,16 +631,19 @@ class Members(unittest.TestCase):
         self.assertEqual(set(boats), {'Sea Dog', 'Blue Duck'})                                        # member's and public
         self.assertEqual(boats['Sea Dog']['member']['memberNumber'], 'm00001')
         self.assertIsNone(boats['Blue Duck']['member'])
-        numbers = lambda q: {i['secondary']: i for i in self.a.get('/api/logons/mobiles?q=' + q).json['items']}
-        self.assertEqual(list(numbers('0412 000')), ['Member m00001 Jane Smith'])
-        contact = numbers('0499888')['Sam Smith, emergency contact of m00001 Jane Smith']
-        self.assertEqual((contact['member']['id'], contact['phone']), (m, '0499 888 777'))
-        owner = numbers('0411222')['Alex, owner of public vessel Blue Duck']
-        self.assertEqual((owner['member'], owner['vessel']['id']), (None, pub))
-        self.assertEqual((contact['kind'], owner['kind'], numbers('0412 000')['Member m00001 Jane Smith']['kind']), ('contact', 'public', 'member'))
-        public_contact = numbers('0433')['Pat Public, emergency contact of Blue Duck']
+        numbers = lambda q: {(i['kind'], i['name']): i for i in self.a.get('/api/logons/mobiles?q=' + q).json['items']}
+        self.assertEqual(list(numbers('0412 000')), [('member', 'm00001 Jane Smith')])
+        contact = numbers('0499888')[('contact', 'Sam Smith')]
+        self.assertEqual((contact['member']['id'], contact['phone'], contact['holder']['name']), (m, '0499 888 777', 'm00001 Jane Smith'))
+        owner = numbers('0411222')[('public', 'Alex')]
+        self.assertEqual((owner['member'], owner['vessel']['id'], owner['holder']['name']), (None, pub, 'Blue Duck'))
+        public_contact = numbers('0433')[('contact', 'Pat Public')]
         self.assertEqual(public_contact['vessel']['id'], pub)
+        html = self.a.get('/api/logons/mobiles?q=0411222').json['html']                  # whose number and who holds it, as badges
+        self.assertIn('title="Owner"><span role="img" aria-label="Owner">🧑</span><span class="dc-record-badge-value">Alex</span>', html)
+        self.assertIn('title="Public user"><span role="img" aria-label="Public user">🌐</span><span class="dc-record-badge-value">Blue Duck</span>', html)
         self.assertEqual(self.a.get('/api/logons/mobiles?q=').json['items'], [])                    # no digits, nothing
+        self.assertIn('data-sp-count>0 found<', self.a.get('/api/logons/mobiles?q=').json['html'])
         page = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('id="roPickAnyVessel"', page)
         self.assertIn('id="roPickMobile"', page)

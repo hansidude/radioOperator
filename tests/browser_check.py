@@ -238,7 +238,7 @@ def main(engine='chromium'):
             # Member or public user, answered through Quackit's shared search picker without leaving the page.
             visit('/logons/new')
             def pick(text):
-                page.locator('#spResults [data-pick]', has_text=text).first.click()
+                page.locator('#spResults .dc-record-grid-row', has_text=text).first.click()
             page.locator('#roPickMember').click()
             expect(page.locator('#searchPicker')).to_be_visible()
             expect(page.locator('label[for="spInput"]')).to_have_text('👤 Member: number, name or mobile')   # with the emoji
@@ -252,10 +252,18 @@ def main(engine='chromium'):
                 probe.remove(); return out; }''')
             assert abs(size['w'] - min(size['ch'], .94 * size['vw'])) < 1 and abs(size['h'] - .8 * size['vh']) < 1, size
             page.locator('#spInput').fill(token)
-            expect(page.locator('#spResults [data-pick]', has_text=member_no).first).to_contain_text('📱 0412 345 678 · 🛥️ ' + vessel)
-            pick(member_no)                                                                         # each field after its emoji
+            results = page.locator('#spResults')                                                   # the Members page's list, in the picker
+            expect(results.locator('[data-sp-count]')).to_have_text(re.compile(r'^\d+ found$'))
+            expect(results.locator('.dc-record-grid-head')).to_contain_text('📱 Mobile')             # column names with their emoji
+            expect(results.locator('.dc-record-grid-head')).to_contain_text('🛥️ Vessels')
+            member_row = results.locator('.dc-record-grid-row', has_text=member_no).first
+            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value')).to_have_text('0412 345 678')
+            expect(member_row.locator('[data-column="vessels"]')).to_contain_text(vessel)
+            expect(member_row.locator('.dc-record-count')).not_to_have_text('')                    # numbered
+            expect(results.locator('.dc-record-grid-action')).to_have_count(0)                       # no open button: a click picks
+            pick(member_no)
             expect(page.locator('#spLabel')).to_have_text("🛥️ Member's vessel: name or rego")
-            expect(page.locator('#spResults [data-pick]', has_text=vessel).first).to_contain_text('🔖 ' + token)
+            expect(results.locator('.dc-record-grid-row', has_text=vessel).first.locator('[data-column="registration"] .dc-record-grid-value')).to_have_text(token)
             expect(page.locator('#spFilter')).to_contain_text('No vessel')
             pick(vessel)
             expect(page.locator('#searchPicker')).to_be_hidden()
@@ -301,7 +309,11 @@ def main(engine='chromium'):
             expect(page.locator('#roWhoNow [data-who="vessel"]')).to_have_count(0)
             page.locator('#roWhoNow [data-ro-pick-vessel]').click()                               # pick one of theirs again
             expect(page.locator('#spLabel')).to_have_text("🛥️ Member's vessel: name or rego")
-            pick(vessel)
+            page.locator('#spInput').fill(vessel)
+            expect(page.locator('#spResults [data-sp-count]')).to_have_text('1 found')
+            page.keyboard.press('ArrowDown')                                                       # with the keys
+            expect(page.locator('#spResults .dc-record-grid-row').first).to_have_class(re.compile(r'\bdc-record-grid-active\b'))
+            page.keyboard.press('Enter')
             expect(page.locator('#f-vesselName')).to_have_value(vessel)
             expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
             first_pick = page.locator('#f-vesselId').input_value()
@@ -309,7 +321,7 @@ def main(engine='chromium'):
             page.locator('#spInput').fill(token)
             pick(member_no)
             page.locator('#spInput').fill('NEWBOAT-' + token)
-            expect(page.locator('#spResults')).to_contain_text('No matches')
+            expect(page.locator('#spResults [data-sp-count]')).to_have_text('0 found')
             page.locator('#spFilter [data-create]').click()
             expect(page.locator('#roNewVesselPanel')).to_be_visible()
             expect(page.locator('#roNewVesselPanel')).to_contain_text(member_no)
@@ -368,13 +380,15 @@ def main(engine='chromium'):
             page.locator('#roPickAnyVessel').click()                                               # 🛥️ Vessel: any vessel
             expect(page.locator('#spLabel')).to_have_text('🛥️ Vessel: name, rego, owner or member')
             page.locator('#spInput').fill(vessel)
+            expect(page.locator('#spResults .dc-record-grid-row', has_text=vessel).first.locator('[data-column="holder"]')).to_contain_text(member_no)   # 👤 who holds it
             pick(vessel)
             expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # a member's vessel brings its member
             expect(page.locator('#roWhoNow [data-who="vessel"]')).to_contain_text(vessel)
             page.locator('#roWhoNow [data-ro-clear="member"]').click()
             page.locator('#roPickMobile').click()                                                  # 📱 Mobile: an emergency contact's phone
             page.locator('#spInput').fill('0499888777')
-            expect(page.locator('#spResults [data-pick]', has_text='Verify Contact ' + token).first.locator('span').first).to_have_text('🆘')   # a contact's number
+            whose = page.locator('#spResults .dc-record-grid-row', has_text='Verify Contact ' + token).first.locator('[data-column="whose"]')
+            expect(whose.get_by_role('img', name='Emergency contact')).to_have_text('🆘')                 # a contact's number
             pick('Verify Contact ' + token)
             expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # brings the member it belongs to
             expect(page.locator('#roWhoNow [data-ro-pick-vessel]')).to_be_visible()
