@@ -122,7 +122,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   stays. Per-page links the menu covers are gone. Help page `/radio/help` explains every feature with the real
   controls on a sample.
 - Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page) and
-  Lines for cards (each field on one line of its own).
+  Lines for cards (each field on one line of its own; on by default, for chosen and narrow-screen cards alike).
 - The log, Members and Public vessels have the same panel (starts closed, remembered per page, refreshed with the rows
   and on the log's 30 s refresh; `_ui.matched_panel`, `members.list_matched`, `logons.matched_fields`).
 - Search has the shared side panel (panel button beside the view buttons): for each kind found, badges of the fields

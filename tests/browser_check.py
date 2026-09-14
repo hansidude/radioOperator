@@ -460,22 +460,21 @@ def main(engine='chromium'):
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # refreshed with the search
             visit('/radio/search?q=' + token)
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()
-            # Lines (cards only): each field of a card on one line of its own.
+            # Lines, on by default: chosen cards give each field a line of its own.
             lines = page.locator('[data-dc-record-view="lines"]:visible')
-            expect(lines).to_be_disabled()
-            page.locator('[data-dc-record-view="cards"]:visible').click()
-            expect(lines).to_be_enabled()
-            lines.click()
             expect(lines).to_have_attribute('aria-pressed', 'true')
+            page.locator('[data-dc-record-view="cards"]:visible').click()
             cells = page.evaluate('''() => [...document.querySelector('#radioFoundMembers .dc-record-grid-row').querySelectorAll('.dc-record-grid-cell:not(.dc-record-grid-action)')]
                 .filter(c => c.offsetParent !== null && getComputedStyle(c).display !== 'none')
                 .map(c => ({top: c.getBoundingClientRect().top, height: c.getBoundingClientRect().height,
                             wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace}))''')
             assert len(cells) >= 3 and all(b['top'] >= a['top'] + a['height'] - 1 for a, b in zip(cells, cells[1:])), 'Lines: fields are not a line each: %s' % cells
             assert all(c['height'] < 32 and c['wrap'] == 'nowrap' for c in cells), 'Lines: a field runs past one line: %s' % cells
+            lines.click()                                                                           # off: fields flow along the card again
+            expect(lines).to_have_attribute('aria-pressed', 'false')
+            expect(page.locator('#radioFoundMembers .dc-record-grid-row').first).to_have_css('display', 'flex')
             lines.click()
             page.locator('[data-dc-record-view="cards"]:visible').click()
-            expect(lines).to_be_disabled()
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
             toggle_all.click()
@@ -732,9 +731,12 @@ def main(engine='chromium'):
                     const mobile = getComputedStyle(head).display === 'none';
                     const nodes = [el, ...el.querySelectorAll('.dc-record-grid-row, .dc-record-grid-cell')];
                     if (mobile) nodes.push(...el.querySelectorAll('.dc-record-grid-value'));
+                    // A value cut off with … on purpose (Lines) hides its overflow; anything else spilling is a fault.
+                    const spills = n => n.clientWidth && n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).overflowX === 'visible';
                     return {mobile, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
                         heights: rows.map(r => r.getBoundingClientRect().height),
-                        overflow: nodes.some(n => n.clientWidth && n.scrollWidth > n.clientWidth + 1),
+                        overflow: nodes.some(spills),
+                        lines: !mobile || [...el.querySelectorAll('.dc-record-grid-value')].every(v => getComputedStyle(v).whiteSpace === 'nowrap'),
                         visibleBlanks: [...el.querySelectorAll('.dc-record-grid-blank')].some(n => n.getBoundingClientRect().height > 0),
                         aligned: rows.every(r => [...r.children].every((cell, i) =>
                             Math.abs(cell.getBoundingClientRect().left - head.children[i].getBoundingClientRect().left) < 3))};
@@ -747,6 +749,7 @@ def main(engine='chromium'):
                     assert metrics['aligned'], 'Headers and row columns do not align at %spx' % width
                 else:
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
+                    assert metrics['lines'], 'Phone cards are not one line per field by default at %spx' % width
                 assert page.locator('.dc-record-wide').evaluate('el => el.getBoundingClientRect().width <= 1920'), 'Width cap'
                 expect(row.locator('[data-column="member"]')).to_be_visible()
                 if width >= 1328:                       # dates and times are never cut off on a desktop
@@ -781,6 +784,9 @@ def main(engine='chromium'):
             expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
             expect(page.locator('[data-dc-record-view="cards"]')).to_have_attribute('aria-pressed', 'true')
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_hidden()
+            expect(grid_rows.first).to_have_css('display', 'grid')                           # Lines on by default: a line per field
+            expect(page.locator('[data-dc-record-view="lines"]')).to_have_attribute('aria-pressed', 'true')
+            page.locator('[data-dc-record-view="lines"]').click()                            # off: the fields flow along one line
             expect(grid_rows.first).to_have_css('display', 'flex')
             expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'false')   # cards keep their own: one line
             got = heights()
@@ -812,7 +818,7 @@ def main(engine='chromium'):
             expect(value).to_have_css('white-space', 'nowrap')
             got = heights()                                                                 # Paragraphs off: the paper's one-line rows
             assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
-            expect(view).to_have_class('')
+            expect(view).to_have_class('')                                                    # (Lines off, Cards off, Paragraphs off)
             # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
             readout = page.locator('[data-dc-record-size-readout]')
             larger = page.get_by_role('button', name='Larger text')
