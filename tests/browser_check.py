@@ -105,6 +105,8 @@ def main(engine='chromium'):
             expect(menu.locator('a[href="/myTasks"]')).to_have_count(0)                            # none of Quackit's menu
             expect(page.locator('#contextNavToggle')).to_have_count(0)
             expect(page.locator('.navbar-brand')).to_have_attribute('href', '/logons')
+            expect(page.locator('.navbar-brand > i')).to_have_count(1)                               # Quackit's home icon, once
+            expect(page.locator('.navbar-brand > i')).to_have_class(re.compile(r'\bbi-house\b'))
             page.locator('#navbarNav a[href="/radio/help"]').click()                               # Help: the real controls, tried on a sample
             page.wait_for_url(re.compile('/radio/help$'))
             for icon in page.locator('[data-help-icon]').all():

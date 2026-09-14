@@ -30,7 +30,7 @@
 <h2 id="menu">🧭 The menu</h2>
 <p>Once you open Radio Logs (the RadioLogs link on Quackit's menu), the menu is Radio Logs' own:</p>
 <table class="table table-sm align-middle">
-  <tr><td><i class="bi bi-broadcast"></i> {{ brand }}</td><td>The log: every log on, with the name of the page you are on beside it.</td></tr>
+  <tr><td><i class="bi bi-house"></i> {{ brand }}</td><td>The log: every log on, with the name of the page you are on beside it.</td></tr>
   {% for href, icon, label in ui.MENU %}
   <tr><td><i class="bi bi-{{ icon }}"></i> {{ label }}</td><td>{{ {'/logons/new': 'Take a new log on.', '/members': 'The unit\'s members, with their emergency contacts, vessels, trailers and cars.',
       '/vessels': 'Vessels of public users (not members): the vessel is the record, with who to reach about it.',
