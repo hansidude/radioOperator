@@ -1,0 +1,167 @@
+{% extends base_template %}
+{% import 'radio/_ui.html' as ui %}
+{% import 'myMacro_record_view.html' as records_ui %}
+{% import 'myMacro_groups.html' as grp %}
+{% block page_title %}<i class="bi bi-question-circle me-1"></i>Help{% endblock %}
+{# Quackit's usual ~1200px page width (layout's mySpacing). #}
+{% block body_wrap_class %}container-fluid mySpacing{% endblock %}
+{% block body %}
+{{ ui.styles() }}
+<style>
+.ro-help h2{font-size:1.15rem;font-weight:600;margin:1.6rem 0 .5rem;padding-bottom:.35rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-help h3{font-size:1rem;font-weight:600;margin:1rem 0 .35rem}
+.ro-help table{font-size:.9rem}
+.ro-help td:first-child{white-space:nowrap}
+.ro-help [data-help-icon]{display:inline-flex;align-items:center;justify-content:center;min-width:1.8rem;padding:.1rem .3rem;border:1px solid var(--bs-border-color);border-radius:.25rem}
+.ro-help-demo{padding:.6rem;border:1px dashed var(--bs-border-color);border-radius:.375rem;margin:.5rem 0 1rem}
+.ro-help-toc{display:flex;flex-wrap:wrap;gap:.35rem}
+</style>
+{# The help for Radio Logs. The demonstrations are the real shared controls over made-up sample rows, and the icons in
+   the tables are copied from those real buttons (data-help-icon), so what this page shows is what the pages have. #}
+<div class="ro-help">
+<p class="lead mb-2">Radio Logs keeps the unit's watch: who is out on the water, when they are due back, and who to call.</p>
+<nav class="ro-help-toc" aria-label="Help sections">
+  {% for id, label in [('menu', '🧭 The menu'), ('log', '📋 The log'), ('views', '🃏 Views: table, cards and more'), ('status', '🚦 Status symbols'),
+                        ('logon', '📝 A log on'), ('members', '👤 Members and public vessels'), ('search', '🔎 Search'), ('fields', '🔤 Field emoji')] %}
+  <a class="btn btn-outline-info btn-sm" href="#{{ id }}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+<h2 id="menu">🧭 The menu</h2>
+<p>Once you open Radio Logs (the RadioLogs link on Quackit's menu), the menu is Radio Logs' own:</p>
+<table class="table table-sm align-middle">
+  <tr><td><i class="bi bi-broadcast"></i> {{ brand }}</td><td>The log: every log on, with the name of the page you are on beside it.</td></tr>
+  {% for href, icon, label in ui.MENU %}
+  <tr><td><i class="bi bi-{{ icon }}"></i> {{ label }}</td><td>{{ {'/logons/new': 'Take a new log on.', '/members': 'The unit\'s members, with their emergency contacts, vessels, trailers and cars.',
+      '/vessels': 'Vessels of public users (not members): the vessel is the record, with who to reach about it.',
+      '/radio/search': 'One search over every radio record.', '/radio/help': 'This page.'}[href] }}</td></tr>
+  {% endfor %}
+  <tr><td><i class="bi bi-arrow-up"></i> <i class="bi bi-arrow-down"></i></td><td>Scroll to the top or the bottom of the page.</td></tr>
+</table>
+<p>On a narrow screen the menu folds into the <i class="bi bi-list"></i> button. To go back to Quackit, use the browser's back button or its address.</p>
+
+<h2 id="log">📋 The log</h2>
+<p>One list of log ons, newest call first. The toolbar under the menu narrows it; everything chosen is kept in the address, so a refresh or a bookmark shows the same view.</p>
+<table class="table table-sm align-middle">
+  <tr><td>Status</td><td>{% for value, state, label in ui.FILTERS %}{{ ui.STATES[state].symbol }} {{ label }}{{ ', ' if not loop.last }}{% endfor %}.</td></tr>
+  <tr><td>Date</td><td>Ticked, only calls on that date. Untick it to see every day. The log opens on today.</td></tr>
+  <tr><td>Sort</td><td>Newest first, Oldest first, or Due first: overdue at the top, then the nearest deadline; drafts and closed log ons after.</td></tr>
+  <tr><td>Search</td><td>Member No., vessel name, rego, mobile (with or without spaces), destination, departure point, trip ID, day number and notes. <i class="bi bi-arrow-counterclockwise"></i> clears it.</td></tr>
+</table>
+<ul>
+  <li>The log refreshes itself every 30 seconds, so a deadline that passes shows without anyone touching anything.</li>
+  <li><strong>Overdue:</strong> a red notice appears above the list, flashing, with a beep, and the browser tab shows <em>(1) OVERDUE</em>. <strong>Seen</strong> records that you saw it; it does not resolve anything. The notice goes when the vessel is logged off.</li>
+  <li><i class="bi bi-pencil-square"></i> at the end of a row opens that log on. Every list's rows have one.</li>
+</ul>
+
+<h2 id="views">🃏 Views: table, cards and more</h2>
+<p>Every list (the log, Members, Public vessels, Search, a member's tabs) has the same view buttons beside its search. Try them on this sample:</p>
+<div class="ro-help-demo">
+  <div id="roHelpToolbar" class="dc-record-toolbar ro-toolbar">{{ records_ui.view_controls('roHelpView', panel='roHelpPanel') }}</div>
+  {% set columns = [{'key': 'no', 'label': 'No.', 'symbol': ui.FIELD_SYMBOLS.dayNumber, 'width': 'minmax(3rem,.5fr)', 'kind': 'index'},
+                    {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.2fr)'},
+                    {'key': 'registration', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration, 'width': 'minmax(0,.8fr)'},
+                    {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
+                    {'key': 'destination', 'label': 'Going to', 'symbol': ui.FIELD_SYMBOLS.destination, 'width': 'minmax(0,1.6fr)'},
+                    {'key': 'notes', 'label': 'Notes', 'symbol': ui.FIELD_SYMBOLS.notes, 'width': 'minmax(0,1.6fr)'}] %}
+  {% set rows = [{'id': 1, 'cells': {'no': '1', 'vesselName': 'Sample Sea Dog', 'registration': 'SAMPLE1', 'mobile': '0400 000 000', 'destination': 'Sample bay', 'notes': 'A sample row, not a record'}},
+                 {'id': 2, 'cells': {'no': '2', 'vesselName': 'Sample vessel with a long name to show truncation', 'registration': 'SAMPLE2', 'mobile': '0400 000 001', 'destination': 'A long sample destination beyond the harbour entrance and around the point', 'notes': 'Long values end in … on one line; hover shows all of it'}}] %}
+  <div id="roHelpView">
+    {% call records_ui.record_panel('roHelpPanel', 'Sample panel', open=False) %}
+      <section class="dc-record-panel-section">
+        {{ records_ui.panel_badge('🎫', 'Log ons', 2, heading=True, button=False) }}
+        <div class="dc-record-panel-badges">{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.vesselName, 'Vessel Name', 2, button=False) }}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.notes, 'Notes', 1, button=False) }}</div>
+      </section>
+    {% endcall %}
+    <div>{{ records_ui.record_grid(rows, columns, 'radioHelpSample') }}</div>
+  </div>
+</div>
+<table class="table table-sm align-middle">
+  <tr><td><span data-help-icon='[data-dc-record-view="cards"]'></span> Cards</td><td>Each record as a card, its fields along one line. Off: a table, one row per record, under column headings. On a phone the list is always cards.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-record-view="paragraphs"]'></span> Paragraphs</td><td>In the table: long values wrap onto more lines instead of ending in …. On cards: a line per field. Tables and cards each keep their own choice.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-record-view="lines"]'></span> Lines</td><td>Cards only (turn Cards on first): each field on one line of its own, names never broken, long values ending in …, all of it on hover.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-record-panel]'></span> Panel</td><td>Shows or hides the side panel beside the list: what the search matched, in which fields, as badges with counts. Search starts with it open, the other lists closed.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-record-size="smaller"]'></span> <span data-help-icon='[data-dc-record-size="larger"]'></span> <span data-help-icon='[data-dc-record-size="reset"]'></span></td><td>Smaller or larger text, 100% to 200%, shown between them; the reset button goes back to 100%.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-record-width]'></span> Width</td><td>The whole page at the usual width (about 1200px, centred) or the full width of the screen.</td></tr>
+</table>
+<p>Text size, width and the panel are remembered in this browser for each page. Cards, Paragraphs and Lines start fresh each time a page opens.</p>
+
+<h2 id="status">🚦 Status symbols</h2>
+<table class="table table-sm align-middle">
+  {% for key, text in [('draft', 'Taken but not yet on the watch: something needed is still missing (a ? marks each gap in the list).'),
+                       ('loggedOn', 'On the watch: the unit is waiting for them back.'), ('overdue', 'Past their return time and not logged off.'),
+                       ('loggedOff', 'Back: the watch is over.'), ('notdeparted', 'Logged off because they never went out.'),
+                       ('discarded', 'A draft that was never a log on, discarded with a reason.'),
+                       ('conflict', 'What was heard disagrees with the member or vessel record.')] %}
+  <tr><td>{{ ui.STATES[key].symbol }} {{ ui.STATES[key].label }}</td><td>{{ text }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2 id="logon">📝 A log on</h2>
+<h3>Member or public user</h3>
+<table class="table table-sm align-middle">
+  <tr><td>{{ ui.WHO.member.symbol }} Member</td><td>Pick the member record (by number, name or mobile), then one of their vessels.</td></tr>
+  <tr><td>{{ ui.WHO.public.symbol }} Public user</td><td>Pick a stored public vessel, or add a new one without leaving the page.</td></tr>
+  <tr><td>{{ ui.FIELD_SYMBOLS.vesselName }} Vessel</td><td>Find any vessel by name or rego; a member's vessel brings its member.</td></tr>
+  <tr><td>{{ ui.FIELD_SYMBOLS.mobile }} Mobile</td><td>Find by phone number: members, public vessel owners and emergency contacts.</td></tr>
+  <tr><td><i class="bi bi-search"></i> Search</td><td>Opens Search in a new tab, the log on stays where it is.</td></tr>
+</table>
+<ul>
+  <li>What was picked shows as badges ({{ ui.WHO.member.symbol }} member, {{ ui.WHO.public.symbol }} public, {{ ui.FIELD_SYMBOLS.vesselName }} vessel). <i class="bi bi-x-lg"></i> on a badge removes it; removing the vessel keeps the member.</li>
+  <li>Boxes filled from a record are read-only (Mobile stays editable). If the record is wrong, fix it on its tab: the <strong>Member</strong> or <strong>Public vessel</strong> tab shows that record and saves in place.</li>
+  <li>A Member No. that was heard but is not a member goes into Notes; the member box only takes a real member.</li>
+</ul>
+<h3>The boxes</h3>
+<ul>
+  <li><i class="bi bi-calendar3"></i> chooses a date, <i class="bi bi-clock"></i> sets the time to now. <strong>How they logged on:</strong> Radio, Phone or In person.</li>
+  <li>A <span class="text-danger">red</span> box has to be fixed before the log on can go on the watch. An <span style="color:var(--bs-orange)">orange</span> box is worth asking for and blocks nothing.</li>
+  <li><i class="bi bi-floppy"></i> <strong>Save</strong> keeps it; once nothing needed is missing, saving puts it on the watch.</li>
+  <li><i class="bi bi-trash"></i> <strong>Discard draft</strong> (with a reason) for a call that was never a log on. <i class="bi bi-box-arrow-right"></i> <strong>Log off</strong> ends the watch when they are back.</li>
+  <li><i class="bi bi-clock-history"></i> <strong>History</strong>: every change to the log on, who made it and when.</li>
+</ul>
+
+<h2 id="members">👤 Members and public vessels</h2>
+<ul>
+  <li>A member gets their number (m00001 and on) when saved. A mobile is 10 digits and shows as 0412 345 678.</li>
+  <li>A member's tabs: Details, Emergency contacts, Vessels, Trailers, Cars and History. Each tab is a list with the view buttons and its own search; Add opens a new one, <i class="bi bi-pencil-square"></i> opens one.</li>
+  <li>History on a member shows every change: their details and every contact, vessel, trailer and car, each marked with what it changed.</li>
+  <li>A public vessel holds the vessel, its owner's name, phone and email, notes, emergency contacts and history.</li>
+</ul>
+
+<h2 id="search">🔎 Search</h2>
+<p>Type two or more characters: it looks through log ons, members, emergency contacts, vessels, trailers and cars, in any field, notes included.</p>
+<div class="ro-help-demo">
+  <div id="roHelpGroupsBar" class="dc-record-toolbar">{{ grp.collapseAllButton('radioHelp', 'kinds') }}</div>
+  <div id="roHelpGroups">
+    {% for gid, symbol, label, count in [('members', ui.WHO.member.symbol, 'Sample members', 2), ('vessels', ui.FIELD_SYMBOLS.vesselName, 'Sample vessels', 3)] %}
+    {% call grp.group('radioHelp', gid) %}{{ grp.groupHeader('', symbol ~ ' ' ~ label, count=count) }}<div class="dc-record-empty">The sample {{ label|lower }} would be listed here.</div>{% endcall %}
+    {% endfor %}
+  </div>
+</div>
+<table class="table table-sm align-middle">
+  <tr><td>A kind's header</td><td>Click it to fold that kind away or open it again.</td></tr>
+  <tr><td><span data-help-icon='[data-grp-toggle-all="radioHelp"]'></span></td><td>Folds every kind away, or opens them all again. Folded kinds stay folded for the next search.</td></tr>
+  <tr><td>Side panel badges</td><td>For each kind found, the fields that matched and how many records: e.g. {{ records_ui.panel_badge(ui.FIELD_SYMBOLS.mobile, 'Mobile', 3, button=False) }}. {{ ui.FIELD_SYMBOLS.holder }} {{ field_labels.holder }}: found through the member or vessel it belongs to. {{ ui.FIELD_SYMBOLS.across }} {{ field_labels.across }}: found only by words across two fields, such as a first and last name. On Search, clicking a badge opens and scrolls to its kind.</td></tr>
+</table>
+
+<h2 id="fields">🔤 Field emoji</h2>
+<p>Every field has its emoji, the same on forms, lists, cards and History.</p>
+<div class="dc-record-panel-badges">
+  {% for field, symbol in ui.FIELD_SYMBOLS.items() %}<span class="dc-record-panel-badge" data-help-field="{{ field }}"><span role="img" aria-hidden="true">{{ symbol }}</span><span class="dc-record-panel-badge-label">{{ field_labels[field] }}</span></span>{% endfor %}
+</div>
+</div>
+{{ grp.groupStyles() }}
+{{ grp.groupEngineScript() }}
+<script>
+(function () {
+  GroupEngine.init({ key: 'radioHelp', root: '#roHelpGroups', itemSel: '.dc-record-empty', defaultCollapsed: false, hideEmpty: false });
+  // The icons in the tables are the real buttons' own.
+  document.querySelectorAll('[data-help-icon]').forEach(function (slot) {
+    var button = document.querySelector('.ro-help-demo ' + slot.getAttribute('data-help-icon'));
+    if (!button) throw new Error('Help: no button matches ' + slot.getAttribute('data-help-icon'));
+    slot.innerHTML = button.innerHTML;
+    slot.title = button.title;
+  });
+})();
+</script>
+{% endblock %}

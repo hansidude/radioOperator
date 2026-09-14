@@ -90,7 +90,28 @@ def main(engine='chromium'):
             # Members and public vessels, reached from the log's navbar. The Member No. on a log on has to be one.
             page.locator('.navbar a[href="/members"]').first.click()
             page.wait_for_url(re.compile('/members$'))
-            expect(page.locator('.navbar a[href="/vessels"]')).to_have_count(0)               # no Public vessels button on Members
+            expect(page.locator('.entity-nav a[href="/vessels"]')).to_have_count(0)           # Public vessels is on the menu, not the Members page
+            expect(page).to_have_title('Radio Logs')                                              # Radio Logs' own program menu
+            menu = page.locator('#navbarNav .navbar-nav')
+            for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help', '/logout'):
+                expect(menu.locator('a[href="%s"]' % href)).to_have_count(1)
+            expect(menu.locator('a[href="/myTasks"]')).to_have_count(0)                            # none of Quackit's menu
+            expect(page.locator('#contextNavToggle')).to_have_count(0)
+            expect(page.locator('.navbar-brand')).to_have_attribute('href', '/logons')
+            page.locator('#navbarNav a[href="/radio/help"]').click()                               # Help: the real controls, tried on a sample
+            page.wait_for_url(re.compile('/radio/help$'))
+            for icon in page.locator('[data-help-icon]').all():
+                assert icon.locator('i, span').count() > 0, 'Help icon not filled: %s' % icon.get_attribute('data-help-icon')
+            page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
+            expect(page.locator('#roHelpView')).to_have_class(re.compile(r'\bdc-record-cards\b'))
+            page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
+            page.screenshot(path=str(ARTIFACTS / ('radio-help-%s.png' % engine)))
+            visit('/myTasks')                                                                       # Quackit's own pages keep Quackit's menu
+            expect(page.locator('#navbarNav a[href="/radio/help"]')).to_have_count(0)
+            expect(page.locator('#navbarNav a[href="/logons"]')).to_have_count(1)
+            expect(page.locator('#contextNavToggle')).to_have_count(1)
+            expect(page).to_have_title('QUACKIT')
+            page.goto(URL + '/members')
             expect(page.locator('[data-dc-record-width]:visible')).to_have_attribute('title', 'Usual page width')   # Members starts wide
             page.locator('a[href="/members/new"]').click()
             page.wait_for_url(re.compile('/members/new$'))
@@ -178,7 +199,7 @@ def main(engine='chromium'):
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Members overflow at %spx' % width
             page.set_viewport_size({'width': 1920, 'height': 1080})
             visit('/vessels')
-            expect(page.locator('.navbar a[href="/members"]')).to_have_count(0)               # no Members button on Public vessels
+            expect(page.locator('.entity-nav a[href="/members"]')).to_have_count(0)           # Members is on the menu, not this page
             visit('/vessels/new')
             usual_width('#ro-vessel-details', 'New public vessel')
             page.locator('#public-vesselName').fill('PUBLIC-' + token)
@@ -462,7 +483,7 @@ def main(engine='chromium'):
                 dialog.dismiss()
             page.once('dialog', dismiss_leave)
             with page.expect_event('dialog'):
-                page.locator('.entity-nav-links a[href="/logons"]').click(no_wait_after=True)
+                page.locator('.navbar-brand[href="/logons"]').click(no_wait_after=True)
             expect(page.locator('#f-vesselName')).to_have_value(vessel)
             assert dialogs == ['beforeunload'], 'Unsaved changes did not warn'
             page.on('dialog', lambda dialog: dialog.accept())

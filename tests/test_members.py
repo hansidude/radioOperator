@@ -62,8 +62,9 @@ class Members(unittest.TestCase):
         self.assertIn('>Jones</span>', page)
         self.assertIn('First name', page)
         self.assertIn('href="/members/new"', page)
-        self.assertNotIn('href="/vessels"', page)                                   # no Public vessels button on Members
-        self.assertNotIn('href="/members"', self.a.get('/vessels').get_data(as_text=True))   # nor Members on Public vessels
+        nav = lambda html: html[html.index('<div class="entity-nav"'):html.index('</nav>', html.index('<div class="entity-nav"'))]
+        self.assertNotIn('href="/vessels"', nav(page))                              # Public vessels is on the menu, not the page
+        self.assertNotIn('href="/members"', nav(self.a.get('/vessels').get_data(as_text=True)))   # nor Members
         self.assertNotIn('Jones', self.a.get('/members?q=jane').get_data(as_text=True))
         self.assertIn('Smith', self.a.get('/members?q=0412345678').get_data(as_text=True))
         logons = self.a.get('/logons').get_data(as_text=True)

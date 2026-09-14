@@ -26,10 +26,12 @@
   </style>
 </head>
 <body>
+  {% import 'radio/_ui.html' as radio_ui %}
   <nav class="navbar fixed-top bg-dark" data-bs-theme="dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="/logons"><i class="bi bi-broadcast me-1"></i>{{ brand }}</a>
       <span class="text-light">{% block page_title %}{% endblock %}</span>
+      <ul class="navbar-nav flex-row flex-wrap gap-1 me-auto">{{ radio_ui.radio_menu(logout_url) }}</ul>
       {% block navbar_buttons %}{% endblock %}
     </div>
   </nav>

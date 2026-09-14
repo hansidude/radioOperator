@@ -117,6 +117,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   remembered in this browser across searches); the page is Quackit's usual ~1200px width (`mySpacing`), as are the member, public vessel and
   contact / vessel / trailer / car pages (new and edit); rows open their
   record (`members.find`, `logons.records`). The log's own search now also matches departure point and notes.
+- Radio Logs is its own program inside Quackit: `radio/_layout.html` (Quackit's shell, Radio Logs menu: New log on,
+  Members, Public vessels, Search, Help, Log out; the brand is the log; title "Radio Logs"). Quackit's RadioLogs link
+  stays. Per-page links the menu covers are gone. Help page `/radio/help` explains every feature with the real
+  controls on a sample.
 - Every row/card page has the shared width button (usual ~1200px container or full width, remembered per page) and
   Lines for cards (each field on one line of its own).
 - The log, Members and Public vessels have the same panel (starts closed, remembered per page, refreshed with the rows

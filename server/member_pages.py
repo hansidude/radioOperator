@@ -333,6 +333,19 @@ def search_page():
                           labels=M.LABELS, reference=L.reference)
 
 
+# Every field's name for the Help page's emoji legend (_ui.FIELD_SYMBOLS): the log's words where the log names it.
+HELP_LABELS = dict(M.MATCH_LABELS, watchStatus='Status', **L.SEARCH_LABELS)
+
+
+@bp.route('/radio/help')
+def help_page():
+    """What every part of Radio Logs does: the menu, the log, the view buttons (tried on a sample), a log on,
+    members and public vessels, Search, and what each symbol means."""
+    h, (conn, cur) = _open()          # logged in, like every other page
+    cur.close()
+    return _page('help.html', field_labels=HELP_LABELS)
+
+
 @bp.route('/logons/who')
 def who_badges():
     """The log on form's badges for a pick, drawn by the one macro the page itself uses (_ui.who_badges)."""

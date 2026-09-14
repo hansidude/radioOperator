@@ -60,7 +60,8 @@ def _logon(cur, logon_id, h, lock=False):
 
 def _page(name, **ctx):
     h = host()
-    return render_template('radio/' + name, base_template=h.base_template, brand=h.brand, now=_now(), **ctx)
+    return render_template('radio/' + name, base_template=h.base_template, brand=h.brand, logout_url=h.logout_url,
+                           now=_now(), **ctx)
 
 
 def _queue(cur, h):

@@ -1,0 +1,10 @@
+{# Radio Logs as its own program inside Quackit: Quackit's page shell (assets, navbar sizing, the navbar controls slot)
+   with the Radio Logs menu instead of Quackit's. Quackit's own RadioLogs link brings you here; a radio page's
+   {% extends base_template %} lands on this. #}
+{% extends 'layout.html' %}
+{% import 'radio/_ui.html' as radio_ui %}
+{% block app_title %}{{ brand }}{% endblock %}
+{% block app_home_href %}/logons{% endblock %}
+{% block app_home_icon %}bi-broadcast{% endblock %}
+{% block app_menu %}{{ radio_ui.radio_menu(logout_url) }}{% endblock %}
+{% block app_extra_actions %}{% endblock %}

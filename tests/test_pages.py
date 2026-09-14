@@ -253,6 +253,9 @@ class Pages(unittest.TestCase):
         self.assertIn('data-dc-record-width aria-controls="roRecordView"', page)                    # shared page width button
         self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="What the search matched" data-open="0">', page)
         self.assertIn('</aside><div id="roLiveRecords">', page)
+        self.assertIn('<title>Radio Logs</title>', page)                                           # the program's own menu
+        for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):
+            self.assertEqual(page.count('href="%s"' % href), 1, href)
         self.assertIn('data-navbar-controls="RadioLogs filters"', page)                             # lives in the navbar                    # outside what refreshes replace
         self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
         self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)

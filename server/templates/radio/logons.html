@@ -3,15 +3,9 @@
 {% from 'myMacro_filters.html' import search_controls %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% import 'myMacro_record_view.html' as records_ui %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>{{ brand }}{% endblock %}
+{% block page_title %}{{ brand }}{% endblock %}
 {# The shared record grid uses the host's wide collection wrapper, capped at 1920px. #}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
-{% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="{{ brand }}">
-  <a class="btn btn-primary btn-sm" href="/logons/new"><i class="bi bi-plus-lg me-1"></i>New log on</a>
-  {{ ui.records_links() }}
-</div>
-{% endblock %}
 {% block body %}
 {{ ui.styles() }}
 {# One collection, four filters. There are no per-status tabs and no per-status renderers: the same

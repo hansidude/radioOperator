@@ -15,7 +15,6 @@
 {% block navbar_buttons %}
 <div class="entity-nav" role="navigation" aria-label="Log on">
   <div class="entity-nav-links">
-    {{ entity_nav.parent_link('/logons', brand, 'list-ul') }}
     {% if not creating %}{{ ui.status_badge(dict(logon, condition=condition)) }}{% endif %}
   </div>
   <div class="btn-group btn-group-sm ro-view-tabs" id="logonViewTabs" role="group" aria-label="Log on views">

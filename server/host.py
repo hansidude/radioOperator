@@ -38,8 +38,9 @@ def install_standalone_ui(app):
 
 class Host:
     base_template = 'radio/_base.html'   # a host with its own layout passes its own
-    brand = 'RadioLogs'
+    brand = 'Radio Logs'
     login_url = None                     # where to send someone who is not logged in; None -> a plain 403
+    logout_url = None                    # the menu's Log out; None -> no Log out in the menu
 
     # Operational values, every one of them a placeholder a host overrides. The spec makes these
     # approved configuration (Appendix D questions 9 and 17) and refuses to invent policy; these

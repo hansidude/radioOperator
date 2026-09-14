@@ -521,9 +521,14 @@
 {% endmacro %}
 
 {# Quackit's navbar links from the log to the standing records, and back. #}
-{% macro records_links() %}
-{% import 'myMacro_entity_nav.html' as entity_nav %}
-{{ entity_nav.page_link('/members', 'Members', 'people') }}
-{{ entity_nav.page_link('/vessels', 'Public vessels', 'life-preserver') }}
-{{ entity_nav.page_link('/radio/search', 'Search', 'search') }}
+{# The Radio Logs program menu, the same in both layouts (radio/_layout.html inside Quackit, radio/_base.html on its
+   own): list items for a .navbar-nav. The brand (the log) is the layout's home link. #}
+{% set MENU = [('/logons/new', 'plus-lg', 'New log on'), ('/members', 'people', 'Members'),
+               ('/vessels', 'life-preserver', 'Public vessels'), ('/radio/search', 'search', 'Search'),
+               ('/radio/help', 'question-circle', 'Help')] %}
+{% macro radio_menu(logout_url=None) %}
+{% for href, icon, label in MENU %}
+<li class="nav-item"><a class="btn btn-sm text-nowrap" href="{{ href }}"><i class="bi bi-{{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a></li>
+{% endfor %}
+{% if logout_url %}<li class="nav-item"><a class="btn btn-sm text-nowrap" href="{{ logout_url }}"><i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Log out</a></li>{% endif %}
 {% endmacro %}
