@@ -212,6 +212,24 @@ def _found_extra(kind):
     return None if kind == 'members' else (lambda r: r['holder']['name'])
 
 
+def found_fields(kind):
+    """Every field the Search panel can name for a kind find searches: its own, the holder's name for a held
+    record, and 'across'."""
+    return SEARCH[kind] + ((HOLDER,) if _found_extra(kind) else ()) + (ACROSS,)
+
+
+def narrow(found, q, kind, field=None):
+    """find's result filtered to one kind (the Search panel's filter), and with `field` to the rows `q` matched in
+    that field: {kind: rows}, every other kind empty."""
+    if field is not None and field not in found_fields(kind):
+        raise L.Refused('No such field for %s: %s' % (kind, field))
+    rows = found[kind]
+    if field is not None:
+        hit = _matcher(q)
+        rows = [r for r in rows if field in _row_fields(r, hit, SEARCH[kind], _found_extra(kind), HOLDER)]
+    return {k: rows if k == kind else [] for k in found}
+
+
 def matched(found, q):
     """For the Search page's panel: {kind: [(field, label, records)]}, what find's `q` matched in each kind."""
     return {kind: [(f, MATCH_LABELS[f], n) for f, n in _matched_fields(rows, q, SEARCH[kind], _found_extra(kind))]
@@ -283,10 +301,16 @@ def _matched_fields(rows, search, fields, extra=None, extra_field=None):
     extra_field = extra_field or HOLDER
     hit, counts = _matcher(search), {}
     for r in rows:
-        own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([extra_field] if extra and hit(extra(r)) else [])
-        for f in own or [ACROSS]:
+        for f in _row_fields(r, hit, fields, extra, extra_field):
             counts[f] = counts.get(f, 0) + 1
     return [(f, counts[f]) for f in fields + (extra_field, ACROSS) if f in counts]
+
+
+def _row_fields(r, hit, fields, extra, extra_field):
+    """The fields a search matched in one row it found: its own, the extra text's, or 'across' when only the
+    fields read together matched."""
+    own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([extra_field] if extra and hit(extra(r)) else [])
+    return own or [ACROSS]
 
 
 def children(cur, kind, owner_id, owner='member'):

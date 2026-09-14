@@ -529,12 +529,42 @@ class Members(unittest.TestCase):
         self.assertIn('hx-select-oob="#roMatched"', page)                                                 # refreshed with each search
         matched = panel(contacts)                                                                     # what matched, as badges
         self.assertIn('data-matched="contacts"', matched)
-        self.assertIn('data-grp-jump="contacts" data-matched-field="phone"', matched)
+        self.assertIn('data-ro-filter-kind="contacts" data-ro-filter-field="phone" data-matched-field="phone"', matched)
         self.assertIn('title="Phone: 1"', matched)
         self.assertIn('<span role="img" aria-hidden="true">📱</span>', matched)
         self.assertIn('title="Held by: ', panel(found('Jane Smith')))                                  # a holder's name
         self.assertIn('title="Across fields: 1"', panel(found('Jane Smith')))                          # first and last name together
-        self.assertIn('title="Notes: 1"  data-grp-key="radioSearch" data-grp-jump="logons" data-matched-field="notes"', panel(found('ramp')))   # log ons too
+        self.assertIn('title="Notes: 1"  data-ro-filter-kind="logons" data-ro-filter-field="notes" data-matched-field="notes"', panel(found('ramp')))   # log ons too
+
+    def test_a_search_panel_badge_filters_the_results_and_says_so(self):
+        m = self.member(firstName='Jane', lastName='Smith', mobile='0412345678')
+        self.vessel(m, vesselName='Sea Dog', registration='AB123Q')
+        self.a.post('/member/%d/contacts' % m, data={'name': 'Sam Smith', 'phone': '0499888777'})
+        self.logon(registration='AB123Q', notes='Sam Smith called')
+        get = lambda url: self.a.get(url).get_data(as_text=True)
+        results = lambda html: html[html.index('<div id="roFound">'):]
+        everything = get('/radio/search?q=smith')
+        self.assertNotIn('Filter applied', everything)
+        for kind in ('members', 'contacts', 'logons'):
+            self.assertIn('data-found="%s"' % kind, everything)
+        contacts = get('/radio/search?q=smith&kind=contacts')                                         # a kind's badge
+        self.assertEqual(results(contacts).count('data-found='), 1)
+        self.assertIn('data-found="contacts"', results(contacts))
+        self.assertIn('Filter applied', contacts)
+        self.assertIn('showing 1 of the 4 records found', contacts)                                  # Jane Smith, Sam Smith, her vessel, the log on
+        self.assertIn('data-ro-filter-clear', contacts)
+        self.assertIn('aria-pressed="true" class="dc-record-panel-badge dc-record-panel-badge-heading dc-record-panel-badge-active" title="Emergency contacts: 1"', contacts)
+        self.assertIn('id="roFilterKind" value="contacts">', contacts)                                  # kept with the next search
+        self.assertIn('data-matched="members"', contacts)                                               # the panel still counts everything
+        notes = get('/radio/search?q=smith&kind=logons&field=notes')                                   # a field's badge
+        self.assertEqual(results(notes).count('data-found='), 1)
+        self.assertIn('data-found="logons"', results(notes))
+        self.assertIn('dc-record-panel-badge-active" title="Notes: 1"', notes)
+        self.assertEqual(results(get('/radio/search?q=smith&kind=members&field=mobile')).count('data-record='), 0)   # no member matched smith in mobile
+        self.assertIn('0 records match', get('/radio/search?q=smith&kind=members&field=mobile'))
+        self.assertIn('data-found="members"', results(get('/radio/search?q=jane%20smith&kind=members&field=across')))   # first and last name together
+        for bad in ('kind=boats', 'field=notes', 'kind=members&field=phone', 'kind=logons&field=holder'):
+            self.assertEqual(self.a.get('/radio/search?q=smith&' + bad).status_code, 400, bad)
 
     def test_the_log_members_and_public_vessels_panels_show_what_matched(self):
         m = self.member(firstName='Jane', lastName='Smith')
@@ -567,9 +597,17 @@ class Members(unittest.TestCase):
         self.assertEqual(M._matched_fields(rows[:1], 'jane smith', fields), [('across', 1)])
         self.assertEqual(M._matched_fields(rows[1:], 'duck', fields, extra=lambda r: r['holder']['name']), [('holder', 1)])
         self.assertEqual(M.matched({'members': rows}, 'jane'), {'members': [('firstName', 'First name', 2)]})
+        found = {'members': rows, 'contacts': [], 'vessels': [], 'trailers': [], 'cars': []}             # as find returns them for 'jane'
+        self.assertEqual(M.narrow(found, 'jane', 'members', 'firstName')['members'], rows)
+        self.assertEqual(M.narrow(dict(found, members=rows[:1]), 'jane smith', 'members', 'across')['members'], rows[:1])
+        self.assertEqual(M.narrow(found, 'jane', 'members')['members'], rows)
+        self.assertEqual(M.narrow(found, 'jane', 'members')['contacts'], [])
+        self.assertRaises(L.Refused, M.narrow, found, 'jane', 'members', 'holder')                    # members have no holder
         logons = [{'registration': 'AB123', 'mobile': '0412 345 678', 'notes': 'ab123 rack', 'tripRef': None}]
         self.assertEqual(L.matched_fields(logons, 'ab123'), [('registration', 'Vessel Rego. No.', 1), ('notes', 'Notes', 1)])
         self.assertEqual(L.matched_fields(logons, '0412345678'), [('mobile', 'Mobile Phone Number', 1)])
+        self.assertEqual(L.matched_rows(logons, 'ab123', 'notes'), logons)
+        self.assertRaises(L.Refused, L.matched_rows, logons, 'ab123', 'phone')
         symbols = self.app.jinja_env.get_template('radio/_ui.html').module.FIELD_SYMBOLS                  # every badge has its emoji
         for field in set(sum(M.SEARCH.values(), ())) | set(L.SEARCH_FIELDS) | {M.HOLDER, M.ACROSS}:
             self.assertTrue(symbols.get(field), field)

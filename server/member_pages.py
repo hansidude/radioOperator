@@ -328,9 +328,22 @@ def search_page():
     found = M.find(cur, h.unit(), q)
     logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q) if len(q) >= 2 else []
     cur.close()
+    # The panel counts the whole search; its filter (a badge clicked: kind, and maybe field) narrows what is listed.
     matched = dict(M.matched(found, q), logons=L.matched_fields(logons, q))
-    return _list_response('search.html', search=q, found=found, logons=logons, matched=matched, kinds=M.KINDS,
-                          labels=M.LABELS, reference=L.reference)
+    everything = dict(found, logons=logons)
+    kind, field = request.args.get('kind') or None, request.args.get('field') or None
+    if (kind is None and field is not None) or (kind is not None and kind not in everything):
+        abort(400)
+    try:
+        if kind == 'logons':
+            found, logons = {k: [] for k in found}, (L.matched_rows(logons, q, field) if field else logons)
+        elif kind:
+            found, logons = M.narrow(found, q, kind, field), []
+    except L.Refused:
+        abort(400)
+    return _list_response('search.html', search=q, found=found, logons=logons, matched=matched, everything=everything,
+                          filter={'kind': kind, 'field': field} if kind else None, kinds=M.KINDS, labels=M.LABELS,
+                          reference=L.reference)
 
 
 # Every field's name for the Help page's emoji legend (_ui.FIELD_SYMBOLS): the log's words where the log names it.

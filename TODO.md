@@ -127,7 +127,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   and on the log's 30 s refresh; `_ui.matched_panel`, `members.list_matched`, `logons.matched_fields`).
 - Search has the shared side panel (panel button beside the view buttons): for each kind found, badges of the fields
   the search matched with how many records (`members.matched`, `logons.matched_fields`, the search's own matching;
-  'Held by' and 'Across fields' too); a badge opens and scrolls to its kind.
+  'Held by' and 'Across fields' too). Clicking a badge filters the results to that kind (or that kind's records matched
+  in that field; `kind`/`field` in the address, `members.narrow`, `logons.matched_rows`), shown by a yellow Filter
+  applied bar with Clear filter; the same badge again or a new search takes it off.
 - Every field is named with its emoji, the same wherever it appears (form labels, list headings and cards, History):
   one map, `_ui.FIELD_SYMBOLS`.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,

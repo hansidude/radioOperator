@@ -412,8 +412,30 @@ def main(engine='chromium'):
             assert panel.bounding_box()['x'] + panel.bounding_box()['width'] <= page.locator('#roFound').bounding_box()['x'], 'The panel is not beside the results'
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
-            contact_names.click()                                                                  # a badge opens its kind
-            expect(page.locator('#radioFoundContacts')).to_be_visible()
+            contact_names.click()                                                                  # a badge filters to it, and says so
+            expect(page.locator('#radioFoundContacts')).to_be_visible()                                # opened, though it was folded away
+            banner = page.locator('#roFound .dc-record-filter-applied')
+            expect(banner).to_be_visible()
+            expect(banner).to_contain_text('Filter applied')
+            expect(page.locator('#roFound [data-found]')).to_have_count(1)                           # everything else hidden
+            expect(page.locator('#roMatched [data-matched="contacts"] [data-matched-field="name"]')).to_have_attribute('aria-pressed', 'true')
+            expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # the panel still shows the whole search
+            assert 'kind=contacts' in page.url and 'field=name' in page.url, 'The filter is not in the address: %s' % page.url
+            banner.locator('[data-ro-filter-clear]').click()                                         # Clear filter
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
+            expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
+            members_badge = page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading')
+            members_badge.click()                                                                   # a kind's badge
+            expect(page.locator('#roFound [data-found]')).to_have_count(1)
+            expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
+            page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading').click()   # the same badge again
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
+            page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading').click()
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_be_visible()
+            with page.expect_response(lambda r: '/radio/search?' in r.url and 'kind=' not in r.url):
+                page.locator('#roFindAll').fill(token + '  ')                                        # a new search takes it off
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
+            expect(page.locator('#roFound [data-found="contacts"]')).to_be_visible()
             panel_button = page.locator('[data-dc-record-panel]:visible')
             expect(panel_button).to_have_attribute('title', 'Hide panel')
             with_panel = page.locator('#roFound').bounding_box()

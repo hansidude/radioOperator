@@ -339,6 +339,14 @@ def _search_hit(search):
         needle in str(r[field]).lower() or (field == 'mobile' and spaceless in re.sub(r'\s+', '', str(r[field]))))
 
 
+def matched_rows(rows, search, field):
+    """The log ons records() found whose `field` holds what was searched (the Search panel's filter)."""
+    if field not in SEARCH_FIELDS:
+        raise Refused('No such search field: %s' % field)
+    hit = _search_hit(search)
+    return [r for r in rows if hit(r, field)]
+
+
 def matched_fields(rows, search):
     """For the log's and the Search page's panel: [(field, label, records)], what `search` matched in the log ons
     records() found."""

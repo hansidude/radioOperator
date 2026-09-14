@@ -221,21 +221,22 @@
 
 {# A list's side panel content (view_controls(panel=...) + record_panel): for each kind listed, a heading badge with
    how many records, then a badge per field the search matched in them (members.matched / list_matched,
-   logons.matched_fields) with how many. sections: (gid, symbol, label, rows, matched fields). `jump`: the
-   myMacro_groups key whose groups the badges open; without it the badges are plain. `body_id` is what a refresh
-   swaps (hx-select-oob). #}
-{% macro matched_panel(body_id, search, sections, jump=None, min_chars=1) %}
+   logons.matched_fields) with how many. sections: (gid, symbol, label, rows, matched fields). `filtering`: the badges
+   are filter buttons (data-ro-filter-kind / -field) and `filter` ({kind, field} or none) is the one applied; without
+   it the badges are plain. `body_id` is what a refresh swaps (hx-select-oob). #}
+{% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1) %}
 <div id="{{ body_id }}">
 {% if search|length < min_chars %}<div class="dc-record-empty">The fields a search matches show here.</div>
 {% else %}
   {% for gid, symbol, label, rows, fields in sections if rows %}
-  {% set attrs = {'data-grp-key': jump, 'data-grp-jump': gid} if jump else {} %}
+  {% set attrs = {'data-ro-filter-kind': gid} if filtering else {} %}
+  {% set on_kind = filter is not none and filter.kind == gid %}
   <section class="dc-record-panel-section" data-matched="{{ gid }}">
-    {{ records_ui.panel_badge(symbol, label, rows|length, attrs, heading=True, button=jump is not none) }}
+    {{ records_ui.panel_badge(symbol, label, rows|length, attrs, heading=True, button=filtering, active=on_kind and filter.field is none) }}
     <div class="dc-record-panel-badges">
     {% for field, field_label, count in fields %}
-      {% set field_attrs = attrs.copy() %}{% set _ = field_attrs.update({'data-matched-field': field}) %}
-      {{ records_ui.panel_badge(FIELD_SYMBOLS[field], field_label, count, field_attrs, button=jump is not none) }}
+      {% set field_attrs = attrs.copy() %}{% set _ = field_attrs.update({'data-ro-filter-field': field} if filtering else {}) %}{% set _ = field_attrs.update({'data-matched-field': field}) %}
+      {{ records_ui.panel_badge(FIELD_SYMBOLS[field], field_label, count, field_attrs, button=filtering, active=on_kind and filter.field == field) }}
     {% endfor %}
     </div>
   </section>

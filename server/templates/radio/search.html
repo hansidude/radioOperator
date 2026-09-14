@@ -23,17 +23,29 @@
   {{ view_controls('roFoundView', panel='roFoundPanel') }}
   {{ grp.collapseAllButton('radioSearch', 'kinds') }}
   {{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}) }}
+  {# The panel's filter: set by a badge, sent with the search, cleared by a new search or Clear filter. #}
+  <input type="hidden" name="kind" id="roFilterKind" value="{{ filter.kind if filter else '' }}"{% if not filter %} disabled{% endif %}>
+  <input type="hidden" name="field" id="roFilterField" value="{{ filter.field or '' if filter else '' }}"{% if not (filter and filter.field) %} disabled{% endif %}>
 </form>
 <div id="roFoundView">
 {# The panel: for each kind found, what the search matched in which field (members.matched, logons.matched_fields),
    as badges; a badge opens and scrolls to its kind. Swapped in with the results. #}
-{% set sections = [] %}{% for gid, symbol, label, rows in SHOWN %}{% set _ = sections.append((gid, symbol, label, rows, matched[gid])) %}{% endfor %}
-{% call records_ui.record_panel('roFoundPanel', 'What the search matched') %}{{ ui.matched_panel('roMatched', search, sections, jump='radioSearch', min_chars=2) }}{% endcall %}
+{# The panel counts the whole search (everything), whatever its filter lists. #}
+{% set sections = [] %}{% for gid, symbol, label, rows in SHOWN %}{% set _ = sections.append((gid, symbol, label, everything[gid], matched[gid])) %}{% endfor %}
+{% call records_ui.record_panel('roFoundPanel', 'What the search matched') %}{{ ui.matched_panel('roMatched', search, sections, filtering=True, filter=filter, min_chars=2) }}{% endcall %}
 <div id="roFound">
 {% if search|length < 2 %}
   <div class="dc-record-empty">Type two or more characters: a name, number, rego, phone, email, place or anything in notes.</div>
 {% else %}
   {% set total = logons|length + found.members|length + found.contacts|length + found.vessels|length + found.trailers|length + found.cars|length %}
+  {% if filter %}
+    {% set every = namespace(n=0) %}{% for rows in everything.values() %}{% set every.n = every.n + rows|length %}{% endfor %}
+    {% set shown = SYMBOL[filter.kind] %}
+    {% call records_ui.filter_applied('showing %d of the %d records found' % (total, every.n), {'data-ro-filter-clear': ''}) %}
+      {{ records_ui.panel_badge(shown[0], shown[1], everything[filter.kind]|length, button=False) }}
+      {% if filter.field %}{% for field, field_label, count in matched[filter.kind] if field == filter.field %}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS[field], field_label, count, button=False) }}{% endfor %}{% endif %}
+    {% endcall %}
+  {% endif %}
   {% if not total %}<div class="dc-record-empty ro-zero">0 records match “{{ search }}”</div>{% endif %}
   {# Each kind is a collapsible group (Quackit's myMacro_groups): the blue header with its count; a group collapsed
      stays collapsed for the next search in this browser. #}
@@ -58,7 +70,31 @@
 (function () {
   var engine = GroupEngine.init({ key: 'radioSearch', root: '#roFoundView', itemSel: '.dc-record-grid-row', defaultCollapsed: false, hideEmpty: false });
   // A new search swaps the groups in: give them the collapsed state this browser remembers.
-  document.addEventListener('htmx:afterSettle', function () { if (engine) engine.apply(); });
+  // A filter shows one kind: open it, even if it was folded away.
+  function openFiltered() {
+    var kind = document.getElementById('roFilterKind');
+    if (engine && !kind.disabled) engine.groups().forEach(function (g) { if (g.dataset.gid === kind.value && g.classList.contains('collapsed')) engine.scrollTo(g); });
+  }
+  openFiltered();
+  document.addEventListener('htmx:afterSettle', function () {
+    if (engine) engine.apply();
+    openFiltered();
+  });
+  // The panel's badges filter the results; the same badge again, Clear filter or a new search takes it off.
+  var form = document.getElementById('roSearchForm'), kindBox = document.getElementById('roFilterKind'), fieldBox = document.getElementById('roFilterField');
+  function setFilter(kind, field) {
+    kindBox.value = kind; kindBox.disabled = !kind;
+    fieldBox.value = field; fieldBox.disabled = !field;
+  }
+  document.addEventListener('click', function (e) {
+    var badge = e.target.closest('[data-ro-filter-kind]'), clear = e.target.closest('[data-ro-filter-clear]');
+    if (!badge && !clear) return;
+    var kind = badge ? badge.dataset.roFilterKind : '', field = badge ? (badge.dataset.roFilterField || '') : '';
+    if (badge && kindBox.value === kind && fieldBox.value === field && !kindBox.disabled) kind = field = '';
+    setFilter(kind, field);
+    htmx.trigger(form, 'submit');
+  });
+  document.getElementById('roFindAll').addEventListener('input', function () { setFilter('', ''); });
 })();
 </script>
 {% endblock %}
