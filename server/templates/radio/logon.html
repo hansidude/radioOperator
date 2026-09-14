@@ -9,7 +9,7 @@
 {% set record_boxes = ('vesselName', 'registration', 'length', 'hullColour', 'make', 'model') %}
 {% set draft = creating or logon.watchStatus not in ('loggedOn', 'loggedOff', 'discarded', 'cancelled') %}
 {% block body_wrap_class %}container-fluid{% endblock %}
-{% block page_title %}<i class="bi bi-broadcast me-1"></i>{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
+{% block page_title %}{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
 {# Yellow as quackit's Update button (lists/editList.html): it changes the record. One button, shown twice. #}
 {% macro save_button(id='', size='') %}<button type="button" class="btn btn-warning {{ size }}"{% if id %} id="{{ id }}"{% endif %} data-save-record><i class="bi bi-floppy me-1"></i>Save</button>{% endmacro %}
 {% block navbar_buttons %}
