@@ -59,7 +59,8 @@ def main(engine='chromium'):
             # An open panel sits left of the list, outside its container: the list keeps the usual ~1200px width.
             p, l = page.locator(panel).bounding_box(), page.locator(listed).bounding_box()
             assert 900 < l['width'] < 1300, '%s is not at the usual ~1200px width beside its panel: %s' % (what, l['width'])
-            assert p['x'] + p['width'] <= l['x'], '%s: the panel is not left of the list' % what
+            assert p['x'] + p['width'] <= l['x'], '%s: the panel is not left of the list: panel %s, list %s, page %s' % (
+                what, p, l, page.evaluate("() => [document.getElementById('roFound').closest('.container-fluid').className, innerWidth, document.documentElement.clientWidth]"))
 
         def usual_width(inside, what):
             # Quackit's usual ~1200px page width (layout's mySpacing), measured at the 1920px viewport.
@@ -415,9 +416,20 @@ def main(engine='chromium'):
             expect(page.locator('#radioFoundContacts')).to_be_visible()
             panel_button = page.locator('[data-dc-record-panel]:visible')
             expect(panel_button).to_have_attribute('title', 'Hide panel')
+            with_panel = page.locator('#roFound').bounding_box()
             panel_button.click()
             expect(panel).to_be_hidden()
             usual_width('#roFoundView', 'Search with its panel closed')                              # the page goes back to the usual width
+            without_panel = page.locator('#roFound').bounding_box()
+            assert abs(with_panel['x'] - without_panel['x']) < 1 and abs(with_panel['width'] - without_panel['width']) < 1, \
+                'Opening the panel moved the list: %s vs %s' % (with_panel, without_panel)            # it sits in the margin
+            page.set_viewport_size({'width': 1400, 'height': 1080})                                  # no room in the margin:
+            panel_button.click()
+            expect(panel).to_be_visible()
+            list_beside_panel('#roFoundPanel', '#roFound', 'Search on a narrower screen')            # the page makes room instead
+            panel_button.click()
+            expect(panel).to_be_hidden()
+            page.set_viewport_size({'width': 1920, 'height': 1080})
             page.reload()                                                                          # remembered
             expect(page.locator('#roFoundPanel')).to_be_hidden()
             page.locator('[data-dc-record-panel]:visible').click()
