@@ -919,13 +919,14 @@ recovery-time and data-loss limits shall be documented, including reconciliation
 made during outage. Restored missed deadlines shall be evaluated before resuming live watch;
 a backup file existing is not evidence that recovery works.
 
-**REC-9.** Each record **shall** carry a number that counts from one for each day, unique
-within the unit and that day, assigned when the record is created and never reused or
-renumbered. It **shall** be what the interface shows and what reports and exports quote. Any
-internal identifier **shall not** be the thing an operator is asked to read out.
-*Rationale: operators talk about "log on fifty yesterday", not about a database key. The paper
-log is a page per day and rows run down it in order, so the number is what a paper row and a
-system record have in common when someone is reading one to the other over a radio.*
+**REC-9.** Each record **shall** carry a Trip ID No., issued when the record is first saved from one
+running sequence, unique, and never reused or changed. It **shall** be what the interface shows and what
+alerts, reports and exports quote. Any internal identifier **shall not** be the thing an operator is asked
+to read out. A list's position numbers (1, 2, 3 down what is on screen) are not a record's number.
+*Rationale: the paper log already has a Trip ID No. column (Appendix F, figure 5, column 13), so the Trip
+ID No. is what a paper row and a system record have in common when someone reads one to the other. A
+second number counting from one each day overlapped it, skipped where drafts were discarded, and left
+open when a day starts (withdrawn question 21).*
 
 ---
 
@@ -966,7 +967,7 @@ within a section is not always contiguous.
 | **AC-53** | Identify, on a new draft, a vessel that already holds an open log on at this unit. | Acceptance is refused, the open record is named and offered, and nothing captured on the draft is discarded (ACC-6). |
 | **AC-54** | Discard a draft begun in error; then attempt to discard an accepted log on. | The draft is discarded with actor, time and reason, remains searchable, and counts as evidence of no vessel or person; the accepted log on refuses and must be logged off (ACC-7). |
 | **AC-55** | View the queue on a screen other than the one that created a draft, with several drafts open. | Every draft is counted and visible, each with the values it is missing and its age, plainly separate from the watched log ons (WAT-1, ACC-5). |
-| **AC-56** | Create records across a day boundary and read the numbers. | Numbering counts from one for each day, is unique within the unit and day, is never reused or renumbered, and is what every page, report and export quotes (REC-9). |
+| **AC-56** | Create records across a day boundary and read the numbers. | Each record's Trip ID No. runs on from the last across days and units, is never reused or changed, and is what every page, alert, report and export quotes (REC-9). |
 | **AC-57** | Capture a member number that is a member, then one that names no member, then save. | The first ties the log on to that member record; the second leaves Member No. blank, is kept word for word in the notes, the save is not refused, and the log on reads as a public user's everywhere it is shown (CAP-24). |
 | **AC-58** | Read the capture view before and after the save that completes the mandatory set. | Before: a draft, with nothing an operator could read back to the vessel as logged on; after: logged on, the moment the operator may say so (ACC-9, ACC-2). |
 
@@ -1305,8 +1306,7 @@ revisions add identifiers; they do not renumber.
 20. How is ACC-6 applied across units? A vessel logged on at one unit and calling another is
     not a duplicate within a unit; whether it is permitted at all, and how it is reconciled,
     depends on the transfer answers (question 10).
-21. Does the daily number in REC-9 reset at midnight or at a watch boundary, and is it taken
-    from the date of the call or the date of entry when the two differ?
+21. *Withdrawn in version 1.1:* there is no daily number; REC-9 uses the Trip ID No.
 
 ---
 
@@ -1336,6 +1336,9 @@ revisions add identifiers; they do not renumber.
   Watching (`watching`, `loggedoff`). Existing records are converted.
 - ACC-1 states that a save on a log on cannot empty or make unreadable its mandatory set (it was
   implied by §3.3 and WAT-10, and the implementation had allowed it).
+- **A record's number is its Trip ID No.** (REC-9, 14 September 2026). Version 0.9 added a number
+  counting from one each day; the unit's position is that it duplicated the Trip ID No. column the paper
+  log already has. REC-9 and AC-56 now name the Trip ID No.; Appendix D question 21 is withdrawn.
 
 <a id="section-version-10-changes-from-09"></a>
 

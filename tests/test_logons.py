@@ -51,10 +51,10 @@ class LogOns(unittest.TestCase):
         self.assertEqual([r['id'] for r in d], [i])
         self.assertEqual(d[0]['condition'], 'notwatched')
         self.assertEqual(L.drafts(self.cur, 'unitB', T0, 30), [])
-        self.assertEqual((row['dayNumber'], row['dayDate']), (1, T0.date()))       # REC-9
+        self.assertRegex(row['tripRef'], r'^T-\d{5}$')                                 # REC-9
         self.cur.execute("SELECT watchStatus FROM LogOns WHERE id = %s", (i,))     # written, not defaulted
         self.assertEqual(self.cur.fetchone()['watchStatus'], 'draft')
-        self.assertEqual(L.reference(row), '1')
+        self.assertEqual(L.reference(row), row['tripRef'])                            # read out as its Trip ID No.
 
     def test_a_record_left_in_a_state_this_version_forgot_is_chased(self):
         """An earlier version's state, or a hand-edited row, must not vanish: anything neither
@@ -66,15 +66,18 @@ class LogOns(unittest.TestCase):
         L.discard(self.cur, i, 'alice', T0, 'left by an earlier version')
         self.assertEqual(L.drafts(self.cur, '', T0, 30), [])
 
-    def test_numbering_counts_from_one_each_day(self):                 # AC-56, REC-9
+    def test_the_trip_id_runs_on_across_days_and_units(self):         # AC-56, REC-9
         a = L.create(self.cur, 'alice', '', T0)
         b = L.create(self.cur, 'alice', '', T0 + timedelta(hours=1))
         c = L.create(self.cur, 'alice', '', T0 + timedelta(days=1))
-        self.assertEqual([L.get(self.cur, x)['dayNumber'] for x in (a, b, c)], [1, 2, 1])
-        self.assertEqual(L.get(self.cur, a)['dayDate'], T0.date())
-        self.assertEqual(L.get(self.cur, c)['dayDate'], (T0 + timedelta(days=1)).date())
-        other = L.create(self.cur, 'bob', 'unitB', T0)                 # numbering is per unit
-        self.assertEqual(L.get(self.cur, other)['dayNumber'], 1)
+        other = L.create(self.cur, 'bob', 'unitB', T0)
+        refs = [L.get(self.cur, x)['tripRef'] for x in (a, b, c, other)]
+        self.assertEqual(refs, sorted(refs))
+        self.assertEqual(len(set(refs)), 4)                              # never the same twice, whatever the day or unit
+        self.assertEqual([int(r[2:]) for r in refs], list(range(int(refs[0][2:]), int(refs[0][2:]) + 4)))
+        self.assertIsNone(L.get(self.cur, a)['dayNumber'])               # no daily number any more
+        row = dict(L.get(self.cur, a), tripRef=None)
+        self.assertEqual(L.reference(row), '#%d' % a)                    # a row from before trip references
 
     def test_acceptance_needs_the_mandatory_set(self):                 # AC-50, ACC-1, ACC-8
         i = L.create(self.cur, 'alice', '', T0)

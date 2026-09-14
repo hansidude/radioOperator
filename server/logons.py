@@ -165,10 +165,11 @@ def _sd(day):
 
 
 def reference(row):
-    """How an operator names this record out loud: "log on 50", not a database key (REC-9)."""
-    if row.get('dayNumber') is None:
+    """How an operator names this record out loud: its Trip ID No., "log on T-00050", not a database key (REC-9).
+    A row saved before trip references were issued has none and is named by its id."""
+    if row.get('tripRef') is None:
         return '#%d' % row['id']
-    return '%d' % row['dayNumber']
+    return row['tripRef']
 
 
 def column(field):
@@ -324,11 +325,11 @@ STATUS_WHERE = {
 }
 # What Find searches. The trip reference and the day number are how an operator refers to a record
 # out loud, so both have to be findable alongside the vessel's identifying values.
-SEARCH_FIELDS = ('tripRef', 'dayNumber', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination',
+SEARCH_FIELDS = ('tripRef', 'memberNumber', 'vesselName', 'registration', 'mobile', 'destination',
                  'departurePoint', 'notes')
 
 
-SEARCH_LABELS = dict(LABELS, tripRef='Trip ID No.', dayNumber='Day No.')
+SEARCH_LABELS = dict(LABELS, tripRef='Trip ID No.')
 
 
 def _search_hit(search):
@@ -431,23 +432,9 @@ def _clash(e):
     return 'uniq' in text or 'unique' in text or 'duplicate' in text
 
 
-def _next_day_number(cur, unit, day):
-    """The next day number for that unit and that call date (REC-9): what the operator says out
-    loud, counting from 1 each day.
-
-    Two operators saving at the same moment must not be handed the same number, so the read of the
-    highest so far takes a row lock and the caller retries if a unique index rejects the write
-    anyway. Both are needed: the lock is the real defence, because a host may apply this schema with
-    the uniqueness dropped (quackit's migration generator emits CREATE INDEX for a CREATE UNIQUE
-    INDEX), and the retry covers the hosts where the constraint does exist."""
-    cur.execute('SELECT COALESCE(MAX(dayNumber), 0) + 1 AS n FROM LogOns WHERE unit = %s AND dayDate = %s '
-                'FOR UPDATE', (unit, day))
-    return cur.fetchone()['n']
-
-
 def _next_trip_ref(cur):
     """The next trip reference: the paper log's 'Trip ID No.', one running sequence across every
-    unit and every day, and the record's key.
+    unit and every day, and the record's key: what the operator reads out (REC-9).
 
     The state-wide system issues these across all units; this branch allocates its own, so two
     branches will eventually meet in the middle -- that is a reconciliation to do with a branch
@@ -459,8 +446,10 @@ def next_ref(cur, table, col, prefix, digits, name):
     """The next prefix-plus-digits reference in `table`.`col`: trip references, member numbers.
 
     Zero-padded to a fixed width so the text order is the number order, which is what lets MAX()
-    find the highest without the database having to know the format. Read under a lock and retried
-    by the caller on a unique clash, like the day number above."""
+    find the highest without the database having to know the format. Two operators saving at the same moment must
+    not be handed the same one, so the read takes a lock and the caller retries on a unique clash: the lock is the
+    real defence, because a host may apply this schema with the uniqueness dropped (quackit's migration generator
+    emits CREATE INDEX for a CREATE UNIQUE INDEX)."""
     cur.execute('SELECT MAX(%s) AS m FROM %s FOR UPDATE' % (col, table))
     highest = (cur.fetchone() or {}).get('m')
     if highest is None:
@@ -482,23 +471,21 @@ def create(cur, user, unit, now):
 
     The operator's path is create_saved(): nothing is stored until an explicit save passes the draft
     minimum. This remains for tests and for any host that wants a bare row."""
-    day = now.date().isoformat()
     for _ in range(5):
-        number = _next_day_number(cur, unit, day)
         trip = _next_trip_ref(cur)
         try:
             # watchStatus is written, never left to the column default: a host that applied an earlier
             # version of this schema still carries that version's default, and an ALTER that adds
             # columns does not change one. A row must not depend on what the database happens to think.
-            cur.execute('INSERT INTO LogOns (unit, watchStatus, dayDate, dayNumber, tripRef, createdBy, createdAt, updatedBy, updatedAt) '
-                        "VALUES (%s, 'draft', %s, %s, %s, %s, %s, %s, %s)",
-                        (unit, day, number, trip, str(user), _s(now), str(user), _s(now)))
+            cur.execute('INSERT INTO LogOns (unit, watchStatus, tripRef, createdBy, createdAt, updatedBy, updatedAt) '
+                        "VALUES (%s, 'draft', %s, %s, %s, %s, %s)",
+                        (unit, trip, str(user), _s(now), str(user), _s(now)))
         except Exception as e:                       # only a clash on that index is retried; anything else is a real fault
             if not _clash(e):
                 raise
             continue
         return cur.lastrowid
-    raise Refused('Could not allocate a number for today after several attempts')
+    raise Refused('Could not allocate a trip reference after several attempts')
 
 
 def rename_statuses(cur):
@@ -523,7 +510,7 @@ def blank(now, unit='', call_day=None):
     for columns in TIME_FIELDS.values():
         for column_name in columns:
             row[column_name] = None
-    row.update(id=None, unit=unit, memberId=None, vesselId=None, watchStatus='draft', dayNumber=None, dayDate=call_day,
+    row.update(id=None, unit=unit, memberId=None, vesselId=None, watchStatus='draft',
                callDayRaw=_sd(call_day), callDate=call_day, version=0, createdAt=now, updatedAt=now,
                createdBy='', updatedBy='', verifyOutcome='unverified', verifyBasis='')
     return row
@@ -701,12 +688,6 @@ def save_fields(cur, logon_id, values, user, now, version=None):
         if field in values:
             _record_identifier(cur, logon_id, field, after.get(field), row.get(field), user, now)
     sets.update(_verify_sets(cur, row, sets))
-    if row['watchStatus'] == 'draft' and after['callDate'] != row.get('dayDate'):
-        # The day number follows the call date, not the entry date, so a delayed paper record entered
-        # tonight still numbers against the day it was called in (REC-9). The trip reference does not
-        # move: it was issued once and it is the record's key.
-        sets.update(dayDate=_sd(after['callDate']),
-                    dayNumber=_next_day_number(cur, row['unit'], _sd(after['callDate'])))
     sets.update(acceptance(cur, after, user, now))       # a complete draft is logged on by this save (ACC-3)
     saved_version = _bump(cur, row, sets, user, now)
     return {'version': saved_version, 'invalid': invalid, 'displays': displays, 'gaps': gaps(after),
@@ -721,22 +702,20 @@ def create_saved(cur, values, user, unit, now):
         raise NotFromRecord(not_from_record)
     if required:
         raise InvalidDraft(required)
-    day = after['callDate']
-
     synthetic = [{'kind': field, 'raw': after[field], 'normalized': normalize(field, after[field]),
                   'source': 'call', 'isActive': 1}
                  for field in IDENT_FIELDS if after.get(field)]
     verification_result = identity.verify(cur, dict(after, id=0, unit=unit), synthetic)
-    sets.update(unit=unit, watchStatus='draft', dayDate=_sd(day),
+    sets.update(unit=unit, watchStatus='draft',
                 verifyOutcome=verification_result['outcome'], verifyBasis=verification_result['basis'][:255],
                 createdBy=str(user), createdAt=_s(now), updatedBy=str(user), updatedAt=_s(now), version=0)
     sets.update(acceptance(cur, dict(after, id=0, unit=unit, watchStatus='draft'), user, now))   # complete on its first save (ACC-3)
 
-    # This is the moment the record gets its numbers: the save passed the draft minimum, so it is a
-    # real record now. Both are read under a lock and the insert is retried on a unique clash.
+    # This is the moment the record gets its Trip ID No.: the save passed the draft minimum, so it is a
+    # real record now. It is read under a lock and the insert is retried on a unique clash.
     logon_id = None
     for _ in range(5):
-        attempt = dict(sets, dayNumber=_next_day_number(cur, unit, _sd(day)), tripRef=_next_trip_ref(cur))
+        attempt = dict(sets, tripRef=_next_trip_ref(cur))
         columns = list(attempt)
         try:
             cur.execute('INSERT INTO LogOns (' + ', '.join(columns) + ') VALUES (' + ', '.join(['%s'] * len(columns)) + ')',

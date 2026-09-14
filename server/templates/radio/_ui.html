@@ -210,7 +210,7 @@
 {# One symbol per field, taught in the log's headings and shown again in each log on's History. #}
 {# One emoji per field, wherever the field is named: list headings and cards, form labels (field_label) and History
    (owner, 2026-09-14). 📝 means Draft on the log, so Notes is 🗒️. #}
-{% set FIELD_SYMBOLS = {'dayNumber': '#️⃣', 'callDay': '📅', 'callTime': '🕒', 'channel': '📻', 'tripRef': '🎫', 'watchStatus': '🚦',
+{% set FIELD_SYMBOLS = {'callDay': '📅', 'callTime': '🕒', 'channel': '📻', 'tripRef': '🎫', 'watchStatus': '🚦',
                         'memberNumber': '👤', 'firstName': '🪪', 'lastName': '🪪', 'mobile': '📱', 'phone': '📱', 'email': '✉️',
                         'address': '🏠', 'notes': '🗒️', 'name': '🆘', 'relationship': '🤝',
                         'vesselName': '🛥️', 'registration': '🔖', 'vesselDetails': '📏', 'length': '📏', 'hullColour': '🎨',
@@ -251,7 +251,7 @@
 <label for="{{ for_id }}">{% if FIELD_SYMBOLS.get(name) %}<span class="ro-field-symbol" aria-hidden="true">{{ FIELD_SYMBOLS[name] }}</span> {% endif %}{{ label }}</label>
 {%- endmacro %}
 {% set COLUMNS = [
-  {'key': 'number', 'label': 'No.', 'symbol': FIELD_SYMBOLS.dayNumber, 'width': 'minmax(3.5rem,.65fr)', 'kind': 'index'},
+  {'key': 'status', 'label': 'Status', 'symbol': FIELD_SYMBOLS.watchStatus, 'width': 'minmax(5rem,.5fr)', 'kind': 'index'},
   {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay, 'width': 'minmax(0,1.15fr)'},
   {'key': 'time', 'label': 'Time', 'symbol': FIELD_SYMBOLS.callTime, 'width': 'minmax(0,.5fr)'},
   {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'width': 'minmax(0,.8fr)'},
@@ -276,11 +276,10 @@
 {% for r in rows %}
   {% set gaps = namespace(keys=[]) %}
   {% if state(r)|trim == 'draft' %}{% for m in r.missing %}{% for b in m.boxes %}{% set gaps.keys = gaps.keys + [BOX_COLUMNS[b]] %}{% endfor %}{% endfor %}{% endif %}
-  {% set number %}<span class="dc-record-index">{{ reference(r) }}</span>{{ state_label(r) }}{% endset %}
   {% set action %}<a class="btn btn-outline-primary btn-sm" href="/logon/{{ r.id }}" title="Open record {{ reference(r) }}" aria-label="Open record {{ reference(r) }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
   {% set display.rows = display.rows + [{
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''), 'missing': gaps.keys,
-    'cells': {'number': number, 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
+    'cells': {'status': state_label(r), 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
               'member': member_cell(r, 'member' in gaps.keys), 'vesselName': r.vesselName or '', 'rego': r.registration or '',
               'mobile': r.mobileBox or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
               'departure': r.departurePoint or '', 'destination': r.destination or '',

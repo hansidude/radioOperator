@@ -46,11 +46,12 @@
   <tr><td>Status</td><td>{% for value, state, label in ui.FILTERS %}{{ ui.STATES[state].symbol }} {{ label }}{{ ', ' if not loop.last }}{% endfor %}.</td></tr>
   <tr><td>Date</td><td>Ticked, only calls on that date. Untick it to see every day. The log opens on today.</td></tr>
   <tr><td>Sort</td><td>Newest first, Oldest first, or Due first: overdue at the top, then the nearest deadline; drafts and closed log ons after.</td></tr>
-  <tr><td>Search</td><td>Member No., vessel name, rego, mobile (with or without spaces), destination, departure point, trip ID, day number and notes. <i class="bi bi-arrow-counterclockwise"></i> clears it.</td></tr>
+  <tr><td>Search</td><td>Member No., vessel name, rego, mobile (with or without spaces), destination, departure point, Trip ID No. and notes. <i class="bi bi-arrow-counterclockwise"></i> clears it.</td></tr>
 </table>
 <ul>
   <li>The log refreshes itself every 30 seconds, so a deadline that passes shows without anyone touching anything.</li>
   <li><strong>Overdue:</strong> a red notice appears above the list, flashing, with a beep, and the browser tab shows <em>(1) OVERDUE</em>. <strong>Seen</strong> records that you saw it; it does not resolve anything. The notice goes when the vessel is logged off.</li>
+  <li>Each row: <strong>#</strong> its place in the list, {{ ui.FIELD_SYMBOLS.watchStatus }} its status, the call's details, and last its {{ ui.FIELD_SYMBOLS.tripRef }} <strong>Trip ID No.</strong> (T-00050): the log on's own number, the one to read out, on every page and alert.</li>
   <li><i class="bi bi-pencil-square"></i> at the end of a row opens that log on. Every list's rows have one.</li>
 </ul>
 
@@ -58,14 +59,14 @@
 <p>Every list (the log, Members, Public vessels, Search, a member's tabs) has the same view buttons beside its search. Try them on this sample:</p>
 <div class="ro-help-demo">
   <div id="roHelpToolbar" class="dc-record-toolbar ro-toolbar">{{ records_ui.view_controls('roHelpView', panel='roHelpPanel') }}</div>
-  {% set columns = [{'key': 'no', 'label': 'No.', 'symbol': ui.FIELD_SYMBOLS.dayNumber, 'width': 'minmax(3rem,.5fr)', 'kind': 'index'},
+  {% set columns = [{'key': 'status', 'label': 'Status', 'symbol': ui.FIELD_SYMBOLS.watchStatus, 'width': 'minmax(2.5rem,.4fr)', 'kind': 'index'},
                     {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName, 'width': 'minmax(0,1.2fr)'},
                     {'key': 'registration', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration, 'width': 'minmax(0,.8fr)'},
                     {'key': 'mobile', 'label': 'Mobile', 'symbol': ui.FIELD_SYMBOLS.mobile, 'width': 'minmax(0,1fr)'},
                     {'key': 'destination', 'label': 'Going to', 'symbol': ui.FIELD_SYMBOLS.destination, 'width': 'minmax(0,1.6fr)'},
                     {'key': 'notes', 'label': 'Notes', 'symbol': ui.FIELD_SYMBOLS.notes, 'width': 'minmax(0,1.6fr)'}] %}
-  {% set rows = [{'id': 1, 'cells': {'no': '1', 'vesselName': 'Sample Sea Dog', 'registration': 'SAMPLE1', 'mobile': '0400 000 000', 'destination': 'Sample bay', 'notes': 'A sample row, not a record'}},
-                 {'id': 2, 'cells': {'no': '2', 'vesselName': 'Sample vessel with a long name to show truncation', 'registration': 'SAMPLE2', 'mobile': '0400 000 001', 'destination': 'A long sample destination beyond the harbour entrance and around the point', 'notes': 'Long values end in … on one line; hover shows all of it'}}] %}
+  {% set rows = [{'id': 1, 'cells': {'status': ui.STATES.loggedOn.symbol, 'vesselName': 'Sample Sea Dog', 'registration': 'SAMPLE1', 'mobile': '0400 000 000', 'destination': 'Sample bay', 'notes': 'A sample row, not a record'}},
+                 {'id': 2, 'cells': {'status': ui.STATES.draft.symbol, 'vesselName': 'Sample vessel with a long name to show truncation', 'registration': 'SAMPLE2', 'mobile': '0400 000 001', 'destination': 'A long sample destination beyond the harbour entrance and around the point', 'notes': 'Long values end in … on one line; hover shows all of it'}}] %}
   <div id="roHelpView">
     {% call records_ui.record_panel('roHelpPanel', 'Sample panel', open=False) %}
       <section class="dc-record-panel-section">

@@ -242,10 +242,10 @@ def search(cur, unit, q, limit=25):
         text = ' '.join(str(x) for x in (r.get('registration'), r.get('vesselName'), r.get('memberNumber'),
                                          r.get('mobile'), r.get('destination'), r.get('departurePoint')) if x).lower()
         if needle in text or (loose and loose in normalize('registration', text)):
-            number = r.get('dayNumber')
+            trip = r.get('tripRef')
             hits.append({'kind': 'trip', 'key': 'trip:%d' % r['id'], 'id': r['id'],
-                         'label': '%s %s %s' % ('log on' if number is not None else 'record',
-                                                number if number is not None else '#%d' % r['id'],
+                         'label': '%s %s %s' % ('log on' if trip is not None else 'record',
+                                                trip if trip is not None else '#%d' % r['id'],
                                                 r.get('registration') or r.get('vesselName') or r.get('memberNumber') or ''),
                          'sublabel': r.get('destination'), 'detail': r.get('vesselDetails'),
                          'state': r['watchStatus'], 'atSea': r['watchStatus'] == 'loggedOn',

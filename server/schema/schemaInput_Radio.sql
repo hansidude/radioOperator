@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   -- watch and what the unit tells the vessel; it then ends by log off. A draft that was never a
   -- log on is discarded instead (ACC-7).
   `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | loggedOn | loggedOff | discarded (renamed from watching / loggedoff 2026-09-13)
-  `dayNumber` INT DEFAULT NULL,                               -- counts from 1 each day: what operators say out loud (REC-9)
-  `dayDate` DATE DEFAULT NULL,                                -- the day that number belongs to
+  `dayNumber` INT DEFAULT NULL,                               -- no longer issued (1.1: REC-9 is the Trip ID No.); kept on older rows
+  `dayDate` DATE DEFAULT NULL,                                -- the day that old number belonged to
   -- Paper column 'Trip ID No.', pre-printed 'T-' (spec A.1). One running sequence, not per day:
   -- this is the record's key, the day number is only what the operator says out loud. The state-wide
   -- system issues these across every unit; this branch allocates its own and the width leaves room

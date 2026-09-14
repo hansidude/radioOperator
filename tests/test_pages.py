@@ -265,11 +265,11 @@ class Pages(unittest.TestCase):
         self.assertIn('data-record="%d"' % watching, page)      # All: the watch is listed too
         self.assertNotIn('data-record="%d"' % watching, self.a.get('/logons?status=draft').get_data(as_text=True))   # a watch is not a draft
 
-        # The paper log's columns: the record number leads, Trip ID No. is last (figure 5).
+        # The paper log's columns: # (the list's own count) and the status lead, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
         head = page[page.index('class="dc-record-grid-head"'):page.index('</div>', page.index('class="dc-record-grid-head"'))]
         self.assertEqual([h.split('</span> ')[-1].split('</span>')[0] for h in head.split('<span title=')[1:]],
-                         ['No.', 'Date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
+                         ['Status', 'Date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
                           'Departure', 'Going to', 'Return date', 'Time', 'Trip ID No.'])
         self.assertIn('<span title="Member No."><span class="dc-record-grid-symbol">👤</span> Member No.</span>', head)
         self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
@@ -442,13 +442,15 @@ class Pages(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn('logged off, not discarded', r.get_data(as_text=True))
 
-    def test_numbering_counts_from_one_each_day(self):                    # AC-56, REC-9
+    def test_a_record_is_named_by_its_trip_id(self):                      # AC-56, REC-9
         first, second = self.new(), self.new()
+        ref = lambda i: L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)['tripRef']
         page = self.a.get('/logon/%d' % second).get_data(as_text=True)
-        self.assertIn('Draft 2', page)
+        self.assertIn('Draft %s' % ref(second), page)
         page = self.a.get('/logons').get_data(as_text=True)
-        self.assertIn('<span class="dc-record-index">1</span>', page)
-        self.assertIn('<span class="dc-record-index">2</span>', page)
+        self.assertIn('title="Open record %s"' % ref(first), page)
+        self.assertNotIn('dc-record-index', page)                        # no daily number
+        self.assertIn('data-column="status"', page)
 
     def test_the_log_off_control_is_not_trapped_inside_the_capture_form(self):
         """A form inside a form is dropped by the browser, which left the Log off button owned by
