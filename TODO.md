@@ -9,7 +9,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 ### Radio Logs as its own program
 
 - Quackit's menu keeps its **RadioLogs** link; every radio page then uses `radio/_layout.html` (Quackit's page shell
-  with the Radio Logs menu: the 📻 brand is the log, New log on, Members, Public vessels, Search, Help, Log out).
+  with the Radio Logs menu: the brand, with Quackit's 🏠 home icon, is the log; New log on, Members, Public vessels,
+  Search, Help, Log out). A page title never repeats that icon.
   Browser tab and brand "Radio Logs" (`Host.brand`). No link back to Quackit (owner). The standalone shell draws the
   same menu (`_ui.radio_menu`). Page links the menu covers are gone.
 - **Help** (`/radio/help`): the menu, the log, every view button (the real controls on sample rows), status symbols,
@@ -19,10 +20,17 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Shared list views (every table/card list: the log, Members, Public vessels, Search, member tabs)
 
-- Quackit's `record_grid` with `view_controls`: **Cards** (at any width), **Paragraphs** (a line per field on cards,
-  wrapped values in rows), **Lines** (on by default: whenever records show as cards, chosen or on a narrow screen,
-  each field on one line of its own), text size A− / A+ / reset (remembered), **width** (usual ~1200px container or
-  full width, remembered per page) and, where a page has one, the **panel** button (remembered per page).
+- Quackit's `record_grid` with `view_controls`: **Cards** (at any width), **Paragraphs** (row values wrap), text size
+  A− / A+ / reset (remembered), **width** (usual ~1200px container or full width, remembered per page) and, where a
+  page has one, the **panel** button (remembered per page). No Lines button (owner, 2026-09-14): cards, however they
+  come, are always a line per field, its name on one line and its value ending in ….
+- **Words never split** (owner: *"never ever break something mid-word"*): text wraps only between words (record_grid's
+  `words`, no `overflow-wrap: anywhere`), a badge is one piece, column names (headings and card labels) are one line.
+- **Columns fit what they hold**: the heading and every row share one set of columns (subgrid); a column is as wide as
+  its values need and the room goes to the long ones (Status is just its symbol). The pages set no widths (only the
+  open button's 2.5rem). With Paragraphs a column is never narrower than its longest word; when the columns cannot
+  fit, the list shows the phone cards instead (`dc-record-grid-stacked`). With the test data the log is rows from
+  about 1328px.
 - Every list numbers its records from 1 (# column, or the card's corner), numbered again after a row search.
 - The side **panel** sits left of the list, in the page margin when there is room (the list does not move), and shows
   what the search matched in which field as badges with counts. On Search it starts open and a badge filters the
@@ -46,7 +54,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   `logons.due_first`, also used by `queue()`.
 - Columns: #, 🚦 Status (the status symbol, with its accessible name), the call's details, 🎫 Trip ID No. last.
   Member No. and Vessel Name are separate columns. Every column heading carries its symbol beside the word (📅 Date, 👤 Member No., 🛥️ Vessel Name,
-  🔖 Rego …) so operators learn them; one-line cards show the symbol alone, the word in its tooltip.
+  🔖 Rego …) so operators learn them; cards show the symbol and the word on each field's line.
 - The table opens with Paragraphs on (values wrap in full). View choices survive the 30 s refresh.
 - Draft rows show what still blocks Accept as an orange `?` (after its symbol on cards, in the cell on rows);
   other empty fields stay blank. Logged-on and closed rows show no `?`.
@@ -139,8 +147,13 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   member), **📱 Mobile** (members' mobiles, public vessel owners' phones and emergency contacts' phones; picks the member or
   public vessel the number belongs to and fills an empty Mobile) and **🔎 Search** (the Search page in a new tab).
   The log's own search matches departure point and notes too.
-- The log on's pickers (Quackit's SearchPicker) show emoji in the title, steps, label and rows: 👤 Member, 🌐 Public
-  user, 🛥️ Vessel, 📱 Mobile (rows 👤 / 🌐 / 🆘 by whose number).
+- The log on's pickers are Quackit's SearchPicker, rebuilt 2026-09-14 on the shared pieces (owner: *"reusable
+  components … numbered index … how many have been found"*): the search box is `search_controls` with its label on top,
+  and the results are the same `record_grid` lists the pages use, under "N found", numbered, rows or cards, a row
+  picked by click or arrow keys + Enter. Member: the Members list; a member's vessel: their Vessels tab list; Vessel
+  and Public user: the Public vessels list with 🤲 Held by (👤 member or 🌐 public); Mobile: 📱 Mobile, whose number
+  (👤 member, 🧑 owner, 🆘 emergency contact) and 🤲 Held by (`_ui.mobiles_grid`). Emoji in the title, step and label
+  (👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile). The box is a contained page wide (120ch) and 80% of the screen tall.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
   8080 is the owner's to migrate (the first set done 2026-09-14; the name/mobile change is in the generator's
@@ -159,16 +172,18 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - Radio data only through `Host`; the standalone shell loads Quackit's real shared templates and assets.
 - `./verify` covers Quackit and radio: Python tests, DOM tests (including the shared search picker), and the
   browser check on port 80 / MariaDB in Chromium and Firefox (save, red boxes, conflicts, search, sort, layout
-  320–2560px, accept, log off; members with vessel and contact, public vessel, a Member No. that is not a member
-  kept in Notes, Member or public user picks and new vessels saved from the log on page).
+  320–2560px with no split word, one-line column names and cards only when rows do not fit, accept, log off; members
+  with vessel and contact, public vessel, a Member No. that is not a member kept in Notes, Member or public user picks
+  by click and keys, the picker's size and lists, and new vessels saved from the log on page).
 
 ## Open
 
 ### Decisions waiting on the owner
 
-- [ ] **8080 is behind.** The last `myUpdate` (started 2026-09-14, detached) pulled what was on origin then; later
-      commits (the Status column and Trip ID No. naming, the confirm box and Reopen, picker emoji) need another
-      `. myUpdate` in `~/personalDb`. 8080's own migrations are the owner's: members' name/mobile, notes, emergency
+- [ ] **8080 is behind.** The last `myUpdate` (2026-09-14, detached, after quackit `c5bf81c`) pulled what was on origin
+      then. Not on 8080 yet: the 🏠 home icon on the Radio Logs link, words never split and content-sized columns,
+      cards always a line per field (no Lines button), and the pickers rebuilt on `record_grid` / `search_controls`
+      (quackit `b3ccae3`, radio `71edbab`). Needs another `. myUpdate` in `~/personalDb`. 8080's own migrations are the owner's: members' name/mobile, notes, emergency
       contacts on public vessels, and dropping `dayNumber` / `dayDate`. Read 8080's generated destructive file before
       executing: on port 80 it also dropped old leftovers (tables `DocumentAttachments`, `AttachmentsNP`; columns
       `LogOns.captureStatus`, `Members_history.name` / `phone`, six `Attachments` columns) and made five columns NOT NULL.
@@ -205,7 +220,23 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Column picker and named presets, built on Quackit's shared `record_grid` (no second grid).
 - [ ] Split Vessel details into Length, Hull colour, Make, Model, Other, and decide how they condense
       when space is short and which columns show by default.
-- [ ] Define "smart" widths before building (content-sized up to a cap, blank columns shrink).
+- [x] Smart widths, first cut (2026-09-14): columns sized by content, never narrower than a word with Paragraphs,
+      cards when they cannot fit. Still open: a cap per column, and phone numbers / dates wrapping at their spaces
+      in narrow rows ("0412 / 345 / 678").
+      1. Keep phone numbers, dates and times as one piece (a `record_grid` column option)
+      2. Leave it
+
+### Pickers and views follow-ups (2026-09-14)
+
+- [ ] **Radio picker searches have no limit**: "04" lists 587 numbers, an empty Vessel search 592 vessels (Quackit's stop
+      at 40–60 and say "N shown, more found").
+      1. Cap them the same way (e.g. 60)
+      2. Leave them
+- [ ] The Mobile picker's **Whose** heading has no emoji (its badges do). Pick one, or leave it.
+- [ ] **Paragraphs does nothing on cards** now that cards are always a line per field.
+      1. Hide it while cards show
+      2. Make it wrap card values under their one-line names
+- [ ] The log's `COLUMNS` (`_ui.html`) still writes its own open-button column instead of `OPEN_COLUMN`.
 
 ### Members follow-ups (not built)
 
@@ -246,4 +277,8 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Move the hand-copied collapse / expand all toggles (`myMacro_listitems.html` days and weeks, the Assets timeline)
       onto `myMacro_groups.collapseAllButton`, and Listboard's own sidebar onto `record_panel` (Quackit).
 - [ ] The log's toolbar search (and every list's) uses Quackit's `search_controls`, which still writes "Search.." inside the box.
-      The owner's rule is a label on top (DRY-CATALOG.md "Owner's standing UI rules"); fix it on Quackit's owner.
+      The owner's rule is a label on top (DRY-CATALOG.md "Owner's standing UI rules"). `search_controls(label=…)` exists
+      now (the picker uses it); move each caller onto it.
+- [ ] Quackit's history viewer (`history_changes.css`) still has `overflow-wrap: anywhere` for values, so a long word can
+      split there.
+- [ ] Listboard at 390px is ~44px too wide: its own toolbar icons (`bi-calendar-range`, `bi-text-paragraph`), Quackit.
