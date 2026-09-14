@@ -636,6 +636,33 @@ class Members(unittest.TestCase):
         self.assertIn('title="Across fields: 1"', panel(found('Jane Smith')))                          # first and last name together
         self.assertIn('title="Notes: 1"  data-ro-filter-kind="logons" data-ro-filter-field="notes" data-matched-field="notes"', panel(found('ramp')))   # log ons too
 
+    def test_search_status_reuses_log_filter_and_preserves_other_kinds(self):
+        self.member(firstName='Statusneedle')
+        draft = self.logon(registration='Statusneedle-DRAFT').json['id']
+        discarded = self.logon(registration='Statusneedle-TRASH').json['id']
+        self.assertEqual(self.a.post('/logon/%s/discard' % discarded, data={'reason': 'test'}).status_code, 302)
+        def page(status=None):
+            url = '/radio/search?q=Statusneedle' + ('&status=' + status if status else '')
+            response = self.a.get(url, headers={'HX-Request': 'true'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['HX-Replace-Url'], url)
+            return BeautifulSoup(response.data, 'html.parser')
+        both = page()
+        self.assertEqual(both.select_one('#roStatus option[selected]')['value'], 'all')
+        for selected, present, absent in [('draft', draft, discarded), ('discarded', discarded, draft)]:
+            html = page(selected)
+            self.assertIsNotNone(html.select_one('#roFound [data-found="logons"] [data-record="%s"]' % present))
+            self.assertIsNone(html.select_one('#roFound [data-found="logons"] [data-record="%s"]' % absent))
+            self.assertIsNotNone(html.select_one('#roFound [data-found="members"]'))
+            badge = html.select_one('[data-dc-filter-value="%s"]' % selected)
+            self.assertEqual(badge['aria-pressed'], 'true')
+            self.assertEqual(badge.select_one('.dc-record-panel-badge-count').text, '1')
+        self.assertEqual(self.a.get('/radio/search?q=Statusneedle&status=unknown').status_code, 400)
+        # The same status choice vocabulary and summary controls on the log.
+        log = BeautifulSoup(self.a.get('/logons?f=1&q=Statusneedle').data, 'html.parser')
+        self.assertEqual([o['value'] for o in log.select('#roStatus option')], [o['value'] for o in both.select('#roStatus option')])
+        self.assertIsNotNone(log.select_one('[data-dc-filter-value="discarded"]'))
+
     def test_a_search_panel_badge_filters_the_results_and_says_so(self):
         m = self.member(firstName='Jane', lastName='Smith', mobile='0412345678')
         self.vessel(m, vesselName='Sea Dog', registration='AB123Q')

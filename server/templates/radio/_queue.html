@@ -1,5 +1,5 @@
 {# The refresh partial: the same alerts and the same one list the page renders, nothing else. #}
 {% import 'radio/_ui.html' as ui %}
 <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
-{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)]) }}
+{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)], status=filters.status) }}
 <div id="roLiveRecords">{{ ui.record_list(records, now, reference, current, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div>

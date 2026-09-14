@@ -701,6 +701,43 @@ def main(engine='chromium'):
                 poll.clock.fast_forward(30000)
             expect(poll.locator('[data-record="%s"]' % record).get_by_role('img', name='Draft', exact=True)).to_be_visible()
             poll.close()
+            # Issues m/q: one status control and clickable summaries on Search
+            # and the log, using the real route and shared change handler.
+            trashed = context.request.post(URL + '/logons/new', data={'fields': dict(first, registration='STATUS-' + token)})
+            assert trashed.status == 200, trashed.text()
+            trashed_id = trashed.json()['id']
+            layout_records.append(trashed_id)
+            response = context.request.post(URL + '/logon/%s/discard' % trashed_id, form={'reason':'Status filter acceptance'})
+            assert response.ok, response.text()
+            layout_records.remove(trashed_id)
+            for path, target, answer, panel in [('/radio/search?q=' + token, '#roFound [data-found="logons"]', '/radio/search?', '#roFoundPanel'),
+                                                ('/logons?f=1&q=' + token, '#roLiveRecords', '/logons/rows?', '#roLogPanel')]:
+                visit(path)
+                expect(page.locator('#roStatus')).to_have_value('all')
+                expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(1)
+                expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
+                if not page.locator(panel).is_visible(): page.locator('[data-dc-record-panel]:visible').click()
+                with page.expect_response(lambda r: answer in r.url and 'status=discarded' in r.url):
+                    page.locator('[data-dc-filter-value="discarded"]').click()
+                expect(page.locator('#roStatus')).to_have_value('discarded')
+                expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(0)
+                expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
+                expect(page.locator('[data-dc-filter-value="discarded"]')).to_have_attribute('aria-pressed','true')
+                page.reload()
+                expect(page.locator('#roStatus')).to_have_value('discarded')
+                with page.expect_response(lambda r: answer in r.url and 'status=draft' in r.url):
+                    page.select_option('#roStatus','draft')
+                expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(1)
+                expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(0)
+                with page.expect_response(lambda r: answer in r.url and 'status=all' in r.url):
+                    page.locator('[data-dc-filter-value="all"]').click()
+                expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
+                for width in (1920,390):
+                    page.set_viewport_size({'width':width,'height':1080 if width>767 else 844})
+                    page.screenshot(path=str(ARTIFACTS / ('radio-status-' + ('search' if 'radio/search' in path else 'log') + '-' + str(width) + '-' + engine + '.png')),full_page=True)
+                    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+                page.set_viewport_size({'width':1920,'height':1080})
+                page.locator('[data-dc-record-panel]:visible').click()
             # Review density with sparse and populated rows, like the owner's
             # i_like_this.png, rather than accepting a single tall record.
             fixtures = [

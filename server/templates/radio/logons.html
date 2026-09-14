@@ -24,12 +24,7 @@
       hx-swap="outerHTML" hx-trigger="change, input from:#roSearch delay:300ms, submit, every 30s"
       hx-sync="this:replace" hx-history="false">
   <input type="hidden" name="f" value="1">
-  <label for="roStatus">Status</label>
-  <select class="form-select form-select-sm" id="roStatus" name="status">
-    {% for value, state, label in ui.FILTERS %}
-    <option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ ui.STATES[state].symbol }} {{ label }}</option>
-    {% endfor %}
-  </select>
+  {{ ui.status_filter(filters.status) }}
   <div class="form-check ro-toolbar-tick">
     <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
     <label class="form-check-label" for="roDayOn">Date</label>
@@ -48,5 +43,5 @@
 {{ ui.alert_alarm() }}
 {# The chosen view lives on roRecordView, outside roLiveRecords, so a refresh keeps it. #}
 {# The side panel: what Find matched in which field; starts closed, the log keeps its room. #}
-<div id="roRecordView">{% call records_ui.record_panel('roLogPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)]) }}{% endcall %}<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
+<div id="roRecordView">{% call records_ui.record_panel('roLogPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)], status=filters.status) }}{% endcall %}<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
 {% endblock %}

@@ -188,6 +188,13 @@
                   ('loggedon', 'loggedOn', 'Logged on'), ('overdue', 'overdue', 'Overdue'),
                   ('closed', 'closed', 'Closed'), ('discarded', 'discarded', 'Discarded')] %}
 
+{# Radio supplies vocabulary; Quackit owns the complete filter control. #}
+{% macro status_filter(selected='all') %}
+{% from 'myMacro_filters.html' import select_filter %}
+{% set options = [] %}{% for value, state, label in FILTERS %}{% set _ = options.append((value, STATES[state].symbol ~ ' ' ~ label)) %}{% endfor %}
+{{ select_filter('roStatus', 'status', 'Log-on status', options, selected) }}
+{% endmacro %}
+
 {# The STATES key a record is shown under, the same on the log and on its own page. #}
 {% macro state_key(r) -%}
   {{- 'discarded' if r.watchStatus in ('discarded', 'cancelled') else
@@ -228,7 +235,7 @@
    logons.matched_fields) with how many. sections: (gid, symbol, label, rows, matched fields). `filtering`: the badges
    are filter buttons (data-ro-filter-kind / -field) and `filter` ({kind, field} or none) is the one applied; without
    it the badges are plain. `body_id` is what a refresh swaps (hx-select-oob). #}
-{% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1) %}
+{% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1, status=None) %}
 <div id="{{ body_id }}">
 {# A filter applied: Clear filter first, above the kinds, near the badge that set it (owner, issue G). #}
 {% if filtering and filter is not none %}{{ records_ui.clear_filter({'data-ro-filter-clear': ''}, 'dc-record-panel-clear') }}{% endif %}
@@ -239,6 +246,15 @@
   {% set on_kind = filter is not none and filter.kind == gid %}
   <section class="dc-record-panel-section" data-matched="{{ gid }}">
     {{ records_ui.panel_badge(symbol, label, rows|length, attrs, heading=True, button=filtering, active=on_kind and filter.field is none) }}
+    {% if gid == 'logons' and status is not none %}
+    <div class="dc-record-panel-badges" aria-label="Log-on statuses">
+    {% for value, state_name, state_text in FILTERS %}
+      {% set count = namespace(n=0) %}
+      {% for row in rows %}{% if value == 'all' or state(row)|lower == value or (value == 'loggedon' and state(row) == 'overdue') %}{% set count.n = count.n + 1 %}{% endif %}{% endfor %}
+      {% if count.n or status == value %}{{ records_ui.panel_badge(STATES[state_name].symbol, state_text, count.n, {'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': value}, active=status == value) }}{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
     <div class="dc-record-panel-badges">
     {% for field, field_label, count in fields %}
       {% set field_attrs = attrs.copy() %}{% set _ = field_attrs.update({'data-ro-filter-field': field} if filtering else {}) %}{% set _ = field_attrs.update({'data-matched-field': field}) %}
