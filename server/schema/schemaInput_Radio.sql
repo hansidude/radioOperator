@@ -17,8 +17,6 @@ CREATE TABLE IF NOT EXISTS `LogOns` (
   -- watch and what the unit tells the vessel; it then ends by log off. A draft that was never a
   -- log on is discarded instead (ACC-7).
   `watchStatus` VARCHAR(16) NOT NULL DEFAULT 'draft',         -- draft | loggedOn | loggedOff | discarded (renamed from watching / loggedoff 2026-09-13)
-  `dayNumber` INT DEFAULT NULL,                               -- no longer issued (1.1: REC-9 is the Trip ID No.); kept on older rows
-  `dayDate` DATE DEFAULT NULL,                                -- the day that old number belonged to
   -- Paper column 'Trip ID No.', pre-printed 'T-' (spec A.1). One running sequence, not per day:
   -- this is the record's key, the day number is only what the operator says out loud. The state-wide
   -- system issues these across every unit; this branch allocates its own and the width leaves room
@@ -92,7 +90,6 @@ CREATE INDEX IF NOT EXISTS `idx_logons_open` ON `LogOns`(`unit`, `watchStatus`, 
 -- One number per unit per day (REC-9). Note: quackit's migration generator emits this as a plain
 -- CREATE INDEX, dropping the uniqueness, so the allocation in logons.create() locks rather than
 -- relying on this constraint. Standalone on SQLite does get the constraint.
-CREATE UNIQUE INDEX IF NOT EXISTS `uniq_logons_daynumber` ON `LogOns`(`unit`, `dayDate`, `dayNumber`);
 -- One trip reference, ever (REC-9). Same caveat as above: on quackit this arrives as a plain index,
 -- so logons._next_number() locks and retries rather than trusting it. NULL repeats freely, which is
 -- what an unsaved draft needs.

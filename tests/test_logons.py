@@ -75,7 +75,7 @@ class LogOns(unittest.TestCase):
         self.assertEqual(refs, sorted(refs))
         self.assertEqual(len(set(refs)), 4)                              # never the same twice, whatever the day or unit
         self.assertEqual([int(r[2:]) for r in refs], list(range(int(refs[0][2:]), int(refs[0][2:]) + 4)))
-        self.assertIsNone(L.get(self.cur, a)['dayNumber'])               # no daily number any more
+        self.assertNotIn('dayNumber', L.get(self.cur, a))                # no daily number any more
         row = dict(L.get(self.cur, a), tripRef=None)
         self.assertEqual(L.reference(row), '#%d' % a)                    # a row from before trip references
 

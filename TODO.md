@@ -125,7 +125,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   Lines for cards (each field on one line of its own; on by default, for chosen and narrow-screen cards alike).
 - Every table/card list numbers its records from 1 (# column / card corner), renumbered after a row search.
 - No daily number (spec 1.1 REC-9): a log on is named by its Trip ID No. everywhere; the log's columns are #, Status,
-  … Trip ID No. last. `dayNumber` / `dayDate` stay on older rows, no longer issued (dropping them is the owner's call).
+  … Trip ID No. last. `dayNumber` / `dayDate` removed from the schema and dropped on port 80 (8080 is the owner's to migrate; its
+  destructive file will also drop the old tables/columns listed in the worklog).
 - The log, Members and Public vessels have the same panel (starts closed, remembered per page, refreshed with the rows
   and on the log's 30 s refresh; `_ui.matched_panel`, `members.list_matched`, `logons.matched_fields`).
 - Search has the shared side panel (panel button beside the view buttons): for each kind found, badges of the fields

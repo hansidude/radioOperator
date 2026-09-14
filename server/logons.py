@@ -92,7 +92,7 @@ TIME_FIELDS = {'eta': ('etaDayRaw', 'etaDate', 'etaRaw', 'eta', 'etaBasis'),
                'callTime': ('callDayRaw', 'callDate', 'callTimeRaw', 'callTime', 'callTimeBasis'),
                'departureTime': ('departureDayRaw', 'departureDate', 'departureRaw', 'departureTime', 'departureBasis')}
 DAY_FIELDS = {'etaDay': 'eta', 'callDay': 'callTime', 'departureDay': 'departureTime'}
-DATES = ('etaDate', 'callDate', 'departureDate', 'dayDate')
+DATES = ('etaDate', 'callDate', 'departureDate')
 NUMBER_FIELDS = {'pob': 'whole number', 'length': 'number of metres'}
 NUMBER = re.compile(r'^\d+(\.\d+)?$')
 IDENT_FIELDS = ('memberNumber', 'registration', 'mobile', 'vesselName')
@@ -188,7 +188,7 @@ HISTORY_LABELS = dict({column(f): LABELS[f] for f in FIELDS},
                       callDate='Call date (read)', callTime='Call time (read)', callTimeBasis='Call time reading',
                       etaDate='Return date (read)', eta='Return deadline', etaBasis='Return time reading',
                       departureDate='Departure date (read)', departureTime='Departure time (read)', departureBasis='Departure reading',
-                      watchStatus='Status', dayNumber='No.', dayDate='Day', tripRef='Trip ID No.',
+                      watchStatus='Status', tripRef='Trip ID No.',
                       acceptedAt='Logged on at', acceptedBy='Logged on by', loggedOffAt='Logged off at',
                       loggedOffNote='Log off note', closeReason='Log off reason', discardedAt='Discarded at',
                       discardReason='Discard reason', cancelledAt='Cancelled at', cancelReason='Cancel reason',
