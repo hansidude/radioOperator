@@ -41,7 +41,7 @@
   {% if filter %}
     {% set every = namespace(n=0) %}{% for rows in everything.values() %}{% set every.n = every.n + rows|length %}{% endfor %}
     {% set shown = SYMBOL[filter.kind] %}
-    {% call records_ui.filter_applied('showing %d of the %d records found' % (total, every.n), {'data-ro-filter-clear': ''}) %}
+    {% call records_ui.filter_applied('showing %d of the %d records found' % (total, every.n), clear=False) %}
       {{ records_ui.panel_badge(shown[0], shown[1], everything[filter.kind]|length, button=False) }}
       {% if filter.field %}{% for field, field_label, count in matched[filter.kind] if field == filter.field %}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS[field], field_label, count, button=False) }}{% endfor %}{% endif %}
     {% endcall %}

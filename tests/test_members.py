@@ -562,7 +562,11 @@ class Members(unittest.TestCase):
         self.assertIn('data-found="contacts"', results(contacts))
         self.assertIn('Filter applied', contacts)
         self.assertIn('showing 1 of the 4 records found', contacts)                                  # Jane Smith, Sam Smith, her vessel, the log on
-        self.assertIn('data-ro-filter-clear', contacts)
+        panel = contacts[contacts.index('<div id="roMatched">'):contacts.index('<div id="roFound">')]
+        self.assertLess(panel.index('data-ro-filter-clear'), panel.index('data-matched='))            # Clear filter first in the panel
+        bar = contacts[contacts.index('class="dc-record-filter-applied"'):]
+        self.assertNotIn('data-ro-filter-clear', bar[:bar.index('</div>')])                             # not in the bar
+        self.assertNotIn('data-ro-filter-clear', everything[everything.index('<div id="roMatched">'):everything.index('<div id="roFound">')])   # no filter, no button
         self.assertIn('aria-pressed="true" class="dc-record-panel-badge dc-record-panel-badge-heading dc-record-panel-badge-active" title="Emergency contacts: 1"', contacts)
         self.assertIn('id="roFilterKind" value="contacts">', contacts)                                  # kept with the next search
         self.assertIn('data-matched="members"', contacts)                                               # the panel still counts everything

@@ -226,6 +226,8 @@
    it the badges are plain. `body_id` is what a refresh swaps (hx-select-oob). #}
 {% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1) %}
 <div id="{{ body_id }}">
+{# A filter applied: Clear filter first, above the kinds, near the badge that set it (owner, issue G). #}
+{% if filtering and filter is not none %}{{ records_ui.clear_filter({'data-ro-filter-clear': ''}, 'dc-record-panel-clear') }}{% endif %}
 {% if search|length < min_chars %}<div class="dc-record-empty">The fields a search matches show here.</div>
 {% else %}
   {% for gid, symbol, label, rows, fields in sections if rows %}

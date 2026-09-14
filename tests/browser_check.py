@@ -459,7 +459,12 @@ def main(engine='chromium'):
             expect(page.locator('#roMatched [data-matched="contacts"] [data-matched-field="name"]')).to_have_attribute('aria-pressed', 'true')
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # the panel still shows the whole search
             assert 'kind=contacts' in page.url and 'field=name' in page.url, 'The filter is not in the address: %s' % page.url
-            banner.locator('[data-ro-filter-clear]').click()                                         # Clear filter
+            expect(banner.locator('[data-ro-filter-clear]')).to_have_count(0)                         # not at the far right of the bar
+            clear = page.locator('#roMatched [data-ro-filter-clear]')                                   # top of the panel, above the kinds (issue G)
+            assert clear.bounding_box()['y'] < page.locator('#roMatched [data-matched]').first.bounding_box()['y'], 'Clear filter is not above the kinds'
+            assert clear.bounding_box()['x'] < page.locator('#roFound').bounding_box()['x'], 'Clear filter is not in the side panel'
+            clear.click()                                                                              # Clear filter
+            expect(page.locator('#roMatched [data-ro-filter-clear]')).to_have_count(0)
             expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
             members_badge = page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading')
