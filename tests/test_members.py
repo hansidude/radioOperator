@@ -392,6 +392,63 @@ class Members(unittest.TestCase):
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
         self.assertIn('id="roWhoTab" hidden', page)
 
+    # ---- what is no longer so (owner, issues h and i) ----
+
+    def test_a_removed_vessel_and_a_changed_mobile_are_marked_where_they_still_show(self):
+        m = self.member()                                                             # mobile 0412 345 678
+        self.vessel(m)
+        vessel = M.children(self.db(), 'vessels', m)[0]
+        r = self.logon(memberNumber='m00001', vesselName='Sea Dog', registration='AB123Q', vesselId=str(vessel['id']), mobile='0412345678')
+        self.assertEqual(r.status_code, 200, r.data)
+        logon_id = r.json['id']
+        self.assertNotIn('Not current', self.a.get('/logons?status=all').get_data(as_text=True))     # all still so: nothing marked
+        self.assertNotIn('data-not-current', self.a.get('/logon/%d' % logon_id).get_data(as_text=True))
+
+        self.assertEqual(self.a.post('/member/%d/vessels/%d/remove' % (m, vessel['id']), data={'version': '0'}).status_code, 302)
+        self.assertEqual(self.a.post('/member/%d' % m, data={'firstName': 'Jane', 'lastName': 'Smith', 'mobile': '0499000111', 'version': '0'}).status_code, 302)
+        cur = self.db()
+        self.assertEqual(M.children(cur, 'vessels', m), [])                                        # current ones only, as before
+        kept = M.children(cur, 'vessels', m, removed_too=True)
+        self.assertEqual([v['vesselName'] for v in kept], ['Sea Dog'])
+        self.assertRegex(kept[0]['removedOn'], r'^\w{3} \d{1,2}/\d{1,2}/\d\d$')
+        day = kept[0]['removedOn']
+
+        # the Vessels tab: still listed, faded, saying when it was removed, and not opened for editing
+        tab = self.a.get('/member/%d' % m).get_data(as_text=True)
+        vessels = tab[tab.index('id="radioMemberVessels"'):tab.index('id="ro-member-trailers"')]
+        self.assertIn('dc-record-grid-row ro-record-card ro-removed', vessels)
+        self.assertIn('Sea Dog', vessels)
+        self.assertIn('title="Removed"><span role="img" aria-label="Removed">🚫</span><span class="dc-record-badge-value">Removed %s</span>' % day, vessels)
+        self.assertNotIn('href="/member/%d/vessels/%d"' % (m, vessel['id']), vessels)
+
+        # the log and Search: ⚠️ before the old values, why in the tooltip; the log on keeps what it was given
+        gone_vessel = 'Not current: Vessel removed from m00001 on %s' % day
+        gone_mobile = 'Not current: m00001&#39;s mobile is now 0499 000 111'
+        for page in ('/logons?status=all', '/radio/search?q=AB123Q'):
+            html = self.a.get(page).get_data(as_text=True)
+            self.assertEqual(html.count('<span class="ro-not-current" title="%s">' % gone_vessel), 2, page)   # Vessel Name and Rego
+            self.assertIn('<span class="ro-not-current" title="%s">' % gone_mobile, html)
+            self.assertIn('<span class="ro-not-current-value"><span class="dc-record-word">Sea</span> <span class="dc-record-word">Dog</span></span>', html)
+        self.assertIn(gone_vessel, self.a.get('/logons/rows?partial=1&f=1&status=all').get_data(as_text=True))           # and the refresh
+
+        # the log on page: the removed vessel still shown, marked, and a note under each box
+        page = self.a.get('/logon/%d' % logon_id).get_data(as_text=True)
+        self.assertIn('<span class="ro-who-badge ro-removed" data-who="vessel">', page)
+        self.assertIn('data-not-current="vesselName">⚠️ Vessel removed from m00001 on %s</div>' % day, page)
+        self.assertIn('data-not-current="mobile">⚠️ m00001&#39;s mobile is now 0499 000 111</div>' % (), page)
+        who = self.a.get('/logons/who?member=%d&vessel=%d' % (m, vessel['id'])).get_data(as_text=True)
+        self.assertIn('ro-removed', who)
+
+        # saving it again keeps its vessel and values; a removed vessel cannot be picked anew
+        row = L.get(self.db(), logon_id)
+        fields = {'memberNumber': 'm00001', 'vesselName': 'Sea Dog', 'registration': 'AB123Q', 'vesselId': str(vessel['id']),
+                  'mobile': '0412345678', 'pob': '2'}
+        saved = self.a.post('/api/logon/%d' % logon_id, json={'fields': fields, 'version': row['version']})
+        self.assertEqual(saved.status_code, 200, saved.data)
+        row = L.get(self.db(), logon_id)
+        self.assertEqual((row['vesselId'], row['vesselName'], row['registration'], row['pob']), (vessel['id'], 'Sea Dog', 'AB123Q', '2'))
+        self.assertEqual(self.logon(memberNumber='m00001', vesselId=str(vessel['id'])).status_code, 400)
+
     def test_what_a_pick_fills_comes_from_the_records(self):
         m = self.member()
         self.vessel(m, hullColour='blue', make='Quintrex')
@@ -687,12 +744,19 @@ class Members(unittest.TestCase):
                 self.asked = []
             def history(self, cur, table, record_id, by='id_'):
                 self.asked.append((table, record_id, by))
-                return [{'id_': 1, 'time': '2026-09-14 10:0%d' % len(self.asked), 'changes': []}]
+                n = len(self.asked)
+                if table == 'Vessels' and by == 'memberId':                 # newest first: renamed, then two boats
+                    return [{'id': 3, 'id_': 3, 'time': '2026-09-14 10:0%d' % n, 'vesselName': 'Sea Dog II', 'registration': 'AB123Q', 'changes': []},
+                            {'id': 4, 'id_': 4, 'time': '2026-09-14 09:5%d' % n, 'vesselName': None, 'registration': 'CD456R', 'changes': []},
+                            {'id': 3, 'id_': 3, 'time': '2026-09-14 09:4%d' % n, 'vesselName': 'Sea Dog', 'registration': 'AB123Q', 'changes': []}]
+                return [{'id': 1, 'id_': 1, 'time': '2026-09-14 10:0%d' % n, 'name': 'Sam', 'registration': 'TR1', 'changes': []}]
         h = FakeHost()
         events = member_history(None, h, 7)
         self.assertEqual(h.asked, [('Members', 7, 'id_'), ('EmergencyContacts', 7, 'memberId'), ('Vessels', 7, 'memberId'),
                                    ('Trailers', 7, 'memberId'), ('Cars', 7, 'memberId')])
-        self.assertEqual([e['scope'] for e in events], ['Car', 'Trailer', 'Vessel', 'Emergency contact', 'Details'])   # newest first
+        # newest first; which record each is about, by its latest values (owner, issue i)
+        self.assertEqual([e['scope'] for e in events], ['Car · TR1', 'Trailer · TR1', 'Vessel · Sea Dog II · AB123Q', 'Emergency contact · Sam',
+                                                        'Details', 'Vessel · CD456R', 'Vessel · Sea Dog II · AB123Q'])
 
         class NoHistory:
             def history(self, *a, **k):
@@ -702,7 +766,7 @@ class Members(unittest.TestCase):
         h = FakeHost()
         events = member_history(None, h, 9, VESSEL_HISTORY_SCOPES)
         self.assertEqual(h.asked, [('Vessels', 9, 'id_'), ('EmergencyContacts', 9, 'vesselId')])
-        self.assertEqual([e['scope'] for e in events], ['Emergency contact', 'Details'])
+        self.assertEqual([e['scope'] for e in events], ['Emergency contact · Sam', 'Details'])
 
 
 if __name__ == '__main__':

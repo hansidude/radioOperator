@@ -108,10 +108,14 @@ def _filters():
 
 def _record_links(cur, h, row):
     """What the log on page shows about who this is: the member or public vessel the record is tied to,
-    as records (the picker badges and the boxes it fills come from them)."""
+    as records (the picker badges and the boxes it fills come from them). A vessel removed since is still shown, marked
+    removed, and `gone` says what the log on names that is no longer so (members.not_current)."""
     member = M.get(cur, 'member', row['memberId']) if row.get('memberId') else None
-    vessel = M.get(cur, 'vessels', row['vesselId']) if row.get('vesselId') else None
-    return {'member': member, 'vessel': vessel,
+    vessel = M.get(cur, 'vessels', row['vesselId'], removed_too=True) if row.get('vesselId') else None
+    if vessel:
+        vessel['removedOn'] = M.removed_on(vessel)
+    gone = M.not_current(cur, [dict(row)])[0]
+    return {'member': member, 'vessel': vessel, 'gone': {'vessel': gone['vesselGone'], 'mobile': gone['mobileGone']},
             'member_item': M.member_item(member) if member else None, 'vessel_item': M.vessel_item(vessel) if vessel else None,
             'kinds': M.KINDS, 'member_labels': M.LABELS, 'heard_note_pattern': L.heard_note('{number}')}
 

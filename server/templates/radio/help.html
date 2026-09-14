@@ -127,7 +127,9 @@
 <ul>
   <li>A member gets their number (m00001 and on) when saved. A mobile is 10 digits and shows as 0412 345 678.</li>
   <li>A member's tabs: Details, Emergency contacts, Vessels, Trailers, Cars and History. Each tab is a list with the view buttons and its own search; Add opens a new one, <i class="bi bi-pencil-square"></i> opens one.</li>
-  <li>History on a member shows every change: their details and every contact, vessel, trailer and car, each marked with what it changed.</li>
+  <li>History on a member shows every change: their details and every contact, vessel, trailer and car, each marked with which one it changed ({{ ui.FIELD_SYMBOLS.vesselName }} Vessel · name · rego).</li>
+  <li><strong>Remove</strong> takes a contact, vessel, trailer or car off the member (sold, gone): it stays on its tab after the current ones, faded, with {{ ui.REMOVED.symbol }} Removed and the day, and History shows Status: Current → {{ ui.REMOVED.symbol }} Removed.</li>
+  <li>An old log on keeps what it was given. {{ ui.NOT_CURRENT.symbol }} before its vessel name, rego or mobile means that is no longer so: the vessel was removed since, or the member now has another mobile. Hover it for which; the log on page says it under the box.</li>
   <li>A public vessel holds the vessel, its contact's name, phone and email, notes, emergency contacts and history.</li>
 </ul>
 

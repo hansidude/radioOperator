@@ -21,6 +21,10 @@ VESSEL_TABS = [('details', 'Details', 'life-preserver'), ('contacts', 'Emergency
 HISTORY_SCOPES = (('Members', 'id_', 'Details'), ('EmergencyContacts', 'memberId', 'Emergency contact'),
                   ('Vessels', 'memberId', 'Vessel'), ('Trailers', 'memberId', 'Trailer'), ('Cars', 'memberId', 'Car'))
 VESSEL_HISTORY_SCOPES = (('Vessels', 'id_', 'Details'), ('EmergencyContacts', 'vesselId', 'Emergency contact'))
+# Which one a held record's events are about, after its scope: "Vessel · Sea Dog · AB123Q" (owner, issue i: which vessel
+# was removed). Its latest values name every event of that record, so one record is one scope.
+SCOPE_NAMES = {'EmergencyContacts': ('name',), 'Vessels': ('vesselName', 'registration'), 'Trailers': ('registration',),
+               'Cars': ('registration',)}
 
 
 def member_history(cur, h, member_id, scopes=HISTORY_SCOPES):
@@ -31,8 +35,11 @@ def member_history(cur, h, member_id, scopes=HISTORY_SCOPES):
         got = h.history(cur, table, member_id, by)
         if got is None:
             return None
-        for event in got:
-            event['scope'] = scope
+        names = {}
+        for event in got:                               # newest first: the first seen of a record is its latest
+            if by != 'id_' and event['id'] not in names:
+                names[event['id']] = ' · '.join(str(event[f]) for f in SCOPE_NAMES[table] if event.get(f))
+            event['scope'] = ' · '.join(p for p in (scope, names.get(event['id'])) if p)
         events.extend(got)
     events.sort(key=lambda e: (e.get('time') is not None, e.get('time') or 0, e.get('id_') or 0), reverse=True)
     return events
@@ -101,7 +108,7 @@ def _member_page(cur, h, member, failed=None, status=200):
 def _member_context(cur, h, member, failed=None):
     ctx = {'member': member, 'failed': failed or {}, 'kinds': M.KINDS, 'labels': M.LABELS, 'tabs': TABS}
     if member.get('id'):
-        ctx['children'] = {kind: M.children(cur, kind, member['id']) for kind in M.CHILDREN}
+        ctx['children'] = {kind: M.children(cur, kind, member['id'], removed_too=True) for kind in M.CHILDREN}
         ctx['history'] = member_history(cur, h, member['id'])
     return ctx
 
@@ -375,11 +382,12 @@ def who_badges():
     member = _member(cur, h, request.args.get('member', type=int)) if request.args.get('member') else None
     vessel = None
     if request.args.get('vessel'):
-        vessel = M.get(cur, 'vessels', request.args.get('vessel', type=int))
+        vessel = M.get(cur, 'vessels', request.args.get('vessel', type=int), removed_too=True)   # an old log on's, removed since
         if not vessel:
             abort(404)
         if vessel['unit'] != h.unit() or (vessel['memberId'] or None) != (member['id'] if member else None):
             abort(400)
+        vessel['removedOn'] = M.removed_on(vessel)
     cur.close()
     return _page('_who.html', member=member, vessel=vessel)
 
@@ -400,7 +408,7 @@ def _vessel_context(cur, h, vessel, failed=None):
            'vessel_tabs': VESSEL_TABS, 'history': None, 'children': {'contacts': []}}
     if vessel.get('id'):
         ctx['history'] = member_history(cur, h, vessel['id'], VESSEL_HISTORY_SCOPES)
-        ctx['children'] = {'contacts': M.children(cur, 'contacts', vessel['id'], 'vessel')}
+        ctx['children'] = {'contacts': M.children(cur, 'contacts', vessel['id'], 'vessel', removed_too=True)}
     return ctx
 
 

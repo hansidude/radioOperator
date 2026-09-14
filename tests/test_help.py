@@ -27,6 +27,8 @@ class Help(unittest.TestCase):
             self.assertIn(control, page)                                          # the demonstration is the real controls
             self.assertIn("data-help-icon='[%s" % control.split(' ')[0].split('=')[0], page)   # and each is explained
         self.assertIn('Sample Sea Dog', page)
+        self.assertIn('with 🚫 Removed and the day', page)                          # what Remove keeps (owner, issue i)
+        self.assertIn('⚠️ before its vessel name, rego or mobile means that is no longer so', page)   # old log ons (issue h)
         self.assertIn('href="/radio/help"', page)                                 # on the menu
         self.assertIn('<div class="container-fluid mySpacing">', page)
 

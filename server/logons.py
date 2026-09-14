@@ -387,6 +387,8 @@ def records(cur, unit, now, approaching_minutes, status=None, day=None, search=N
     if search:
         hit = _search_hit(search)
         rows = [r for r in rows if any(hit(r, field) for field in SEARCH_FIELDS)]
+    from . import members        # members.py imports this module; a top-level import would be circular
+    members.not_current(cur, rows)
     rows.sort(key=lambda r: (r['callTime'] or r['createdAt'], r['id']), reverse=sort != 'oldest')
     return due_first(rows) if sort == 'due' else rows
 
@@ -555,7 +557,9 @@ def _links(cur, row, clean, picked=None):
                 sets.update(memberNumber=row.get('memberNumber'), memberId=row.get('memberId'))
     member_id = sets['memberId'] if 'memberId' in sets else row.get('memberId')
     if picked not in (None, ''):
-        vessel = members.get(cur, 'vessels', int(picked)) if str(picked).isdigit() else None
+        # The vessel this log on is already tied to stays tied after it is removed (the trip keeps what it was given);
+        # a removed vessel cannot be newly picked.
+        vessel = members.get(cur, 'vessels', int(picked), removed_too=int(picked) == row.get('vesselId')) if str(picked).isdigit() else None
         if not vessel or vessel['unit'] != row['unit'] or (vessel['memberId'] or None) != (member_id or None):
             raise Refused('That vessel is not %s' % ("one of this member's vessels" if member_id else 'a public vessel'))
         sets['vesselId'] = vessel['id']
@@ -641,7 +645,11 @@ def _record_values(cur, after, clean):
     pick and is unchanged."""
     from . import members
     if after.get('vesselId'):
-        vessel = members.get(cur, 'vessels', after['vesselId'])
+        vessel = members.get(cur, 'vessels', after['vesselId'], removed_too=True)
+        if not vessel:
+            raise Refused('No such vessel: %s' % after['vesselId'])
+        if not vessel['isActive']:
+            return {}, []               # removed since: the log on keeps the values it was given (owner, issue i)
         return {f: vessel.get(f) for f in RECORD_VESSEL_FIELDS}, []
     if after.get('memberId'):
         typed = [f for f in RECORD_VESSEL_FIELDS if f in clean and clean[f]]

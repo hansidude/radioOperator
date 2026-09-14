@@ -186,6 +186,19 @@ def main(engine='chromium'):
             expect(rows.filter(has_text='SECOND-' + token)).to_contain_text('white')
             add_on_tab('contacts', {'name': 'Verify Contact ' + token, 'phone': '0499888777'})
             expect(page.locator('#radioMemberContacts .dc-record-grid-row')).to_contain_text('0499 888 777')
+            # Remove takes the second vessel off the member: its tab still lists it, faded and dated, without an open
+            # button, and History names which vessel and says Removed (owner, issue i).
+            page.locator('[data-entity-tab="vessels"]').click()
+            rows.filter(has_text='SECOND-' + token).locator('a[title="Open vessel"]').click()
+            page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/[0-9]+$'))
+            page.once('dialog', lambda dialog: dialog.accept())
+            page.get_by_role('button', name='Remove').click()
+            page.wait_for_url(re.compile(r'/member/[0-9]+#vessels$'))
+            removed_row = rows.filter(has_text='SECOND-' + token)
+            expect(removed_row).to_have_class(re.compile(r'\bro-removed\b'))
+            expect(removed_row.locator('[data-column="removed"]')).to_contain_text(re.compile(r'🚫\s*Removed \w{3} \d{1,2}/\d{1,2}/\d\d'))
+            expect(removed_row.locator('a[title="Open vessel"]')).to_have_count(0)
+            expect(rows.filter(has_not_text='SECOND-' + token).locator('a[title="Open vessel"]')).to_have_count(1)
             page.locator('[data-entity-tab="details"]').click()
             page.locator('#member-email').fill('verify.changed@example.com')                  # one save, one history event
             page.locator('#member-firstName').fill('Verified')                                # a member's own first name is a change
@@ -201,6 +214,10 @@ def main(engine='chromium'):
             expect(member_history.locator('.badge', has_text='Vessel')).not_to_have_count(0)       # and every vessel they hold
             expect(member_history.locator('.badge', has_text='Emergency contact')).not_to_have_count(0)
             expect(member_history).to_contain_text('white')                                       # the vessel's hull colour edit
+            removal = member_history.locator('[data-history-event]', has=page.locator('.badge', has_text='Vessel · SECOND-%s · S2-%s' % (token, token)))
+            expect(removal.filter(has_text='Status')).to_have_count(1)                           # which vessel, and Removed, not isActive 1 → 0
+            expect(removal.filter(has_text='Status').locator('.dc-history-after')).to_contain_text('🚫 Removed')
+            expect(removal.filter(has_text='Status').locator('.dc-history-before')).to_contain_text('Current')
             page.locator('[data-entity-tab="vessels"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-member-%s.png' % engine)), full_page=True)
             vessels_grid = page.locator('#ro-member-vessels .dc-record-grid')                    # two short vessels: tight from the left
@@ -1039,6 +1056,40 @@ def main(engine='chromium'):
                                                view: innerWidth,
                                                cap: getComputedStyle(document.querySelector('#ro-history-pane .mySpacing')).maxWidth})''')
             assert widths['history'] < widths['view'] - 300, 'History is not in the usual page width: %s' % widths
+            # An old log on whose vessel is removed and whose member's mobile changes since: the log keeps what it was given
+            # and marks it ⚠️, why in the tooltip; the log on page notes it and shows the vessel as removed (owner, issues h, i).
+            page.goto(member_page.split('#')[0])                                                 # member_page is page.url: a full address
+            page.locator('[data-entity-tab="vessels"]').click()
+            kept = page.locator('#radioMemberVessels .dc-record-grid-row').filter(has_text=vessel)
+            expect(kept).to_have_count(1)
+            kept_id = int(kept.locator('a[title="Open vessel"]').get_attribute('href').rsplit('/', 1)[1])
+            kept_name = kept.locator('[data-column="vesselName"] .dc-record-grid-value').inner_text()
+            old_logon = context.request.post(URL + '/logons/new', data={'fields': dict(
+                callDay=today, callTime='06:10', memberNumber=member_no, vesselId=str(kept_id), mobile='0412345678')})
+            assert old_logon.status == 200 and not old_logon.json()['accepted'], old_logon.text()
+            layout_records.append(old_logon.json()['id'])                                       # a draft: discarded at the end
+            kept.locator('a[title="Open vessel"]').click()
+            page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/%d$' % kept_id))           # its confirm: the page's accept-all handler
+            page.get_by_role('button', name='Remove').click()
+            page.wait_for_url(re.compile(r'/member/[0-9]+#vessels$'))
+            page.locator('[data-entity-tab="details"]').click()
+            page.locator('#member-mobile').fill('0499000222')
+            page.locator('#ro-member-details button.btn-warning').click()
+            page.wait_for_url(re.compile(r'/member/[0-9]+#details$'))
+            expect(page.locator('#member-mobile')).to_have_value('0499 000 222')                 # saved: written back formatted
+            visit('/logons?status=all')
+            old_row = page.locator('[data-record="%s"]' % old_logon.json()['id'])
+            expect(old_row.locator('[data-column="vesselName"] .ro-not-current')).to_have_attribute('title', re.compile(r'^Not current: Vessel removed from %s on \w{3} ' % member_no))
+            expect(old_row.locator('[data-column="vesselName"]')).to_contain_text('⚠️')
+            expect(old_row.locator('[data-column="vesselName"]')).to_contain_text(kept_name)
+            expect(old_row.locator('[data-column="rego"] .ro-not-current')).to_have_count(1)
+            expect(old_row.locator('[data-column="mobile"] .ro-not-current')).to_have_attribute('title', "Not current: %s's mobile is now 0499 000 222" % member_no)
+            assert float(old_row.locator('[data-column="mobile"] .ro-not-current-value').evaluate('e => getComputedStyle(e).opacity')) < 1, 'Not current value is not faded'
+            old_row.screenshot(path=str(ARTIFACTS / ('radio-not-current-%s.png' % engine)))       # the row: the whole log is too tall
+            visit('/logon/%s' % old_logon.json()['id'])
+            expect(page.locator('#roWhoNow [data-who="vessel"].ro-removed')).to_contain_text('Removed')
+            expect(page.locator('[data-not-current="vesselName"]')).to_contain_text('Vessel removed from ' + member_no)
+            expect(page.locator('[data-not-current="mobile"]')).to_contain_text("%s's mobile is now 0499 000 222" % member_no)
             # An overdue notice: raised by the real checker, brought onto an open page by the 30 s refresh (no reload),
             # and gone the moment its log on is logged off.
             overdue = context.request.post(URL + '/logons/new', data={'fields': dict(

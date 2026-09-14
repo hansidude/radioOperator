@@ -35,8 +35,8 @@
   <div class="container-fluid mySpacing px-0">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges %}
-  {{ dcFn_ShowHistoryChanges(history, dcKey_i='member-history-' ~ member.id, dcTitle_i='Member history', dcFieldLabelsDictionary_i=labels,
-                             dcFieldSymbolsDictionary_i=ui.FIELD_SYMBOLS, dcShowScope_i=True, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
+  {{ dcFn_ShowHistoryChanges(history, dcKey_i='member-history-' ~ member.id, dcTitle_i='Member history', dcFieldLabelsDictionary_i=dict(labels, isActive='Status'),
+                             dcFieldSymbolsDictionary_i=ui.FIELD_SYMBOLS, dcValueLabelsDictionary_i=ui.HISTORY_VALUES, dcShowScope_i=True, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
   </div>
 </section>
 {% endmacro %}
@@ -54,8 +54,8 @@
   <div class="container-fluid mySpacing px-0">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
   {% else %}{% from "myMacro_history_changes.html" import dcFn_ShowHistoryChanges %}
-  {{ dcFn_ShowHistoryChanges(history, dcKey_i='vessel-history-' ~ vessel.id, dcTitle_i='Public vessel history', dcFieldLabelsDictionary_i=labels,
-                             dcFieldSymbolsDictionary_i=ui.FIELD_SYMBOLS, dcShowScope_i=True, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
+  {{ dcFn_ShowHistoryChanges(history, dcKey_i='vessel-history-' ~ vessel.id, dcTitle_i='Public vessel history', dcFieldLabelsDictionary_i=dict(labels, isActive='Status'),
+                             dcFieldSymbolsDictionary_i=ui.FIELD_SYMBOLS, dcValueLabelsDictionary_i=ui.HISTORY_VALUES, dcShowScope_i=True, dcSortControls_i=True, dcAdvancedSearch_i=True) }}{% endif %}
   </div>
 </section>
 {% endif %}

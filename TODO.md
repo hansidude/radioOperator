@@ -111,6 +111,15 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   each. Each of those four tabs is a list like the log (Quackit's `record_grid`: one row each, Cards / Paragraphs /
   text size, search over the rows) with an Add button; a row opens its own page to edit or Remove it. Remove
   makes a row inactive, never deletes it. The Members and Public vessels lists have the same view buttons.
+- **Removed stays visible** (owner, issue i, 2026-09-15): a removed contact, vessel, trailer or car stays on its tab after the
+  current ones, faded and dashed like a Discarded log on, with 🚫 Removed and the day, and no open button. History names
+  which record each event is about ("Vessel · Sea Dog · AB123Q", by its latest values) and shows Remove as Status:
+  Current → 🚫 Removed.
+- **Not current on old log ons** (owner, issues h and i): a log on keeps what it was given. When its vessel has since been
+  removed, its Vessel Name and Rego show ⚠️ and fade (tooltip "Vessel removed from m00001 on Tue 15/9/26"); when its
+  member (or public vessel) now has another number, its Mobile does ("m00001's mobile is now 0499 000 111"). The log, its
+  refresh and Search (`members.not_current` from `logons.records`); the log on page shows the removed vessel's badge and a
+  note under Vessel Name and Mobile, and saving that log on keeps its vessel. A removed vessel cannot be picked anew.
 - A public vessel is the record for a public user: the boat plus its owner's name and phone (both required),
   email and **notes** (a text box that grows), with an **Emergency contacts** tab like a member's and a History that
   includes its contacts' changes. A vessel needs a name or a rego. Contacts, vessels, trailers and cars share one set

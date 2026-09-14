@@ -14,6 +14,7 @@ host's history keeps it.
 import re
 
 from . import logons as L
+from . import times
 
 MEMBER_PREFIX = 'm'
 MEMBER_DIGITS = 5
@@ -95,10 +96,17 @@ def blank(kind):
 
 # ---------- reading ----------
 
-def get(cur, kind, record_id, lock=False):
-    cur.execute('SELECT * FROM %s WHERE id = %%s AND isActive = 1%s' % (KINDS[kind]['table'], ' FOR UPDATE' if lock else ''),
-                (record_id,))
+def get(cur, kind, record_id, lock=False, removed_too=False):
+    """One record. `removed_too`: a removed one as well (isActive 0), for what an old log on is still tied to."""
+    cur.execute('SELECT * FROM %s WHERE id = %%s%s%s' % (KINDS[kind]['table'], '' if removed_too else ' AND isActive = 1',
+                                                        ' FOR UPDATE' if lock else ''), (record_id,))
     return cur.fetchone()
+
+
+def removed_on(row):
+    """The day a removed record was taken off, as the log writes days ('Tue 15/9/26'); None while it is current. Remove
+    is a record's last save, so that is its last update."""
+    return None if row['isActive'] else times.fmt_day(L._dt(row['updatedAt']).date())
 
 
 def members(cur, unit, search=None):
@@ -313,12 +321,49 @@ def _row_fields(r, hit, fields, extra, extra_field):
     return own or [ACROSS]
 
 
-def children(cur, kind, owner_id, owner='member'):
-    """The records of this kind a member (or a public vessel) holds."""
+def children(cur, kind, owner_id, owner='member', removed_too=False):
+    """The records of this kind a member (or a public vessel) holds. `removed_too`: the ones removed as well, after the
+    current ones, each with `removedOn`, so a tab shows what they used to have (owner, issue i)."""
     if kind not in OWNERS[owner]['kinds']:
         raise L.Refused('A %s holds no %s' % (owner, KINDS[kind]['label'].lower()))
-    cur.execute('SELECT * FROM %s WHERE %s = %%s AND isActive = 1 ORDER BY id' % (KINDS[kind]['table'], OWNERS[owner]['key']), (owner_id,))
-    return cur.fetchall() or []
+    cur.execute('SELECT * FROM %s WHERE %s = %%s%s ORDER BY isActive DESC, id' % (KINDS[kind]['table'], OWNERS[owner]['key'],
+                                                                              '' if removed_too else ' AND isActive = 1'), (owner_id,))
+    rows = cur.fetchall() or []
+    for r in rows:
+        r['removedOn'] = removed_on(r)
+    return rows
+
+
+def not_current(cur, rows):
+    """What log ons name that is no longer so, in words (owner, issues h and i). Each row gets `vesselGone` when the
+    vessel it is tied to has since been removed, and `mobileGone` when its member (or public vessel) now has another
+    number. The log on keeps what it was given; these only say what changed since. None when still so."""
+    member_ids = sorted({r['memberId'] for r in rows if r.get('memberId')})
+    vessel_ids = sorted({r['vesselId'] for r in rows if r.get('vesselId')})
+    by_member, by_vessel = {}, {}
+    if member_ids:
+        cur.execute('SELECT * FROM Members WHERE id IN (%s)' % ', '.join(['%s'] * len(member_ids)), tuple(member_ids))
+        by_member = {m['id']: m for m in cur.fetchall() or []}
+    if vessel_ids:
+        cur.execute('SELECT * FROM Vessels WHERE id IN (%s)' % ', '.join(['%s'] * len(vessel_ids)), tuple(vessel_ids))
+        by_vessel = {v['id']: v for v in cur.fetchall() or []}
+    digits = lambda number: re.sub(r'\D', '', number or '')
+    for r in rows:
+        member, vessel = by_member.get(r.get('memberId')), by_vessel.get(r.get('vesselId'))
+        r['vesselGone'] = r['mobileGone'] = None
+        if vessel and not vessel['isActive']:
+            holder = by_member.get(vessel['memberId'])
+            r['vesselGone'] = 'Vessel removed from %s on %s' % (holder['memberNumber'], removed_on(vessel)) if holder \
+                else 'Vessel removed on %s' % removed_on(vessel)
+        if member:
+            whose, now = "%s's mobile" % member['memberNumber'], member.get('mobile')
+        elif vessel and not vessel['memberId']:
+            whose, now = "%s's phone" % (vessel.get('vesselName') or vessel.get('registration')), vessel.get('ownerPhone')
+        else:
+            continue
+        if digits(r.get('mobile')) and digits(now) and digits(r['mobile']) != digits(now):
+            r['mobileGone'] = '%s is now %s' % (whose, L.written_mobile(now)[0])
+    return rows
 
 
 def by_number(cur, unit, number):

@@ -23,7 +23,10 @@
 .ro-record-card.overdue{border-left-color:var(--bs-danger);background:rgba(var(--bs-danger-rgb),.14)}
 .ro-record-card.loggedOn{border-left-color:var(--bs-success);background:rgba(var(--bs-success-rgb),.1)}
 .ro-record-card.closed{border-left-color:var(--bs-black);background:rgba(var(--bs-black-rgb),.3)}
-.ro-record-card.discarded{border-left-color:var(--bs-secondary);border-left-style:dashed;opacity:.6}
+.ro-record-card.discarded,.ro-record-card.ro-removed{border-left-color:var(--bs-secondary);border-left-style:dashed;opacity:.6}
+/* What a record no longer is (owner, issues h and i): the value faded after its ⚠️, and a removed vessel's badge. */
+.ro-not-current-value,.ro-who-badge.ro-removed>.dc-record-badge:first-child{opacity:.6}
+.ro-not-current-note{color:var(--bs-warning-text-emphasis);font-size:.78rem;margin-top:.15rem}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 /* Layout comes from dc-record-toolbar; only the control widths are radio's. */
 .ro-toolbar label{font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--bs-secondary-color);margin:0}
@@ -283,8 +286,9 @@
   {% set display.rows = display.rows + [{
     'id': r.id, 'css_class': 'ro-record-card ' ~ state(r)|trim ~ (' ro-current' if r.id == current else ''), 'missing': gaps.keys,
     'cells': {'status': state_label(r), 'day': r.callDayBox or '', 'time': r.callTimeBox or '',
-              'member': member_cell(r, 'member' in gaps.keys), 'vesselName': r.vesselName or '', 'rego': r.registration or '',
-              'mobile': r.mobileBox or '', 'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
+              'member': member_cell(r, 'member' in gaps.keys), 'vesselName': not_current(r.vesselName, r.vesselGone),
+              'rego': not_current(r.registration, r.vesselGone), 'mobile': not_current(r.mobileBox, r.mobileGone),
+              'vessel': vessel_summary(r, ''), 'pob': cell(r.pob),
               'departure': r.departurePoint or '', 'destination': r.destination or '',
               'returnDay': r.etaDayBox or '', 'returnTime': r.etaBox or '',
               'trip': r.tripRef or '', 'action': action}
@@ -294,6 +298,20 @@
 {% endmacro %}
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
+
+{# What is no longer so, and the two words for it everywhere: a record taken off its member (Remove) and a value an old log
+   on keeps that its member or vessel no longer has (members.not_current; owner, issues h and i). #}
+{% set REMOVED = {'symbol': '🚫', 'label': 'Removed'} %}
+{% set NOT_CURRENT = {'symbol': '⚠️', 'label': 'Not current'} %}
+{# History shows Remove as the word, not isActive 1 → 0. #}
+{% set HISTORY_VALUES = {'isActive': {1: 'Current', 0: REMOVED.symbol ~ ' ' ~ REMOVED.label}} %}
+{% macro removed_badge(day) %}{{ records_ui.symbol(REMOVED.symbol, REMOVED.label, value=REMOVED.label ~ ' ' ~ day, tone='danger') }}{% endmacro %}
+
+{# A log on's value with ⚠️ before it and why in its tooltip, when `reason` says it is no longer so; otherwise the value. #}
+{% macro not_current(value, reason) -%}
+{%- if value and reason -%}<span class="ro-not-current" title="{{ NOT_CURRENT.label }}: {{ reason }}"><span role="img" aria-label="{{ NOT_CURRENT.label }}: {{ reason }}">{{ NOT_CURRENT.symbol }}</span> <span class="ro-not-current-value">{{ records_ui.words(value) }}</span></span>
+{%- else -%}{{ value or '' }}{%- endif -%}
+{%- endmacro %}
 
 {% macro vessel_summary(r, empty='—') -%}
 {% set parts = [((r.length ~ 'm') if r.length else ''), r.hullColour or '', r.make or '', r.model or '', r.vesselDetails or ''] -%}
@@ -408,7 +426,7 @@
 {%- endif -%}
 {%- if vessel -%}
 {% set words = [vessel.vesselName or '', vessel.registration or '']|select|join(' · ') %}
-<span class="ro-who-badge" data-who="vessel">{{ records_ui.symbol(FIELD_SYMBOLS.vesselName, 'Vessel', value=words) }}{% if open %}<button type="button" class="btn btn-sm ro-who-clear" data-ro-clear="vessel" title="Remove the vessel" aria-label="Remove the vessel"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}</span>
+<span class="ro-who-badge{% if vessel.removedOn %} ro-removed{% endif %}" data-who="vessel">{{ records_ui.symbol(FIELD_SYMBOLS.vesselName, 'Vessel', value=words) }}{% if vessel.removedOn %}{{ removed_badge(vessel.removedOn) }}{% endif %}{% if open %}<button type="button" class="btn btn-sm ro-who-clear" data-ro-clear="vessel" title="Remove the vessel" aria-label="Remove the vessel"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}</span>
 {%- elif member and open -%}
 <button type="button" class="btn btn-outline-secondary btn-sm" data-ro-pick-vessel>{{ FIELD_SYMBOLS.vesselName }} Pick their vessel</button>
 {%- endif -%}
@@ -457,14 +475,16 @@
 {% set grid = namespace(columns=[], rows=[]) %}
 {% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, '')}] %}{% endfor %}
 {% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True}] %}{% endif %}
+{# Removed ones (members.children removed_too) stay listed after the current ones, faded, saying when (owner, issue i). #}
+{% if rows|selectattr('removedOn')|list %}{% set grid.columns = grid.columns + [{'key': 'removed', 'label': REMOVED.label, 'heading': '', 'own_symbol': True}] %}{% endif %}
 {% if open %}{% set grid.columns = grid.columns + OPEN_COLUMN %}{% endif %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
   {% if holders %}{% set _ = cells.update({'holder': holder_badge(c.holder)}) %}{% endif %}
   {% set url = c.url if holders else owner_url ~ '/' ~ kind ~ '/' ~ c.id %}
   {% set action %}<a class="btn btn-outline-primary btn-sm" href="{{ url }}"{% if in_place %} hx-get="{{ url }}?panel=1" hx-target="#roWhoPanel" hx-swap="innerHTML"{% endif %} title="Open {{ spec.one }}" aria-label="Open {{ spec.one }}"><i class="bi bi-pencil-square" aria-hidden="true"></i></a>{% endset %}
-  {% set _ = cells.update({'action': action}) %}
-  {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells}] %}
+  {% if c.removedOn %}{% set _ = cells.update({'removed': removed_badge(c.removedOn)}) %}{% else %}{% set _ = cells.update({'action': action}) %}{% endif %}
+  {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells, 'css_class': 'ro-record-card ro-removed' if c.removedOn else ''}] %}
 {% endfor %}
 {{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower) }}
 {% endmacro %}
