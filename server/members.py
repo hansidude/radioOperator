@@ -46,7 +46,7 @@ LABELS = dict({f: L.LABELS[f] for f in VESSEL_FIELDS if f in L.LABELS},
               vesselName='Vessel Name', registration='Rego', memberNumber='Member No.', name='Name', address='Address',
               firstName='First name', lastName='Last name', mobile=L.LABELS['mobile'],
               phone='Phone', email='Email', relationship='Relationship', colour='Colour', ais='AIS / MMSI',
-              ownerName='Owner name', ownerPhone='Owner phone', ownerEmail='Owner email', notes='Notes')
+              ownerName='Contact', ownerPhone='Phone', ownerEmail='Email', notes='Notes')
 PHONES = ('mobile', 'phone', 'ownerPhone')
 EMAILS = ('email', 'ownerEmail')
 EMAIL = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')

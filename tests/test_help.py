@@ -35,7 +35,7 @@ class Help(unittest.TestCase):
         for field in symbols:
             self.assertTrue(P.HELP_LABELS.get(field), field)
         page = self.a.get('/radio/help').get_data(as_text=True)
-        self.assertIn('data-help-field="ownerPhone"><span role="img" aria-hidden="true">📱</span><span class="dc-record-panel-badge-label">Owner phone</span>', page)
+        self.assertIn('data-help-field="ownerPhone"><span role="img" aria-hidden="true">📱</span><span class="dc-record-panel-badge-label">Phone</span>', page)
 
     def test_help_needs_a_login(self):
         self.assertEqual(self.app.test_client().get('/radio/help').status_code, 302)          # to the host's login page

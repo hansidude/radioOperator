@@ -115,7 +115,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   email and **notes** (a text box that grows), with an **Emergency contacts** tab like a member's and a History that
   includes its contacts' changes. A vessel needs a name or a rego. Contacts, vessels, trailers and cars share one set
   of pages whichever holds them (`/<member|vessel>/<id>/<kind>/…`, `members.OWNERS`).
-- Emergency contact and owner phones follow the same mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
+- Emergency contact and public vessel contact phones follow the same mobile rule (10 digits, written `0412 345 678`); email needs an @. A refused save
   writes nothing, keeps what was typed and turns its boxes red; each form comes back to its own tab.
 - **A log on is a member's or a public user's** (owner, 2026-09-14; spec CAP-24). The Member No. box offers the
   unit's members; a number that is not a member is emptied as focus leaves the box and written into **Notes**
@@ -152,9 +152,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   and the results are the same `record_grid` lists the pages use, under "N found", numbered, rows or cards, a row
   picked by click or arrow keys + Enter. Member: the Members list; a member's vessel: their Vessels tab list; Vessel
   and Public user: the Public vessels list with 🤲 Held by (👤 member or 🌐 public); Mobile: 📱 Mobile and one Whose
-  column, never blank (👤 member; 🧑 owner · 🌐 the vessel; 🆘 emergency contact · 👤 / 🌐 who holds it; owner, issue D,
+  column, never blank (👤 member; 🧑 contact · 🌐 the vessel; 🆘 emergency contact · 👤 / 🌐 who holds it; owner, issue D,
   `_ui.mobiles_grid`). Every row value has its field's emoji before it and headings are words only (owner, issues A and E: record_grid
-  `symbol`); rows tight from the left; the log's status column has no heading word, Date is Logon date, Return date 🏁. Emoji in the title, step and label
+  `symbol`); rows tight from the left; a public vessel's person is 🧑 Contact / 📱 Phone / ✉️ Email, never
+  Owner (owner, issue F: the caller need not own it); the log's status column has no heading word, Date is Logon date, Return date 🏁. Emoji in the title, step and label
   (👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile). The box is a contained page wide (120ch) and 80% of the screen tall.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.

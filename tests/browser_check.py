@@ -345,7 +345,7 @@ def main(engine='chromium'):
             expect(page.locator('#f-registration')).to_have_value('NB-' + token)
             expect(page.locator('#f-vesselId')).not_to_have_value(first_pick)
             page.locator('#roPickPublic').click()                                                 # a public user's known vessel
-            expect(page.locator('#spLabel')).to_have_text('🌐 Public vessel: name, rego or owner')
+            expect(page.locator('#spLabel')).to_have_text('🌐 Public vessel: name, rego or contact')
             page.locator('#spInput').fill('PUBLIC-' + token)
             pick('PUBLIC-' + token)
             expect(page.locator('#f-memberNumber')).to_have_value('')
@@ -384,7 +384,7 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile('/logons/new(#[a-z]+)?$'))                       # never left the page
             page.screenshot(path=str(ARTIFACTS / ('radio-who-%s.png' % engine)), full_page=True)
             page.locator('#roPickAnyVessel').click()                                               # 🛥️ Vessel: any vessel
-            expect(page.locator('#spLabel')).to_have_text('🛥️ Vessel: name, rego, owner or member')
+            expect(page.locator('#spLabel')).to_have_text('🛥️ Vessel: name, rego, contact or member')
             page.locator('#spInput').fill(vessel)
             expect(page.locator('#spResults .dc-record-grid-row', has_text=vessel).first.locator('[data-column="holder"]')).to_contain_text(member_no)   # 👤 who holds it
             pick(vessel)

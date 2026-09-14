@@ -169,6 +169,8 @@ class Members(unittest.TestCase):
         self.assertEqual(r.status_code, 302, r.data)
         v = int(r.location.rsplit('/', 1)[1])
         listed = self.a.get('/vessels').get_data(as_text=True)
+        self.assertIn('<span title="Contact"><span class="dc-record-word">Contact</span></span><span title="Phone">', listed)   # not Owner (issue F)
+        self.assertNotIn('Owner', listed)
         self.assertIn('Blue Duck', listed)
         self.assertIn('Alex Public', listed)
         page = self.a.get('/vessel/%d' % v).get_data(as_text=True)
@@ -582,7 +584,7 @@ class Members(unittest.TestCase):
         get = lambda url: self.a.get(url).get_data(as_text=True)
         cases = [('/logons', 'roLogPanel', 'roMatched', 'q=ab123', 'logons', 'registration', 'Vessel Rego. No.'),
                  ('/members', 'roMemberPanel', 'roMemberMatched', 'q=ab123', 'members', 'vesselRegos', 'Vessel regos'),
-                 ('/vessels', 'roVesselPanel', 'roVesselMatched', 'q=0411222333', 'public', 'ownerPhone', 'Owner phone')]
+                 ('/vessels', 'roVesselPanel', 'roVesselMatched', 'q=0411222333', 'public', 'ownerPhone', 'Phone')]
         for url, panel_id, body_id, query, gid, field, label in cases:
             page = get(url)
             self.assertIn('data-dc-record-panel aria-controls="%s"' % panel_id, page)                    # the panel button
@@ -645,7 +647,7 @@ class Members(unittest.TestCase):
         self.assertIn('<span class="dc-record-badge-value">Alex</span></span> · <span', html)
         self.assertNotIn('data-column="holder"', self.a.get('/api/logons/mobiles?q=0412000').json['html'])   # a member's own number: Whose, never blank
         self.assertIn('aria-label="Member">👤</span><span class="dc-record-badge-value">m00001 Jane Smith', self.a.get('/api/logons/mobiles?q=0412000').json['html'])
-        self.assertIn('title="Owner"><span role="img" aria-label="Owner">🧑</span><span class="dc-record-badge-value">Alex</span>', html)
+        self.assertIn('title="Contact"><span role="img" aria-label="Contact">🧑</span><span class="dc-record-badge-value">Alex</span>', html)
         self.assertIn('title="Public user"><span role="img" aria-label="Public user">🌐</span><span class="dc-record-badge-value">Blue Duck</span>', html)
         self.assertEqual(self.a.get('/api/logons/mobiles?q=').json['items'], [])                    # no digits, nothing
         self.assertIn('data-sp-count>0 found<', self.a.get('/api/logons/mobiles?q=').json['html'])

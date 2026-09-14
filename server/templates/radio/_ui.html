@@ -505,15 +505,15 @@
   {'key': 'name', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'kind': 'index'},
   {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration},
   {'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True},
-  {'key': 'owner', 'label': 'Owner', 'symbol': FIELD_SYMBOLS.ownerName},
-  {'key': 'phone', 'label': 'Owner phone', 'symbol': FIELD_SYMBOLS.ownerPhone},
+  {'key': 'owner', 'label': 'Contact', 'symbol': FIELD_SYMBOLS.ownerName},
+  {'key': 'phone', 'label': 'Phone', 'symbol': FIELD_SYMBOLS.ownerPhone},
   {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails}] + OPEN_COLUMN[:1 if open else 0], key, empty) }}
 {% endmacro %}
 
 {# Phone numbers the log on's 📱 Mobile picker found (members.mobile_picks): the number and whose it is, one column
-   never blank (owner, 2026-09-14): 👤 a member, 🧑 a public vessel's owner · 🌐 the vessel, 🆘 an emergency
+   never blank (owner, 2026-09-14): 👤 a member, 🧑 a public vessel's contact · 🌐 the vessel, 🆘 an emergency
    contact · 👤 the member or 🌐 public vessel holding it. #}
-{% set WHOSE = {'member': (WHO.member.symbol, WHO.member.label), 'public': (FIELD_SYMBOLS.ownerName, 'Owner'),
+{% set WHOSE = {'member': (WHO.member.symbol, WHO.member.label), 'public': (FIELD_SYMBOLS.ownerName, 'Contact'),
                 'contact': (FIELD_SYMBOLS.name, 'Emergency contact')} %}
 {% macro mobiles_grid(picks, key, empty='0 numbers') %}
 {% set display = namespace(rows=[]) %}

@@ -456,7 +456,7 @@
   if (pickAnyVessel) pickAnyVessel.addEventListener('click', function () {
     SearchPicker.open({
       title: 'Vessel', symbol: SYM.vessel,
-      stages: [{ key: 'vessel', symbol: SYM.vessel, endpoint: '/api/logons/all-vessels', label: 'Vessel: name, rego, owner or member' }],
+      stages: [{ key: 'vessel', symbol: SYM.vessel, endpoint: '/api/logons/all-vessels', label: 'Vessel: name, rego, contact or member' }],
       onConfirm: function (id, picks) { chosen(picks.vessel.item.member, picks.vessel.item); }
     });
   });
@@ -465,7 +465,7 @@
   if (pickMobile) pickMobile.addEventListener('click', function () {
     SearchPicker.open({
       title: 'Mobile', symbol: SYM.mobile,
-      stages: [{ key: 'mobile', symbol: SYM.mobile, endpoint: '/api/logons/mobiles', label: 'Mobile: a member, an owner or an emergency contact' }],
+      stages: [{ key: 'mobile', symbol: SYM.mobile, endpoint: '/api/logons/mobiles', label: 'Mobile: a member, a public vessel contact or an emergency contact' }],
       onConfirm: function (id, picks) {
         var item = picks.mobile.item;
         if (!box('mobile').value.trim()) put('mobile', item.phone);
@@ -477,7 +477,7 @@
     SearchPicker.open({
       title: 'Public user', symbol: SYM.public,
       stages: [
-        { key: 'vessel', symbol: SYM.public, endpoint: '/api/logons/public-vessels', label: 'Public vessel: name, rego or owner',
+        { key: 'vessel', symbol: SYM.public, endpoint: '/api/logons/public-vessels', label: 'Public vessel: name, rego or contact',
           create: { label: 'New public vessel', onCreate: function (typed) {
             chosen(null, null);
             openPanel('public', null, typed);
