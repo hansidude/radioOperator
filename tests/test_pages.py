@@ -268,10 +268,16 @@ class Pages(unittest.TestCase):
         # The paper log's columns: # (the list's own count) and the status lead, Trip ID No. is last (figure 5).
         self.assertIn('class="dc-record-grid-head"', page)
         head = page[page.index('class="dc-record-grid-head"'):page.index('</div>', page.index('class="dc-record-grid-head"'))]
-        self.assertEqual([re.sub(r'<[^>]+>', '', h.split('</span> ', 1)[-1]) for h in head.split('<span title=')[1:]],   # words as record_grid's word spans
-                         ['Status', 'Date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
+        self.assertEqual([re.sub(r'<[^>]+>', '', h.split('>', 1)[-1]) for h in head.split('<span title=')[1:]],   # words as record_grid's word spans
+                         ['', 'Logon date', 'Time', 'Member No.', 'Vessel Name', 'Rego', 'Mobile', 'Vessel details', 'POB',
                           'Departure', 'Going to', 'Return date', 'Time', 'Trip ID No.'])
-        self.assertIn('<span title="Member No."><span class="dc-record-grid-symbol">👤</span> <span class="dc-record-word">Member</span> <span class="dc-record-word">No.</span></span>', head)
+        self.assertIn('<span title="Member No."><span class="dc-record-word">Member</span> <span class="dc-record-word">No.</span></span>', head)   # words only
+        self.assertIn('<span title="Status"></span>', head)                                    # no Status word
+        self.assertNotIn('dc-record-grid-symbol', head)                                        # the emoji are in the cells
+        cell = lambda column: page[page.index('data-column="%s"' % column):page.index('</div>', page.index('data-column="%s"' % column))]
+        self.assertIn('<span class="dc-record-grid-value-symbol" aria-hidden="true">📅</span><span class="dc-record-grid-value"', cell('day'))   # emoji, value
+        self.assertNotIn('dc-record-grid-value-symbol', cell('status'))                       # the status symbol is its own
+        self.assertNotIn('dc-record-grid-value-symbol', cell('member'))                       # 👤 / 🌐 badge, not twice
         self.assertIn('class="dc-record-card dc-record-grid-row ro-record-card draft', page)
         self.assertNotIn('<table', page)
         self.assertNotIn('Still needed', page)
@@ -516,7 +522,8 @@ class Pages(unittest.TestCase):
         i = self.accepted(time='0001')                                                # a return time long past
         self.assertEqual(self.a.post('/logon/%d/logoff' % i, data={'notes': 'thought it was back'}).status_code, 302)
         closed_page = self.a.get('/logon/%d' % i).get_data(as_text=True)                      # Reopen, asked first
-        self.assertIn('<form id="reopenForm" method="post" action="/logon/%d/reopen" data-confirm-title="Reopen %s' % (i, L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), i)['tripRef']), closed_page)
+        self.assertIn('<form id="reopenForm" method="post" action="/logon/%d/reopen" data-confirm-title="Are you sure you want to Reopen this log on?" data-confirm-label' % i, closed_page)
+        self.assertNotIn('stays in its History', closed_page.split('id="reopenForm"')[1].split('</form>')[0])    # the question alone
         self.assertIn('data-confirm-label="Reopen" data-confirm-tone="warning"', closed_page)
         self.assertIn('name="reason" form="reopenForm"', closed_page)
         self.assertIn('id="qcConfirm"', closed_page)
@@ -534,7 +541,7 @@ class Pages(unittest.TestCase):
         self.assertNotIn('onsubmit="return confirm(', open_page)
         draft = self.new()                                                              # a discarded draft reopens as a draft
         self.assertEqual(self.a.post('/logon/%d/discard' % draft, data={'reason': 'wrong one'}).status_code, 302)
-        self.assertIn('It goes back as a draft.', self.a.get('/logon/%d' % draft).get_data(as_text=True))
+        self.assertIn('data-confirm-title="Are you sure you want to Reopen this draft?"', self.a.get('/logon/%d' % draft).get_data(as_text=True))
         self.assertEqual(self.a.post('/logon/%d/reopen' % draft, data={'reason': 'discarded the wrong draft'}).status_code, 302)
         self.assertEqual(L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), draft)['watchStatus'], 'draft')
         self.assertEqual(self.a.post('/logon/%d/reopen' % i, data={'reason': 'again'}).status_code, 400)

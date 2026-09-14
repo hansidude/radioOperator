@@ -203,6 +203,9 @@ def main(engine='chromium'):
             expect(member_history).to_contain_text('white')                                       # the vessel's hull colour edit
             page.locator('[data-entity-tab="vessels"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-member-%s.png' % engine)), full_page=True)
+            vessels_grid = page.locator('#ro-member-vessels .dc-record-grid')                    # two short vessels: tight from the left
+            tight = vessels_grid.evaluate("g => [g.clientWidth, g.querySelector('.dc-record-grid-row').getBoundingClientRect().width]")
+            assert tight[1] < tight[0] - 200, 'Columns spread across the width instead of tight from the left: %s' % tight
             visit('/members?q=' + token)
             expect(page.locator('#radioMembers .dc-record-grid-row')).to_have_count(1)
             expect(page.locator('#radioMembers')).to_contain_text(vessel)
@@ -254,10 +257,13 @@ def main(engine='chromium'):
             page.locator('#spInput').fill(token)
             results = page.locator('#spResults')                                                   # the Members page's list, in the picker
             expect(results.locator('[data-sp-count]')).to_have_text(re.compile(r'^\d+ found$'))
-            expect(results.locator('.dc-record-grid-head')).to_contain_text('📱 Mobile')             # column names with their emoji
-            expect(results.locator('.dc-record-grid-head')).to_contain_text('🛥️ Vessels')
+            expect(results.locator('.dc-record-grid-head')).to_contain_text('Mobile')                # column names, their emoji in the cells
+            expect(results.locator('.dc-record-grid-head')).not_to_contain_text('📱')
             member_row = results.locator('.dc-record-grid-row', has_text=member_no).first
             expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value')).to_have_text('0412 345 678')
+            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_have_text('📱')   # emoji, field
+            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_be_visible()
+            expect(member_row.locator('[data-column="number"] .dc-record-grid-value-symbol')).to_have_count(0)   # the 👤 badge is its own
             expect(member_row.locator('[data-column="vessels"]')).to_contain_text(vessel)
             expect(member_row.locator('.dc-record-count')).not_to_have_text('')                    # numbered
             expect(results.locator('.dc-record-grid-action')).to_have_count(0)                       # no open button: a click picks
@@ -389,6 +395,8 @@ def main(engine='chromium'):
             page.locator('#spInput').fill('0499888777')
             whose = page.locator('#spResults .dc-record-grid-row', has_text='Verify Contact ' + token).first.locator('[data-column="whose"]')
             expect(whose.get_by_role('img', name='Emergency contact')).to_have_text('🆘')                 # a contact's number
+            expect(whose).to_contain_text(member_no)                                                  # · 👤 the member holding it, same column
+            expect(page.locator('#spResults [data-column="holder"]')).to_have_count(0)                # no Held by column
             pick('Verify Contact ' + token)
             expect(page.locator('#roWhoNow [data-who="member"]')).to_contain_text(member_no)      # brings the member it belongs to
             expect(page.locator('#roWhoNow [data-ro-pick-vessel]')).to_be_visible()
@@ -593,7 +601,10 @@ def main(engine='chromium'):
             expect(row.locator('[data-column="returnTime"]')).to_contain_text('1700')
             expect(row.locator('[data-column="member"]')).to_contain_text('Public')             # nothing picked: a public user
             expect(row.locator('[data-column="member"]').get_by_role('img', name='Public user', exact=True)).to_be_visible()
-            expect(page.locator('.dc-record-grid-head')).to_contain_text('👤 Member No.')       # symbols taught in the headings
+            expect(page.locator('.dc-record-grid-head')).to_contain_text('Logon date')           # headings are words (issue E)
+            expect(row.locator('[data-column="returnTime"] .dc-record-grid-value-symbol')).to_have_text('⏰')   # emoji inside the field
+            row_box, last_box = row.bounding_box(), row.locator('[data-column="action"]').bounding_box()
+            assert abs(row_box['x'] + row_box['width'] - last_box['x'] - last_box['width']) < 2, (row_box, last_box)   # the row ends at its last column
             # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
             expect(page.get_by_role('button', name='Apply', exact=True)).to_have_count(0)
             def rows_for(**want):
@@ -792,7 +803,7 @@ def main(engine='chromium'):
                 assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
                 assert not metrics['split'], 'Words split across lines at %spx: %s' % (width, metrics['split'])
                 assert not metrics['twoLineNames'], 'Column names on two lines at %spx: %s' % (width, metrics['twoLineNames'])
-                if width >= 1328:
+                if width >= 1920:                       # the operator's normal screen (owner, 2026-09-14): always rows
                     assert not metrics['mobile'], 'Desktop unexpectedly switched to cards at %spx' % width
                 if width >= 768 and not metrics['stacked']:
                     assert not metrics['mobile'], 'Tablet switched to cards without the rows overflowing at %spx' % width
@@ -958,7 +969,8 @@ def main(engine='chromium'):
             visit('/logon/%s' % record)                                                          # logged off by mistake: Reopen
             page.locator('#reopenReason').fill('Logged off the wrong vessel ' + token)
             page.locator('button[form="reopenForm"]').click()
-            expect(page.locator('#qcTitle')).to_contain_text('Reopen T-')
+            expect(page.locator('#qcTitle')).to_have_text('Are you sure you want to Reopen this log on?')
+            expect(page.locator('#qcBody')).to_be_hidden()                                       # the question alone, no body
             page.locator('#qcOk').click()
             page.wait_for_url(re.compile('/logon/%s$' % record))
             expect(page.locator('.ro-status-now')).to_contain_text('Logged on')

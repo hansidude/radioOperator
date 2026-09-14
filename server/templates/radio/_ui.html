@@ -217,7 +217,7 @@
                         'colour': '🎨', 'vesselType': '⛵', 'make': '🏭', 'model': '🏷️', 'ais': '📡',
                         'ownerName': '🧑', 'ownerPhone': '📱', 'ownerEmail': '✉️', 'vesselNames': '🛥️', 'vesselRegos': '🔖',
                         'holder': '🤲', 'across': '🧩',
-                        'pob': '👥', 'departurePoint': '⚓', 'destination': '🧭', 'etaDay': '📆', 'eta': '⏰'} %}
+                        'pob': '👥', 'departurePoint': '⚓', 'destination': '🧭', 'etaDay': '🏁', 'eta': '⏰'} %}
 
 {# A list's side panel content (view_controls(panel=...) + record_panel): for each kind listed, a heading badge with
    how many records, then a badge per field the search matched in them (members.matched / list_matched,
@@ -251,10 +251,10 @@
 <label for="{{ for_id }}">{% if FIELD_SYMBOLS.get(name) %}<span class="ro-field-symbol" aria-hidden="true">{{ FIELD_SYMBOLS[name] }}</span> {% endif %}{{ label }}</label>
 {%- endmacro %}
 {% set COLUMNS = [
-  {'key': 'status', 'label': 'Status', 'symbol': FIELD_SYMBOLS.watchStatus, 'kind': 'index'},
-  {'key': 'day', 'label': 'Date', 'symbol': FIELD_SYMBOLS.callDay},
+  {'key': 'status', 'label': 'Status', 'heading': '', 'symbol': FIELD_SYMBOLS.watchStatus, 'kind': 'index', 'own_symbol': True},
+  {'key': 'day', 'label': 'Logon date', 'symbol': FIELD_SYMBOLS.callDay},
   {'key': 'time', 'label': 'Time', 'symbol': FIELD_SYMBOLS.callTime},
-  {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber},
+  {'key': 'member', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'own_symbol': True},
   {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName},
   {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration},
   {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile},
@@ -453,7 +453,7 @@
 {% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False, holders=False, open=True) %}
 {% set grid = namespace(columns=[], rows=[]) %}
 {% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, '')}] %}{% endfor %}
-{% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder}] %}{% endif %}
+{% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True}] %}{% endif %}
 {% if open %}{% set grid.columns = grid.columns + OPEN_COLUMN %}{% endif %}
 {% for c in rows %}
   {% set cells = {} %}{% for f in spec.fields %}{% set _ = cells.update({f: c[f] if c[f] is not none else ''}) %}{% endfor %}
@@ -482,7 +482,7 @@
                                                                 'email': m.email or '', 'vessels': m.vesselNames, 'action': action}}] %}
 {% endfor %}
 {{ records_ui.record_grid(display.rows, [
-  {'key': 'number', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'kind': 'index'},
+  {'key': 'number', 'label': 'Member No.', 'symbol': FIELD_SYMBOLS.memberNumber, 'kind': 'index', 'own_symbol': True},
   {'key': 'firstName', 'label': 'First name', 'symbol': FIELD_SYMBOLS.firstName},
   {'key': 'lastName', 'label': 'Last name', 'symbol': FIELD_SYMBOLS.lastName},
   {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile},
@@ -504,27 +504,27 @@
 {{ records_ui.record_grid(display.rows, [
   {'key': 'name', 'label': 'Vessel Name', 'symbol': FIELD_SYMBOLS.vesselName, 'kind': 'index'},
   {'key': 'rego', 'label': 'Rego', 'symbol': FIELD_SYMBOLS.registration},
-  {'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder},
+  {'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True},
   {'key': 'owner', 'label': 'Owner', 'symbol': FIELD_SYMBOLS.ownerName},
   {'key': 'phone', 'label': 'Owner phone', 'symbol': FIELD_SYMBOLS.ownerPhone},
   {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails}] + OPEN_COLUMN[:1 if open else 0], key, empty) }}
 {% endmacro %}
 
-{# Phone numbers the log on's 📱 Mobile picker found (members.mobile_picks): the number, whose it is (👤 a member,
-   🧑 a public vessel's owner, 🆘 an emergency contact) and who holds that record. #}
+{# Phone numbers the log on's 📱 Mobile picker found (members.mobile_picks): the number and whose it is, one column
+   never blank (owner, 2026-09-14): 👤 a member, 🧑 a public vessel's owner · 🌐 the vessel, 🆘 an emergency
+   contact · 👤 the member or 🌐 public vessel holding it. #}
 {% set WHOSE = {'member': (WHO.member.symbol, WHO.member.label), 'public': (FIELD_SYMBOLS.ownerName, 'Owner'),
                 'contact': (FIELD_SYMBOLS.name, 'Emergency contact')} %}
 {% macro mobiles_grid(picks, key, empty='0 numbers') %}
 {% set display = namespace(rows=[]) %}
 {% for p in picks %}
   {% set number %}<span class="dc-record-index">{{ p.phone }}</span>{% endset %}
-  {% set display.rows = display.rows + [{'id': p.id, 'cells': {'phone': number, 'whose': records_ui.symbol(WHOSE[p.kind][0], WHOSE[p.kind][1], value=p.name),
-                                                                'holder': holder_badge(p.holder) if p.holder else ''}}] %}
+  {% set whose %}{{ records_ui.symbol(WHOSE[p.kind][0], WHOSE[p.kind][1], value=p.name) }}{% if p.holder %} · {{ holder_badge(p.holder) }}{% endif %}{% endset %}
+  {% set display.rows = display.rows + [{'id': p.id, 'cells': {'phone': number, 'whose': whose}}] %}
 {% endfor %}
 {{ records_ui.record_grid(display.rows, [
   {'key': 'phone', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile, 'kind': 'index'},
-  {'key': 'whose', 'label': 'Whose'},
-  {'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder}], key, empty) }}
+  {'key': 'whose', 'label': 'Whose', 'symbol': WHO.member.symbol, 'own_symbol': True}], key, empty) }}
 {% endmacro %}
 
 {# The form for one of those records: add (creating) or edit with Remove. in_place saves without leaving the page. #}

@@ -95,7 +95,7 @@
     {# Closed by mistake (§3.3, AC-36): Reopen, with the reason. The closure stays in History; a log on is watched again at
        once (a passed return time is overdue straight away), a discarded draft comes back as a draft. #}
     {% set back_to = 'a draft' if logon.watchStatus == 'discarded' else 'on the watch' %}
-    <form id="reopenForm" method="post" action="/logon/{{ logon.id }}/reopen" data-confirm-title="Reopen {{ reference(logon) }}{{ ' · ' ~ who if who }}?" data-confirm-body="It goes back {{ 'as a draft' if logon.watchStatus == 'discarded' else 'on the watch now, and its return time is checked straight away' }}. The {{ 'discard' if logon.watchStatus == 'discarded' else 'log off' }} stays in its History." data-confirm-label="Reopen" data-confirm-tone="warning"><input type="hidden" name="version" value="{{ logon.version }}"></form>
+    <form id="reopenForm" method="post" action="/logon/{{ logon.id }}/reopen" data-confirm-title="Are you sure you want to Reopen this {{ 'draft' if logon.watchStatus == 'discarded' else 'log on' }}?" data-confirm-label="Reopen" data-confirm-tone="warning"><input type="hidden" name="version" value="{{ logon.version }}"></form>
     <div class="ro-action-text"><label for="reopenReason">Reason to reopen (what was wrong with the {{ 'discard' if logon.watchStatus == 'discarded' else 'log off' }})</label><textarea id="reopenReason" name="reason" form="reopenForm" class="form-control" rows="3" data-auto-grow maxlength="255" required></textarea></div>
     <div class="ro-primary-actions"><button form="reopenForm" class="btn btn-warning text-nowrap"><i class="bi bi-arrow-counterclockwise me-1"></i>Reopen</button> <span class="text-secondary">Back to {{ back_to }}.</span></div>
     {% endif %}

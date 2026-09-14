@@ -287,8 +287,9 @@ class Members(unittest.TestCase):
         html = answer['html']                                                          # the Members page's list, under a count
         self.assertIn('<div class="dc-record-found small text-muted mb-1" data-sp-count>1 found</div>', html)
         self.assertIn('data-record="%d"' % m, html)
-        for heading in ('👤', '📱', '🛥️'):
-            self.assertIn('<span class="dc-record-grid-symbol">%s</span>' % heading, html)
+        self.assertIn('<span class="dc-record-grid-value-symbol" aria-hidden="true">📱</span>', html)   # emoji, field in the cells
+        self.assertIn('<span class="dc-record-grid-value-symbol" aria-hidden="true">🛥️</span>', html)
+        self.assertNotIn('<span class="dc-record-grid-value-symbol" aria-hidden="true">👤</span>', html)   # the 👤 badge is its own
         self.assertNotIn('href="/member/%d"' % m, html)                                   # no open button: a click picks
         self.assertEqual(self.a.get('/api/logons/members?q=nobody').json['items'], [])
         boats = self.a.get('/api/logons/vessels?member=%d' % m).json['items']
@@ -639,7 +640,11 @@ class Members(unittest.TestCase):
         self.assertEqual((owner['member'], owner['vessel']['id'], owner['holder']['name']), (None, pub, 'Blue Duck'))
         public_contact = numbers('0433')[('contact', 'Pat Public')]
         self.assertEqual(public_contact['vessel']['id'], pub)
-        html = self.a.get('/api/logons/mobiles?q=0411222').json['html']                  # whose number and who holds it, as badges
+        html = self.a.get('/api/logons/mobiles?q=0411222').json['html']                  # whose number and who holds it, as badges in one column
+        self.assertNotIn('data-column="holder"', html)
+        self.assertIn('<span class="dc-record-badge-value">Alex</span></span> · <span', html)
+        self.assertNotIn('data-column="holder"', self.a.get('/api/logons/mobiles?q=0412000').json['html'])   # a member's own number: Whose, never blank
+        self.assertIn('aria-label="Member">👤</span><span class="dc-record-badge-value">m00001 Jane Smith', self.a.get('/api/logons/mobiles?q=0412000').json['html'])
         self.assertIn('title="Owner"><span role="img" aria-label="Owner">🧑</span><span class="dc-record-badge-value">Alex</span>', html)
         self.assertIn('title="Public user"><span role="img" aria-label="Public user">🌐</span><span class="dc-record-badge-value">Blue Duck</span>', html)
         self.assertEqual(self.a.get('/api/logons/mobiles?q=').json['items'], [])                    # no digits, nothing
@@ -661,11 +666,12 @@ class Members(unittest.TestCase):
         boat = self.a.get('/member/%d/vessels/new' % m).get_data(as_text=True)
         for name, emoji in (('hullColour', '🎨'), ('vesselType', '⛵'), ('make', '🏭'), ('model', '🏷️'), ('ais', '📡')):
             self.assertIn('<span class="ro-field-symbol" aria-hidden="true">%s</span>' % emoji, boat)
-        self.assertIn('<span title="Relationship"><span class="dc-record-grid-symbol">🤝</span> <span class="dc-record-word">Relationship</span></span>', page)   # list headings
+        self.assertIn('<span title="Relationship"><span class="dc-record-word">Relationship</span></span>', page)   # list headings: words
+        self.assertIn('<span class="dc-record-grid-value-symbol" aria-hidden="true">🤝</span>', page)                   # the emoji before the value
         logon = self.a.get('/logons/new').get_data(as_text=True)
         self.assertIn('<label for="f-channel"><span class="ro-field-symbol" aria-hidden="true">📻</span> How they logged on</label>', logon)
         self.assertIn('<label for="f-hullColour"><span class="ro-field-symbol" aria-hidden="true">🎨</span> Hull colour</label>', logon)
-        self.assertIn('<span title="Email"><span class="dc-record-grid-symbol">✉️</span> <span class="dc-record-word">Email</span></span>', self.a.get('/members').get_data(as_text=True))
+        self.assertIn('<span title="Email"><span class="dc-record-word">Email</span></span>', self.a.get('/members').get_data(as_text=True))
 
     def test_member_history_holds_every_change_they_hold(self):
         from server.member_pages import member_history

@@ -71,7 +71,7 @@ EXTRA = (
     ('Notes', ('notes',)),
 )
 LABELS = {
-    'callDay': 'Date', 'callTime': 'Time', 'memberNumber': 'Member No.', 'vesselName': 'Vessel Name',
+    'callDay': 'Logon date', 'callTime': 'Time', 'memberNumber': 'Member No.', 'vesselName': 'Vessel Name',
     'registration': 'Vessel Rego. No.', 'mobile': 'Mobile Phone Number', 'vesselDetails': 'Other vessel details',
     'pob': 'POB', 'departurePoint': 'Departure Point', 'destination': 'Going to',
     'etaDay': 'Return Day or Date', 'eta': 'Time',

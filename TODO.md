@@ -29,8 +29,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - **Columns fit what they hold**: the heading and every row share one set of columns (subgrid); a column is as wide as
   its values need and the room goes to the long ones (Status is just its symbol). The pages set no widths (only the
   open button's 2.5rem). With Paragraphs a column is never narrower than its longest word; when the columns cannot
-  fit, the list shows the phone cards instead (`dc-record-grid-stacked`). With the test data the log is rows from
-  about 1328px.
+  fit, the list shows the phone cards instead (`dc-record-grid-stacked`). The operator's normal screen is 1920px
+  wide (owner, 2026-09-14): the log must be rows there; narrower, with Paragraphs, it may be cards.
 - Every list numbers its records from 1 (# column, or the card's corner), numbered again after a row search.
 - The side **panel** sits left of the list, in the page margin when there is room (the list does not move), and shows
   what the search matched in which field as badges with counts. On Search it starts open and a badge filters the
@@ -86,8 +86,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   going to, the return day/time or the second ID is refused, nothing written, those boxes red (ACC-1, WAT-10).
 - Discard keeps the record, marked never a log on, with its required reason (ACC-7).
 - **Log off** and **Discard draft** ask first in Quackit's confirm box, naming the log on and vessel (Cancel focused).
-  A logged-off log on or discarded draft has **Reopen** with a reason (§3.3, AC-36; `logons.reopen`), also confirmed:
-  back on the watch (deadline checked at once) or back to a draft; the closure stays in History.
+  A logged-off log on or discarded draft has **Reopen** with a reason (§3.3, AC-36; `logons.reopen`), also confirmed
+  ("Are you sure you want to Reopen this log on?", nothing more; owner, issue C): back on the watch (deadline checked at once) or back to a draft; the closure stays in History.
 - Mobile: exactly 10 digits, saved and shown as `0412 345 678` (spaces while typing are fine); anything else
   is kept as typed and red. Search finds it with or without spaces.
 - Orange boxes: with Member No. or Vessel Name heard, the other empty one turns orange (worth asking for,
@@ -151,8 +151,10 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   components … numbered index … how many have been found"*): the search box is `search_controls` with its label on top,
   and the results are the same `record_grid` lists the pages use, under "N found", numbered, rows or cards, a row
   picked by click or arrow keys + Enter. Member: the Members list; a member's vessel: their Vessels tab list; Vessel
-  and Public user: the Public vessels list with 🤲 Held by (👤 member or 🌐 public); Mobile: 📱 Mobile, whose number
-  (👤 member, 🧑 owner, 🆘 emergency contact) and 🤲 Held by (`_ui.mobiles_grid`). Emoji in the title, step and label
+  and Public user: the Public vessels list with 🤲 Held by (👤 member or 🌐 public); Mobile: 📱 Mobile and one Whose
+  column, never blank (👤 member; 🧑 owner · 🌐 the vessel; 🆘 emergency contact · 👤 / 🌐 who holds it; owner, issue D,
+  `_ui.mobiles_grid`). Every row value has its field's emoji before it and headings are words only (owner, issues A and E: record_grid
+  `symbol`); rows tight from the left; the log's status column has no heading word, Date is Logon date, Return date 🏁. Emoji in the title, step and label
   (👤 Member, 🌐 Public user, 🛥️ Vessel, 📱 Mobile). The box is a contained page wide (120ch) and 80% of the screen tall.
 - Tables `Members`, `EmergencyContacts`, `Vessels`, `Trailers`, `Cars` (with history); `LogOns.memberId`,
   `LogOns.vesselId`; `Members.firstName`, `lastName`, `mobile` (replacing `name`, `phone`). Migrated on port 80.
