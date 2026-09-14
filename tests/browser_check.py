@@ -242,6 +242,18 @@ def main(engine='chromium'):
             visit('/logons/new')
             def pick(text):
                 page.locator('#spResults .dc-record-grid-row', has_text=text).first.click()
+            if engine == 'chromium':                                                                # a phone: tapping a box must not zoom
+                phone = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True,
+                                            storage_state=context.storage_state())
+                p = phone.new_page()
+                p.goto(URL + '/logons/new')
+                p.locator('#roPickMember').click()
+                boxes = p.evaluate('''() => [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')]
+                    .filter(b => b.getClientRects().length).map(b => [b.id || b.name, getComputedStyle(b).fontSize])''')
+                small = [b for b in boxes if float(b[1][:-2]) < 16]
+                assert boxes and not small, 'Text boxes under 16px on a phone (iPhone zooms in and the page scrolls sideways): %s' % small
+                assert p.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Phone log on page scrolls sideways'
+                phone.close()
             page.locator('#roPickMember').click()
             expect(page.locator('#searchPicker')).to_be_visible()
             expect(page.locator('label[for="spInput"]')).to_have_text('👤 Member: number, name or mobile')   # with the emoji
