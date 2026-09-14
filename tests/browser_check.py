@@ -243,9 +243,17 @@ def main(engine='chromium'):
             expect(page.locator('#spTitle')).to_have_text('👤Member')
             expect(page.locator('#spCrumb')).to_contain_text('👤 member: choosing')
             expect(page.locator('#searchPicker [placeholder]')).to_have_count(0)                # a label on top, nothing inside
+            size = page.locator('#searchPicker > .card').evaluate('''card => {                     // a contained page wide, 80% tall
+                const probe = document.createElement('div'); probe.style.width = '120ch'; card.appendChild(probe);
+                const box = card.getBoundingClientRect(), out = {w: box.width, h: box.height, ch: probe.getBoundingClientRect().width,
+                                                                 vw: innerWidth, vh: innerHeight};
+                probe.remove(); return out; }''')
+            assert abs(size['w'] - min(size['ch'], .94 * size['vw'])) < 1 and abs(size['h'] - .8 * size['vh']) < 1, size
             page.locator('#spInput').fill(token)
-            pick(member_no)
+            expect(page.locator('#spResults [data-pick]', has_text=member_no).first).to_contain_text('📱 0412 345 678 · 🛥️ ' + vessel)
+            pick(member_no)                                                                         # each field after its emoji
             expect(page.locator('#spLabel')).to_have_text("🛥️ Member's vessel: name or rego")
+            expect(page.locator('#spResults [data-pick]', has_text=vessel).first).to_contain_text('🔖 ' + token)
             expect(page.locator('#spFilter')).to_contain_text('No vessel')
             pick(vessel)
             expect(page.locator('#searchPicker')).to_be_hidden()

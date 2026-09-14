@@ -283,7 +283,7 @@ class Members(unittest.TestCase):
         self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public', 'ownerPhone': '0411222333'})
         members = self.a.get('/api/logons/members?q=smith').json['items']
         self.assertEqual([(i['id'], i['primary'], i['memberNumber']) for i in members], [(m, 'm00001 Jane Smith', 'm00001')])
-        self.assertEqual(members[0]['secondary'], '0412 345 678 · Sea Dog')
+        self.assertEqual(members[0]['secondary'], [['mobile', '0412 345 678'], ['vesselName', 'Sea Dog']])   # 📱 and 🛥️ in the picker
         self.assertEqual(self.a.get('/api/logons/members?q=nobody').json['items'], [])
         boats = self.a.get('/api/logons/vessels?member=%d' % m).json['items']
         self.assertEqual([(b['primary'], b['fields']['registration']) for b in boats], [('Sea Dog', 'AB123Q')])
@@ -291,7 +291,8 @@ class Members(unittest.TestCase):
         self.assertEqual(self.a.get('/api/logons/vessels').status_code, 400)
         public = self.a.get('/api/logons/public-vessels?q=alex').json['items']
         self.assertEqual([(p['primary'], p['fields']['ownerPhone']) for p in public], [('Blue Duck', '0411 222 333')])
-        self.assertIn('Alex Public', public[0]['secondary'])
+        self.assertIn(['ownerName', 'Alex Public'], public[0]['secondary'])
+        self.assertEqual(boats[0]['secondary'][0], ['registration', 'AB123Q'])
         self.assertEqual(self.b.get('/api/logons/vessels?member=%d' % m).status_code, 403)   # another unit's member
         self.assertEqual(self.b.get('/api/logons/members').json['items'], [])
 

@@ -349,10 +349,18 @@ def vessel_for(cur, unit, registration, member_id):
     return found[0] if len(found) == 1 else None
 
 
+def _picker_fields(*pairs):
+    """A picker row's second line as [field, text] pairs, each shown after its field's emoji (the stage's
+    fieldSymbols, _ui.FIELD_SYMBOLS); empty values left out."""
+    return [[field, text] for field, text in pairs if text]
+
+
 def member_item(m):
-    """A member as the shared search picker shows it ({id, primary, secondary}), with what the log on takes from it."""
+    """A member as the shared search picker shows it ({id, primary, secondary}), with what the log on takes from it:
+    📱 mobile, then 🛥️ each vessel (🔖 its rego when it has no name)."""
     return {'id': m['id'], 'primary': '%s %s %s' % (m['memberNumber'], m['firstName'], m['lastName']),
-            'secondary': ' · '.join(x for x in (m.get('mobile'), m.get('vesselNames')) if x),
+            'secondary': _picker_fields(('mobile', m.get('mobile')), *(('vesselName', v['vesselName']) if v['vesselName'] else
+                                                                        ('registration', v['registration']) for v in m.get('vessels', ()))),
             'memberNumber': m['memberNumber'], 'name': '%s %s' % (m['firstName'], m['lastName']), 'mobile': m.get('mobile')}
 
 
@@ -360,8 +368,8 @@ def vessel_item(v):
     """A vessel as the shared search picker shows it, with the log on boxes it fills."""
     length = ('%sm' % v['length']) if v.get('length') else None
     return {'id': v['id'], 'primary': v.get('vesselName') or v.get('registration'),
-            'secondary': ' · '.join(x for x in (v.get('registration') if v.get('vesselName') else None, length, v.get('hullColour'),
-                                                v.get('make'), v.get('model'), v.get('ownerName')) if x),
+            'secondary': _picker_fields(('registration', v.get('registration') if v.get('vesselName') else None), ('length', length),
+                                        *((f, v.get(f)) for f in ('hullColour', 'make', 'model', 'ownerName'))),
             'fields': {f: v.get(f) for f in ('vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'ownerPhone')}}
 
 
