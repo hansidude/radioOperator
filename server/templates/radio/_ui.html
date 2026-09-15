@@ -125,7 +125,7 @@
     <span>{{ a.vessel }}</span>
     <span class="text-secondary">due {{ a.dueAt|hhmm }}, {{ minutes(a.overdueMinutes) }} ago{% if a.notifyCount > 1 %} · raised {{ a.notifyCount }} times{% endif %}</span>
     {% if a.acknowledgedAt %}<span class="text-secondary">seen {{ a.acknowledgedAt|hhmm }} by {{ a.acknowledgedBy }}</span>
-    {% else %}<form method="post" action="/logon/{{ a.logOnId }}/alert/{{ a.id }}/ack"><input type="hidden" name="back" value="{{ back }}"><button class="btn btn-outline-light btn-sm py-0" title="Records that you have seen it. It does not resolve anything.">Seen</button></form>{% endif %}
+    {% else %}<form method="post" action="/logon/{{ a.logOnId }}/alert/{{ a.id }}/ack"><input type="hidden" name="back" value="{{ back }}"><button class="btn btn-outline-light btn-sm py-0" title="Records that you have seen it. It does not resolve anything."><i class="bi bi-eye me-1" aria-hidden="true"></i>Seen</button></form>{% endif %}
   </div>
   {% endfor %}
 </div>
@@ -340,8 +340,8 @@
 {% set text = parts|select|join(' · ') -%}{{ text or empty }}
 {%- endmacro %}
 
-{% set VERIFY = {'verified': ['text-bg-success', 'Verified'], 'conflict': ['text-bg-danger', 'CONFLICT'],
-                 'partial': ['text-bg-warning', 'Partial'], 'unverified': ['border text-secondary', 'Unverified']} %}
+{% set VERIFY = {'verified': ['text-bg-success', '✅ Verified'], 'conflict': ['text-bg-danger', '⚠️ CONFLICT'],
+                 'partial': ['text-bg-warning', '🟡 Partial'], 'unverified': ['border text-secondary', '❓ Unverified']} %}
 
 {# The outcome alone means little, so it is never shown alone: IDV-2 asks for the evidence too. #}
 {% macro outcome(name, title='') %}{% set v = VERIFY.get(name or 'unverified') %}<span class="badge {{ v[0] }}" title="{{ title }}">{{ v[1] }}</span>{% endmacro %}
@@ -388,9 +388,9 @@
       return '<div class="ro-search-card"><span class="k">' + KIND[h.kind] + '</span>' +
         '<div class="body"><strong>' + esc(h.label) + '</strong>' + (h.sublabel ? ' <span class="text-secondary">' + esc(h.sublabel) + '</span>' : '') +
         (h.detail ? '<div class="text-secondary">' + esc(h.detail) + '</div>' : '') + offers + '</div>' +
-        '<span class="text-secondary">' + state + (h.atSea ? ' <span class="badge text-bg-info">at sea</span>' : '') + '</span>' +
-        (current ? '<button class="btn btn-outline-primary btn-sm" data-apply="' + esc(h.key) + '">Use</button>'
-                 : '<a class="btn btn-outline-secondary btn-sm" href="/logon/' + (h.lastTrip || '') + '">Open</a>') + '</div>';
+        '<span class="text-secondary">' + state + (h.atSea ? ' <span class="badge text-bg-info">👀 at sea</span>' : '') + '</span>' +
+        (current ? '<button class="btn btn-outline-primary btn-sm" data-apply="' + esc(h.key) + '"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Use</button>'
+                 : '<a class="btn btn-outline-secondary btn-sm" href="/logon/' + (h.lastTrip || '') + '"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Open</a>') + '</div>';
     }).join('');
     pane.hidden = false;
   }
@@ -480,7 +480,7 @@
   {% if json %}<div class="text-danger mt-2" role="alert" data-ro-form-error hidden></div>{% endif %}
   <div class="ro-primary-actions">
     <button class="btn btn-warning"><i class="bi bi-floppy me-1"></i>{{ submit }}</button>
-    {% if json %}<button type="button" class="btn btn-outline-secondary" data-ro-cancel>Cancel</button>{% endif %}
+    {% if json %}<button type="button" class="btn btn-outline-secondary" data-ro-cancel><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Cancel</button>{% endif %}
     {% if remove %}<button form="{{ form }}-remove" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Remove</button>{% endif %}
   </div>
 </form>

@@ -18,7 +18,7 @@
 </style>
 {# The help for Radio Logs. The demonstrations are the real shared controls over made-up sample rows, and the icons in
    the tables are copied from those real buttons (data-help-icon), so what this page shows is what the pages have. #}
-<div class="ro-help">
+<div class="ro-help" data-ui-symbol>
 <p class="lead mb-2">Radio Logs keeps the unit's watch: who is out on the water, when they are due back, and who to call.</p>
 <nav class="ro-help-toc" aria-label="Help sections">
   {% for id, label in [('menu', '🧭 The menu'), ('log', '📋 The log'), ('views', '🃏 Views: table, cards and more'), ('status', '🚦 Status symbols'),
@@ -95,7 +95,7 @@
                        ('loggedOff', 'Back: the watch is over.'), ('notdeparted', 'Logged off because they never went out.'),
                        ('discarded', 'A draft that was never a log on, discarded with a reason.'),
                        ('conflict', 'What was heard disagrees with the member or vessel record.')] %}
-  <tr><td>{{ ui.STATES[key].symbol }} {{ ui.STATES[key].label }}</td><td>{{ text }}</td></tr>
+  <tr><td><span role="img" aria-label="{{ ui.STATES[key].label }}">{{ ui.STATES[key].symbol }}</span> {{ ui.STATES[key].label }}</td><td>{{ text }}</td></tr>
   {% endfor %}
 </table>
 

@@ -67,6 +67,27 @@ def main(engine='chromium'):
             response = page.goto(URL + path)
             assert response and response.status == 200, 'GET %s: HTTP %s' % (path, response.status if response else 'none')
             assert '/login' not in page.url, 'Sample login failed'
+            check_symbol_artwork()
+
+        def check_symbol_artwork():
+            # Test the rendered artwork, not just icon classes or loaded assets.
+            # This includes the real navbar, shared tools, help and record pages.
+            page.wait_for_function('!!window.dcEmoji')
+            missing = page.locator('.bi').evaluate_all("""icons => icons.filter(icon =>
+              !getComputedStyle(icon, '::before').backgroundImage.includes('/noto-emoji-2.051/svg/'))
+              .map(icon => icon.className)""")
+            assert not missing, ('Icons bypass bundled artwork', page.url, missing)
+            missing = page.evaluate(r"""() => {
+              const missing = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+              while (walker.nextNode()) {
+                const node = walker.currentNode, parent = node.parentElement;
+                if (parent.closest('[role="img"], [data-ui-symbol], .dc-history-symbol') &&
+                    !parent.closest('.dc-emoji, script, style, option, textarea, [contenteditable]') &&
+                    /\p{Extended_Pictographic}/u.test(node.nodeValue)) missing.push(node.nodeValue);
+              }
+              return missing;
+            }""")
+            assert not missing, ('Symbols bypass bundled artwork', page.url, missing)
 
         def list_beside_panel(panel, listed, what):
             # An open panel sits left of the list, outside its container: the list keeps the usual ~1200px width.
@@ -124,6 +145,7 @@ def main(engine='chromium'):
             expect(page.locator('.navbar-brand > i')).to_have_class(re.compile(r'\bbi-house\b'))
             page.locator('#navbarNav a[href="/radio/help"]').click()                               # Help: the real controls, tried on a sample
             page.wait_for_url(re.compile('/radio/help$'))
+            check_symbol_artwork()
             for icon in page.locator('[data-help-icon]').all():
                 assert icon.locator('i, span').count() > 0, 'Help icon not filled: %s' % icon.get_attribute('data-help-icon')
             page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
@@ -258,6 +280,7 @@ def main(engine='chromium'):
             expect(removal.filter(has_text='Status').locator('.dc-history-before')).to_contain_text('Current')
             page.locator('[data-entity-tab="vessels"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-member-%s.png' % engine)), full_page=True)
+            check_symbol_artwork()
             vessels_grid = page.locator('#ro-member-vessels .dc-record-grid')                    # two short vessels: tight from the left
             tight = vessels_grid.evaluate("g => [g.clientWidth, g.querySelector('.dc-record-grid-row').getBoundingClientRect().width]")
             assert tight[1] < tight[0] - 200, 'Columns spread across the width instead of tight from the left: %s' % tight
@@ -1182,6 +1205,7 @@ def main(engine='chromium'):
             expect(history).to_contain_text('✅ loggedOff')
             expect(history.locator('.dc-history-field', has_text='POB').first).to_contain_text('👥')   # fields with the log's symbols
             page.screenshot(path=str(ARTIFACTS / ('radio-history-%s.png' % engine)), full_page=True)
+            check_symbol_artwork()
             widths = page.evaluate('''() => ({history: document.querySelector('#ro-history-pane .dc-history').getBoundingClientRect().width,
                                                form: document.querySelector('#capture').getBoundingClientRect().width || innerWidth,
                                                view: innerWidth,

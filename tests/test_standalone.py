@@ -22,6 +22,7 @@ class Standalone(unittest.TestCase):
                 self.assertEqual(response.data, (shared / asset).read_bytes())
                 response.close()
             for asset in ('vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
+                          'vendor/noto-emoji-2.051/svg/emoji_u1f6df.svg',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg'):
                 response = c.get('/radio-shared/static/' + asset)
                 self.assertEqual(response.status_code, 200)
