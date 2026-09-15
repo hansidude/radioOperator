@@ -22,9 +22,12 @@ def install_standalone_ui(app):
     templates = Path(os.environ.get('RADIO_SHARED_TEMPLATES') or
                      Path(__file__).resolve().parents[2] / 'dflask' / 'templates')
     for name in ('myMacro_record_view.html', 'myMacro_filters.html', 'myMacro_entity_nav.html', 'myMacro_search_picker.html',
-                 'myMacro_groups.html', 'myMacro_confirm.html',
+                 'myMacro_groups.html', 'myMacro_confirm.html', 'myMacro_context.html',
                  '../static/css/record_views.css', '../static/css/navbar_controls.css',
-                 '../static/css/search_controls.css', '../static/js/search_controls.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
+                 '../static/css/search_controls.css', '../static/js/ui_symbols.js',
+                 '../static/vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
+                 '../static/vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg',
+                 '../static/js/search_controls.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js',
                  '../static/vendor/jquery-3.6.0/jquery.min.js'):
         if not (templates / name).is_file():

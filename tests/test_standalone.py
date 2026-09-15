@@ -15,11 +15,18 @@ class Standalone(unittest.TestCase):
             shared = Path(__file__).resolve().parents[2] / 'dflask' / 'static'
             page = c.get('/logons').get_data(as_text=True)
             for asset in ('css/record_views.css', 'css/navbar_controls.css',
-                          'css/search_controls.css', 'js/search_controls.js', 'js/record_view.js', 'js/auto_grow.js'):
+                          'css/search_controls.css', 'js/search_controls.js', 'js/ui_symbols.js', 'js/record_view.js', 'js/auto_grow.js'):
                 self.assertIn('/radio-shared/static/' + asset, page)
                 response = c.get('/radio-shared/static/' + asset)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.data, (shared / asset).read_bytes())
+                response.close()
+            for asset in ('vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
+                          'vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg'):
+                response = c.get('/radio-shared/static/' + asset)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, (shared / asset).read_bytes())
+                response.close()
 
     def test_pages_and_api_work_with_no_host(self):
         with tempfile.TemporaryDirectory() as tmp:

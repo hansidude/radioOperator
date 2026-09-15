@@ -10,7 +10,7 @@
   {% from 'myMacro_record_view.html' import styles as record_styles, scripts as record_scripts %}
   {{ record_styles('radio_shared.static') }}
   {% for asset in ('navbar_controls.css', 'search_controls.css') %}
-  <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset) }}">
+  <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset, v='2') }}">
   {% endfor %}
   <script src="{{ url_for('radio_shared.static', filename='vendor/jquery-3.6.0/jquery.min.js') }}"></script>
   <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js', v='3') }}"></script>
@@ -47,5 +47,9 @@
       fit();
     })();
   </script>
+{% from 'myMacro_search_picker.html' import searchPickerModal %}
+{{ searchPickerModal() }}
+{% from 'myMacro_context.html' import combo_enhance %}
+{{ combo_enhance('*', placeholder='Choose', context=False) }}
 </body>
 </html>

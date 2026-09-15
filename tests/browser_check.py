@@ -53,6 +53,16 @@ def main(engine='chromium'):
         page.on('pageerror', lambda e: errors.append(e.stack))
         page.on('request', lambda r: writes.append(r.url) if r.method == 'POST' and '/logon' in r.url and not is_check(r) else None)
 
+        def choose(select, value):
+            ident = select.get_attribute('id')
+            combo = page.locator('[id="' + ident + 'Combo"]')
+            if combo.count():
+                combo.click()
+                combo.fill('')
+                page.locator('[id="' + ident + 'Choices"] [data-value="' + value + '"]').click()
+            else:
+                select.select_option(value)
+
         def visit(path):
             response = page.goto(URL + path)
             assert response and response.status == 200, 'GET %s: HTTP %s' % (path, response.status if response else 'none')
@@ -204,10 +214,10 @@ def main(engine='chromium'):
             # Status: Current by default, Removed and All bring removed ones back, numbered from 1 (owner, issue p).
             status = page.locator('#ro-member-vessels select[id$="-vessels-choice"]')
             expect(status).to_have_value('current')
-            expect(page.locator('#ro-member-vessels label[for$="-vessels-choice"]')).to_have_text('Status')
+            expect(page.locator('#ro-member-vessels label[for$="-vessels-choiceCombo"]')).to_have_text('Status')
             expect(removed_row).to_be_hidden()
             expect(current_row).to_be_visible()
-            status.select_option('removed')
+            choose(status, 'removed')
             expect(removed_row).to_be_visible()
             expect(current_row).to_be_hidden()
             expect(removed_row.locator('.dc-record-grid-count')).to_have_text('1')
@@ -218,7 +228,7 @@ def main(engine='chromium'):
             expect(removed_row).to_be_visible()
             page.locator('#ro-member-vessels .dc-search-reset').click()
             expect(status).to_have_value('removed')                                               # Reset search leaves the choice
-            status.select_option('all')
+            choose(status, 'all')
             expect(removed_row).to_be_visible()
             expect(current_row).to_be_visible()
             expect(current_row.locator('a[title="Open vessel"]')).to_have_count(1)
@@ -349,7 +359,7 @@ def main(engine='chromium'):
             panel.locator('[data-entity-tab="vessels"]').click()                                 # its tabs work, loaded in place
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row')).to_have_count(2)
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)   # Current: the removed one hidden
-            panel.locator('#ro-member-vessels select[id$="-vessels-choice"]').select_option('all')   # the Status choice works in place
+            choose(panel.locator('#ro-member-vessels select[id$="-vessels-choice"]'), 'all')   # the Status choice works in place
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(2)
             panel.locator('#ro-member-vessels .dc-search-input').first.fill('second-')           # and its search
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)
@@ -609,7 +619,7 @@ def main(engine='chromium'):
             page.locator('[data-now-for="callTime"]').click()           # a real click: sets now as 4-digit 24-hour
             expect(page.locator('#f-callTime')).to_have_value(re.compile(r'^([01][0-9]|2[0-3])[0-5][0-9]$'))
             page.locator('#f-callTime').fill(fields['callTime'])
-            page.select_option('#f-channel', 'phone')                                             # how they logged on
+            choose(page.locator('#f-channel'), 'phone')                                             # how they logged on
             expect(page.locator('#f-channel option')).to_have_text(['—', 'Radio', 'Phone', 'In person'])
             expect(page.locator('[data-ro-tab="contact"], [data-ro-tab="identity"], [data-ro-tab="record"]')).to_have_count(0)
             page.wait_for_timeout(400)  # detect unwanted debounced autosave
@@ -692,16 +702,16 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile(r'/logons\?.*q=' + vessel))
             # The reported bug: choosing a status must change the list straight away.
             with page.expect_response(rows_for(status='loggedon', q=vessel)):
-                page.select_option('#roStatus', 'loggedon')
+                choose(page.locator('#roStatus'), 'loggedon')
             expect(page.locator('#radioRecords')).to_have_text('0 logged on')
             expect(page).to_have_url(re.compile(r'/logons\?.*status=loggedon'))
             with page.expect_response(rows_for(status='draft', q=vessel)):
-                page.select_option('#roStatus', 'draft')
+                choose(page.locator('#roStatus'), 'draft')
             with page.expect_response(rows_for(sort='due', q=vessel)):          # Due first swaps in place too
-                page.select_option('#roSort', 'due')
+                choose(page.locator('#roSort'), 'due')
             expect(page).to_have_url(re.compile(r'/logons\?.*sort=due'))
             with page.expect_response(rows_for(sort='newest', q=vessel)):
-                page.select_option('#roSort', 'newest')
+                choose(page.locator('#roSort'), 'newest')
             # ◀ ▶ move the date a day and swap the list in place; Today shows only away from today (owner, issue n).
             today_button = page.locator('[data-dc-date-today-for="roDay"]')
             expect(page.locator('#roDay')).to_have_value(today)
@@ -731,7 +741,7 @@ def main(engine='chromium'):
             failing = re.compile(r'/logons/rows\?')
             page.route(failing, lambda route: route.fulfill(status=500, body='verification failure'))
             with page.expect_response(rows_for(status='closed')):
-                page.select_option('#roStatus', 'closed')
+                choose(page.locator('#roStatus'), 'closed')
             expect(page.locator('#dcHtmxError')).to_contain_text('/logons/rows?')
             expect(page.locator('#dcHtmxError')).to_contain_text('HTTP 500')
             expect(row).to_have_count(1)
@@ -765,7 +775,7 @@ def main(engine='chromium'):
                 if not page.locator(panel).is_visible(): page.locator('[data-dc-record-panel]:visible').click()
                 with page.expect_response(lambda r: answer in r.url and 'status=discarded' in r.url):
                     if 'radio/search' in path:
-                        page.locator('#roFoundPanel #roStatus').select_option('discarded')
+                        choose(page.locator('#roFoundPanel #roStatus'), 'discarded')
                     else:
                         page.locator('[data-dc-filter-value="discarded"]').click()
                 expect(page.locator('#roStatus')).to_have_value('discarded')
@@ -779,7 +789,7 @@ def main(engine='chromium'):
                 page.reload()
                 expect(page.locator('#roStatus')).to_have_value('discarded')
                 with page.expect_response(lambda r: answer in r.url and 'status=draft' in r.url):
-                    page.select_option('#roStatus','draft')
+                    choose(page.locator('#roStatus'), 'draft')
                 expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(1)
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(0)
                 if 'radio/search' in path:
@@ -787,7 +797,7 @@ def main(engine='chromium'):
                     page.locator(badge).click()
                     expect(page.locator('#roFound .dc-record-filter-applied')).to_contain_text('showing 1 of')
                     with page.expect_response(lambda r: answer in r.url and 'status=discarded' in r.url and 'field=registration' in r.url):
-                        page.select_option('#roStatus', 'discarded')
+                        choose(page.locator('#roStatus'), 'discarded')
                     expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(0)
                     expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
                     page.reload()
@@ -797,9 +807,9 @@ def main(engine='chromium'):
                     expect(page.locator('#roStatus')).to_have_value('discarded')
                     # Zero matches still leaves the dropdown available; typing/reset retains status.
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
-                        page.select_option('#roStatus', 'closed')
+                        choose(page.locator('#roStatus'), 'closed')
                     expect(page.locator('#roMatched [data-matched="logons"]')).to_have_count(0)
-                    expect(page.locator('#roFoundPanel #roStatus')).to_be_visible()
+                    expect(page.locator('#roFoundPanel #roStatusCombo')).to_be_visible()
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
                         page.locator('#roFindAll-reset').click()
                     expect(page.locator('#roStatus')).to_have_value('closed')
@@ -807,7 +817,7 @@ def main(engine='chromium'):
                         page.locator('#roFindAll').fill(token)
                 with page.expect_response(lambda r: answer in r.url and 'status=all' in r.url):
                     if 'radio/search' in path:
-                        page.select_option('#roStatus', 'all')
+                        choose(page.locator('#roStatus'), 'all')
                     else:
                         page.locator('[data-dc-filter-value="all"]').click()
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
@@ -982,7 +992,7 @@ def main(engine='chromium'):
                     # Bootstrap sets scroll-behavior: smooth; an instant scroll is where it says it is when read.
                     page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
                     assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
-                    expect(page.locator('#roStatus')).to_be_in_viewport()
+                    expect(page.locator('#roStatusCombo')).to_be_in_viewport()
                     expect(page.locator('#roSearch')).to_be_in_viewport()
                     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
                     nav = page.locator('.navbar.fixed-top').evaluate('el => el.getBoundingClientRect().bottom')
@@ -993,16 +1003,16 @@ def main(engine='chromium'):
             # Chosen views on a desktop: cards on one line, a line per field, wrapped rows; a refresh keeps them.
             page.set_viewport_size({'width': 1920, 'height': 1080})
             # The table opens with Paragraphs on: long values wrap in full rather than ending in an ellipsis.
-            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'true')
+            expect(page.locator('[data-dc-record-view="paragraphs"][aria-controls="roRecordView"]')).to_have_attribute('aria-pressed', 'true')
             long_name = page.locator('#radioRecords [data-column="vesselName"] .dc-record-grid-value', has_text='A very long vessel name')
             expect(long_name).to_have_css('white-space', 'normal')
             assert long_name.evaluate('el => el.scrollWidth <= el.clientWidth + 1'), 'The long vessel name is still cut off'
             view = page.locator('#roRecordView')
             grid_rows = page.locator('#radioRecords .dc-record-grid-row')
             heights = lambda: grid_rows.evaluate_all('rows => rows.map(r => r.getBoundingClientRect().height)')
-            page.locator('[data-dc-record-view="cards"]').click()
+            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()
             expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
-            expect(page.locator('[data-dc-record-view="cards"]')).to_have_attribute('aria-pressed', 'true')
+            expect(page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]')).to_have_attribute('aria-pressed', 'true')
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_hidden()
             expect(grid_rows.first).to_have_css('display', 'grid')                           # a line per field
             got = heights()
@@ -1024,9 +1034,9 @@ def main(engine='chromium'):
             expect(grid_rows.first.locator('[data-column="member"] .dc-record-grid-value')).to_be_visible()
             assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") == '0', 'Emoji only is not remembered'
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-emoji-%s.png' % engine)), full_page=True)
-            page.locator('[data-dc-record-view="cards"]').click()                                 # rows: no heading of names
+            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()                                 # rows: no heading of names
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_have_css('position', 'absolute')
-            page.locator('[data-dc-record-view="cards"]').click()
+            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()
             names_button.click()                                                                   # names back
             expect(label.locator('.dc-record-grid-label-text')).to_be_visible()
             assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") is None
@@ -1034,22 +1044,22 @@ def main(engine='chromium'):
             expect(gap.locator('.dc-record-grid-missing')).to_have_text('?')                     # symbol and ?, not gone
             expect(gap.locator('.dc-record-grid-symbol')).to_be_visible()
             with page.expect_response(rows_for(sort='oldest', q=token)):
-                page.select_option('#roSort', 'oldest')
+                choose(page.locator('#roSort'), 'oldest')
             expect(grid_rows).to_have_count(4)
             expect(view).to_have_class(re.compile(r'\bdc-record-cards\b'))
             expect(grid_rows.first).to_have_css('display', 'grid')                        # the swapped list is still cards
-            page.locator('[data-dc-record-view="cards"]').click()                          # rows again, their own Paragraphs still on
+            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()                          # rows again, their own Paragraphs still on
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_be_visible()
-            expect(page.locator('[data-dc-record-view="paragraphs"]')).to_have_attribute('aria-pressed', 'true')
+            expect(page.locator('[data-dc-record-view="paragraphs"][aria-controls="roRecordView"]')).to_have_attribute('aria-pressed', 'true')
             value = page.locator('#radioRecords [data-column="destination"] .dc-record-grid-value').first
             expect(value).to_have_css('white-space', 'normal')
-            page.locator('[data-dc-record-view="paragraphs"]').click()
+            page.locator('[data-dc-record-view="paragraphs"][aria-controls="roRecordView"]').click()
             expect(value).to_have_css('white-space', 'nowrap')
             got = heights()                                                                 # Paragraphs off: the paper's one-line rows
             assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
             expect(view).to_have_class('')                                                    # (Cards off, Paragraphs off)
             # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
-            readout = page.locator('[data-dc-record-size-readout]')
+            readout = page.locator('[data-dc-record-size-readout][aria-controls="roRecordView"]')
             larger = page.get_by_role('button', name='Larger text')
             time_value = page.locator('#radioRecords [data-column="time"] .dc-record-grid-value').first
             font = lambda: time_value.evaluate('el => parseFloat(getComputedStyle(el).fontSize)')
@@ -1062,7 +1072,7 @@ def main(engine='chromium'):
             expect(larger).to_be_disabled()
             assert abs(font() - 2 * base) < 0.6, 'Text did not double at 200%%: %s -> %s' % (base, font())
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Page overflows at 200%'
-            page.locator('[data-dc-record-view="cards"]').click()
+            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-200-%s.png' % engine)), full_page=True)
             spill = grid_rows.evaluate_all('''rows => rows.filter(r => {
                 const b = r.querySelector('.dc-record-grid-action .btn').getBoundingClientRect(), c = r.getBoundingClientRect();
