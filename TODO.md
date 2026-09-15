@@ -47,7 +47,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - One collection through Quackit's shared `record_grid`: compact aligned rows on desktop/tablet,
   labelled cards at phone width, paper-log column order, width capped at 1920px.
 - Toolbar: status (All, Drafts, Logged on, Overdue, Closed; default All), call date (default today,
-  untickable), sort (Newest first by default, Oldest first, **Due first**), search. It rides in Quackit's
+  untickable; ◀ / ▶ move a day, **Today** shows only on another day: Quackit's `date_filter`, owner issue n), sort (Newest first by default, Oldest first, **Due first**), search. It rides in Quackit's
   fixed navbar (`data-navbar-controls`), so it stays on screen while the log scrolls. Swapped in place by
   Quackit's htmx; state kept in the URL; 30s refresh.
 - Due first: overdue, then by return time; drafts and closed after, newest call first. One rule,
@@ -112,7 +112,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   text size, search over the rows) with an Add button; a row opens its own page to edit or Remove it. Remove
   makes a row inactive, never deletes it. The Members and Public vessels lists have the same view buttons.
 - **Removed stays visible** (owner, issue i, 2026-09-15): a removed contact, vessel, trailer or car stays on its tab after the
-  current ones, faded and dashed like a Discarded log on, with 🚫 Removed and the day, and no open button. History names
+  current ones, shown by each tab's **Status** choice (Current, the start; 🚫 Removed; All — Quackit's row filter `choices`,
+  owner issue p), faded and dashed like a Discarded log on, with 🚫 Removed and the day, and no open button. History names
   which record each event is about ("Vessel · Sea Dog · AB123Q", by its latest values) and shows Remove as Status:
   Current → 🚫 Removed.
 - **Not current on old log ons** (owner, issues h and i): a log on keeps what it was given. When its vessel has since been
@@ -193,10 +194,9 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Decisions waiting on the owner
 
-- [ ] **8080 is behind.** The last `myUpdate` (2026-09-14, detached, after quackit `c5bf81c`) pulled what was on origin
-      then. Not on 8080 yet: the 🏠 home icon on the Radio Logs link, words never split and content-sized columns,
-      cards always a line per field (no Lines button), and the pickers rebuilt on `record_grid` / `search_controls`
-      (quackit `b3ccae3`, radio `71edbab`). Needs another `. myUpdate` in `~/personalDb`. 8080's own migrations are the owner's: members' name/mobile, notes, emergency
+- [ ] **8080 is behind.** Its web container last started 2026-09-15 12:04, before quackit `22c38d0` / radio `5778f12`
+      (12:19): the log's date arrows and Today (issue n), the tabs' Status choice (issue p) and Quackit issues o, q, r are
+      not on it. Needs another `. myUpdate` in `~/personalDb` (owner's call). 8080's own migrations are the owner's: members' name/mobile, notes, emergency
       contacts on public vessels, and dropping `dayNumber` / `dayDate`. Read 8080's generated destructive file before
       executing: on port 80 it also dropped old leftovers (tables `DocumentAttachments`, `AttachmentsNP`; columns
       `LogOns.captureStatus`, `Members_history.name` / `phone`, six `Attachments` columns) and made five columns NOT NULL.
