@@ -1,6 +1,6 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
-{% from 'myMacro_filters.html' import search_controls %}
+{% from 'myMacro_filters.html' import search_controls, date_filter %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% import 'myMacro_record_view.html' as records_ui %}
 {% block page_title %}{{ brand }}{% endblock %}
@@ -29,7 +29,7 @@
     <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
     <label class="form-check-label" for="roDayOn">Date</label>
   </div>
-  <input class="form-control form-control-sm ro-toolbar-date" type="date" id="roDay" name="day" value="{{ filters.day.isoformat() }}" aria-label="Call date">
+  {{ date_filter('roDay', 'day', filters.day.isoformat(), now.date().isoformat(), label='Call date', css_class='ro-toolbar-date') }}
   <label for="roSort">Sort</label>
   <select class="form-select form-select-sm" id="roSort" name="sort">
     <option value="newest"{% if filters.sort == 'newest' %} selected{% endif %}>Newest first</option>

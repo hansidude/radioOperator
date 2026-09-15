@@ -200,10 +200,33 @@ def main(engine='chromium'):
             page.get_by_role('button', name='Remove').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+#vessels$'))
             removed_row = rows.filter(has_text='SECOND-' + token)
+            current_row = rows.filter(has_not_text='SECOND-' + token)
+            # Status: Current by default, Removed and All bring removed ones back, numbered from 1 (owner, issue p).
+            status = page.locator('#ro-member-vessels select[id$="-vessels-choice"]')
+            expect(status).to_have_value('current')
+            expect(page.locator('#ro-member-vessels label[for$="-vessels-choice"]')).to_have_text('Status')
+            expect(removed_row).to_be_hidden()
+            expect(current_row).to_be_visible()
+            status.select_option('removed')
+            expect(removed_row).to_be_visible()
+            expect(current_row).to_be_hidden()
+            expect(removed_row.locator('.dc-record-grid-count')).to_have_text('1')
             expect(removed_row).to_have_class(re.compile(r'\bro-removed\b'))
             expect(removed_row.locator('[data-column="removed"]')).to_contain_text(re.compile(r'🚫\s*Removed \w{3} \d{1,2}/\d{1,2}/\d\d'))
             expect(removed_row.locator('a[title="Open vessel"]')).to_have_count(0)
-            expect(rows.filter(has_not_text='SECOND-' + token).locator('a[title="Open vessel"]')).to_have_count(1)
+            page.locator('#ro-member-vessels .dc-search-input').fill('SECOND-' + token)            # the search narrows within the choice
+            expect(removed_row).to_be_visible()
+            page.locator('#ro-member-vessels .dc-search-reset').click()
+            expect(status).to_have_value('removed')                                               # Reset search leaves the choice
+            status.select_option('all')
+            expect(removed_row).to_be_visible()
+            expect(current_row).to_be_visible()
+            expect(current_row.locator('a[title="Open vessel"]')).to_have_count(1)
+            page.screenshot(path=str(ARTIFACTS / ('radio-removed-choice-all-%s.png' % engine)))
+            page.reload()
+            expect(status).to_have_value('current')                                               # not remembered: Current each load
+            expect(removed_row).to_be_hidden()
+            page.screenshot(path=str(ARTIFACTS / ('radio-removed-choice-current-%s.png' % engine)))
             page.locator('[data-entity-tab="details"]').click()
             page.locator('#member-email').fill('verify.changed@example.com')                  # one save, one history event
             page.locator('#member-firstName').fill('Verified')                                # a member's own first name is a change
@@ -325,6 +348,9 @@ def main(engine='chromium'):
             expect(panel.locator('#member-lastName')).to_have_value('Member ' + token)
             panel.locator('[data-entity-tab="vessels"]').click()                                 # its tabs work, loaded in place
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row')).to_have_count(2)
+            expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)   # Current: the removed one hidden
+            panel.locator('#ro-member-vessels select[id$="-vessels-choice"]').select_option('all')   # the Status choice works in place
+            expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(2)
             panel.locator('#ro-member-vessels .dc-search-input').first.fill('second-')           # and its search
             expect(panel.locator('#radioMemberVessels .dc-record-grid-row:visible')).to_have_count(1)
             panel.locator('#ro-member-vessels .dc-search-reset').first.click()
@@ -676,6 +702,26 @@ def main(engine='chromium'):
             expect(page).to_have_url(re.compile(r'/logons\?.*sort=due'))
             with page.expect_response(rows_for(sort='newest', q=vessel)):
                 page.select_option('#roSort', 'newest')
+            # ◀ ▶ move the date a day and swap the list in place; Today shows only away from today (owner, issue n).
+            today_button = page.locator('[data-dc-date-today-for="roDay"]')
+            expect(page.locator('#roDay')).to_have_value(today)
+            expect(today_button).to_be_hidden()
+            for label, day in [('Previous day', date.today() - timedelta(days=1)), ('Next day', date.today()), ('Next day', date.today() + timedelta(days=1))]:
+                with page.expect_response(rows_for(day=day.isoformat(), q=vessel)):
+                    page.get_by_role('button', name=label, exact=True).click()
+                expect(page.locator('#roDay')).to_have_value(day.isoformat())
+                expect(today_button).to_be_hidden() if day == date.today() else expect(today_button).to_be_visible()
+            expect(page).to_have_url(re.compile(r'/logons\?.*day=' + (date.today() + timedelta(days=1)).isoformat()))
+            page.screenshot(path=str(ARTIFACTS / ('radio-date-step-%s.png' % engine)))
+            with page.expect_response(rows_for(day=today, q=vessel)):
+                today_button.click()
+            expect(page.locator('#roDay')).to_have_value(today)
+            expect(today_button).to_be_hidden()
+            with page.expect_response(rows_for(day=(date.today() - timedelta(days=1)).isoformat())):   # the picker hides/shows it too
+                page.locator('#roDay').fill((date.today() - timedelta(days=1)).isoformat())
+            expect(today_button).to_be_visible()
+            with page.expect_response(rows_for(day=today, q=vessel)):
+                today_button.click()
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             page.reload()
             expect(page.locator('#roSearch')).to_have_value(vessel)
