@@ -747,8 +747,8 @@ def main(engine='chromium'):
                 poll.clock.fast_forward(30000)
             expect(poll.locator('[data-record="%s"]' % record).get_by_role('img', name='Draft', exact=True)).to_be_visible()
             poll.close()
-            # Issues m/q: one status control and clickable summaries on Search
-            # and the log, using the real route and shared change handler.
+            # ISSUE-1: Search's panel dropdown applies to both counts and rows.
+            # The log retains its shared dropdown and summary shortcuts (issues m/q).
             trashed = context.request.post(URL + '/logons/new', data={'fields': dict(first, registration='STATUS-' + token)})
             assert trashed.status == 200, trashed.text()
             trashed_id = trashed.json()['id']
@@ -764,19 +764,52 @@ def main(engine='chromium'):
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
                 if not page.locator(panel).is_visible(): page.locator('[data-dc-record-panel]:visible').click()
                 with page.expect_response(lambda r: answer in r.url and 'status=discarded' in r.url):
-                    page.locator('[data-dc-filter-value="discarded"]').click()
+                    if 'radio/search' in path:
+                        page.locator('#roFoundPanel #roStatus').select_option('discarded')
+                    else:
+                        page.locator('[data-dc-filter-value="discarded"]').click()
                 expect(page.locator('#roStatus')).to_have_value('discarded')
                 expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(0)
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
-                expect(page.locator('[data-dc-filter-value="discarded"]')).to_have_attribute('aria-pressed','true')
+                if 'radio/search' in path:
+                    expect(page.locator('#roMatched [data-matched="logons"] .dc-record-panel-badge-heading')).to_have_attribute('title', 'Log ons: 1')
+                    expect(page.locator('#roMatched [data-matched="logons"] [data-matched-field="registration"] .dc-record-panel-badge-count')).to_have_text('1')
+                else:
+                    expect(page.locator('[data-dc-filter-value="discarded"]')).to_have_attribute('aria-pressed','true')
                 page.reload()
                 expect(page.locator('#roStatus')).to_have_value('discarded')
                 with page.expect_response(lambda r: answer in r.url and 'status=draft' in r.url):
                     page.select_option('#roStatus','draft')
                 expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(1)
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(0)
+                if 'radio/search' in path:
+                    badge = '#roMatched [data-matched="logons"] [data-matched-field="registration"]'
+                    page.locator(badge).click()
+                    expect(page.locator('#roFound .dc-record-filter-applied')).to_contain_text('showing 1 of')
+                    with page.expect_response(lambda r: answer in r.url and 'status=discarded' in r.url and 'field=registration' in r.url):
+                        page.select_option('#roStatus', 'discarded')
+                    expect(page.locator(target + ' [data-record="%s"]' % record)).to_have_count(0)
+                    expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
+                    page.reload()
+                    expect(page.locator(badge)).to_have_attribute('aria-pressed', 'true')
+                    page.locator('[data-ro-filter-clear]').click()
+                    expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
+                    expect(page.locator('#roStatus')).to_have_value('discarded')
+                    # Zero matches still leaves the dropdown available; typing/reset retains status.
+                    with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
+                        page.select_option('#roStatus', 'closed')
+                    expect(page.locator('#roMatched [data-matched="logons"]')).to_have_count(0)
+                    expect(page.locator('#roFoundPanel #roStatus')).to_be_visible()
+                    with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
+                        page.locator('#roFindAll-reset').click()
+                    expect(page.locator('#roStatus')).to_have_value('closed')
+                    with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
+                        page.locator('#roFindAll').fill(token)
                 with page.expect_response(lambda r: answer in r.url and 'status=all' in r.url):
-                    page.locator('[data-dc-filter-value="all"]').click()
+                    if 'radio/search' in path:
+                        page.select_option('#roStatus', 'all')
+                    else:
+                        page.locator('[data-dc-filter-value="all"]').click()
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
                 for width in (1920,390):
                     page.set_viewport_size({'width':width,'height':1080 if width>767 else 844})

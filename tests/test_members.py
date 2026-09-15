@@ -654,14 +654,49 @@ class Members(unittest.TestCase):
             self.assertIsNotNone(html.select_one('#roFound [data-found="logons"] [data-record="%s"]' % present))
             self.assertIsNone(html.select_one('#roFound [data-found="logons"] [data-record="%s"]' % absent))
             self.assertIsNotNone(html.select_one('#roFound [data-found="members"]'))
-            badge = html.select_one('[data-dc-filter-value="%s"]' % selected)
-            self.assertEqual(badge['aria-pressed'], 'true')
-            self.assertEqual(badge.select_one('.dc-record-panel-badge-count').text, '1')
+            self.assertEqual(html.select_one('#roFoundPanel #roStatus option[selected]')['value'], selected)
+            self.assertEqual(html.select_one('#roStatus')['form'], 'roSearchForm')
+            self.assertEqual(html.select_one('#roMatched [data-matched="logons"] .dc-record-panel-badge-heading')['title'], 'Log ons: 1')
+            self.assertEqual(html.select_one('#roMatched [data-matched-field="registration"] .dc-record-panel-badge-count').text, '1')
+            self.assertFalse(html.select('#roFoundPanel [data-dc-filter-value]'))
         self.assertEqual(self.a.get('/radio/search?q=Statusneedle&status=unknown').status_code, 400)
         # The same status choice vocabulary and summary controls on the log.
         log = BeautifulSoup(self.a.get('/logons?f=1&q=Statusneedle').data, 'html.parser')
         self.assertEqual([o['value'] for o in log.select('#roStatus option')], [o['value'] for o in both.select('#roStatus option')])
         self.assertIsNotNone(log.select_one('[data-dc-filter-value="discarded"]'))
+
+    def test_search_status_and_field_counts_share_the_same_results(self):
+        # ISSUE-1's example: a registration OR a mobile matches 34, AND the selected status.
+        ids = {}
+        for status in ('draft', 'discarded'):
+            for field, fields in [('registration', {'registration': 'AB34Q', 'mobile': '0400000001'}),
+                                  ('mobile', {'registration': 'AB99Q', 'mobile': '0412345678'})]:
+                record = self.logon(**fields).json['id']
+                ids[status, field] = str(record)
+                if status == 'discarded':
+                    self.a.post('/logon/%s/discard' % record, data={'reason': 'test'})
+        self.logon(registration='UNRELATED')
+        for status in ('all', 'draft', 'discarded', 'closed'):
+            expected = {rid for (state, _), rid in ids.items() if status == 'all' or state == status}
+            for field in (None, 'registration', 'mobile'):
+                with self.subTest(status=status, field=field):
+                    args = dict(q='34', status=status)
+                    if field:
+                        args.update(kind='logons', field=field)
+                    response = self.a.get('/radio/search', query_string=args)
+                    self.assertEqual(response.status_code, 200)
+                    html = BeautifulSoup(response.data, 'html.parser')
+                    shown = {r['data-record'] for r in html.select('#radioRecords [data-record]')}
+                    self.assertEqual(shown, expected & {rid for (_, f), rid in ids.items() if not field or f == field})
+                    panel = html.select_one('#roMatched [data-matched="logons"]')
+                    if expected:
+                        self.assertEqual(panel.select_one('.dc-record-panel-badge-heading')['title'], 'Log ons: %s' % len(expected))
+                        for f in ('registration', 'mobile'):
+                            self.assertEqual(panel.select_one('[data-matched-field="%s"] .dc-record-panel-badge-count' % f).text,
+                                             str(len(expected) // 2))
+                    else:
+                        self.assertIsNone(panel)
+                        self.assertIsNotNone(html.select_one('#roFoundPanel #roStatus'))  # recover from no matches
 
     def test_a_search_panel_badge_filters_the_results_and_says_so(self):
         m = self.member(firstName='Jane', lastName='Smith', mobile='0412345678')

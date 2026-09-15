@@ -20,10 +20,9 @@
 <form id="roSearchForm" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Search controls" method="get" action="/radio/search"
       hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-select-oob="#roMatched" hx-swap="outerHTML"
       hx-trigger="change from:#roStatus, input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ ui.status_filter(status) }}
   {{ view_controls('roFoundView', panel='roFoundPanel') }}
   {{ grp.collapseAllButton('radioSearch', 'kinds') }}
-  {{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}) }}
+  <div>{{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}, label='Search') }}</div>
   {# The panel's filter: set by a badge, sent with the search, cleared by a new search or Clear filter. #}
   <input type="hidden" name="kind" id="roFilterKind" value="{{ filter.kind if filter else '' }}"{% if not filter %} disabled{% endif %}>
   <input type="hidden" name="field" id="roFilterField" value="{{ filter.field or '' if filter else '' }}"{% if not (filter and filter.field) %} disabled{% endif %}>
@@ -31,9 +30,12 @@
 <div id="roFoundView">
 {# The panel: for each kind found, what the search matched in which field (members.matched, logons.matched_fields),
    as badges; a badge opens and scrolls to its kind. Swapped in with the results. #}
-{# The panel counts the whole search (everything), whatever its filter lists. #}
+{# The panel counts search AND status, before a kind/field badge narrows the list. #}
 {% set sections = [] %}{% for gid, symbol, label, rows in SHOWN %}{% set _ = sections.append((gid, symbol, label, everything[gid], matched[gid])) %}{% endfor %}
-{% call records_ui.record_panel('roFoundPanel', 'What the search matched') %}{{ ui.matched_panel('roMatched', search, sections, filtering=True, filter=filter, min_chars=2, status=status) }}{% endcall %}
+{% call records_ui.record_panel('roFoundPanel', 'What the search matched') %}
+  {{ ui.status_filter(status, {'form': 'roSearchForm'}) }}
+  {{ ui.matched_panel('roMatched', search, sections, filtering=True, filter=filter, min_chars=2) }}
+{% endcall %}
 <div id="roFound">
 {% if search|length < 2 %}
   <div class="dc-record-empty">Type two or more characters: a name, number, rego, phone, email, place or anything in notes.</div>

@@ -189,10 +189,10 @@
                   ('closed', 'closed', 'Closed'), ('discarded', 'discarded', 'Discarded')] %}
 
 {# Radio supplies vocabulary; Quackit owns the complete filter control. #}
-{% macro status_filter(selected='all') %}
+{% macro status_filter(selected='all', attrs={}) %}
 {% from 'myMacro_filters.html' import select_filter %}
 {% set options = [] %}{% for value, state, label in FILTERS %}{% set _ = options.append((value, STATES[state].symbol ~ ' ' ~ label)) %}{% endfor %}
-{{ select_filter('roStatus', 'status', 'Log-on status', options, selected) }}
+{{ select_filter('roStatus', 'status', 'Log-on status', options, selected, attrs) }}
 {% endmacro %}
 
 {# The STATES key a record is shown under, the same on the log and on its own page. #}

@@ -345,14 +345,12 @@ def search_page():
     if status != 'all' and status not in L.STATUS_WHERE:
         abort(400)
     found = M.find(cur, h.unit(), q)
-    logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q) if len(q) >= 2 else []
-    all_logons = logons
-    if status != 'all' and len(q) >= 2:
-        logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q, status=status)
+    logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q,
+                      status=None if status == 'all' else status) if len(q) >= 2 else []
     cur.close()
-    # The panel counts the whole search; its filter (a badge clicked: kind, and maybe field) narrows what is listed.
-    matched = dict(M.matched(found, q), logons=L.matched_fields(all_logons, q))
-    everything = dict(found, logons=all_logons)
+    # ISSUE-1: panel counts and rows both match search AND status. A kind/field badge narrows those results further.
+    matched = dict(M.matched(found, q), logons=L.matched_fields(logons, q))
+    everything = dict(found, logons=logons)
     kind, field = request.args.get('kind') or None, request.args.get('field') or None
     if (kind is None and field is not None) or (kind is not None and kind not in everything):
         abort(400)
