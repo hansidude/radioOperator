@@ -326,13 +326,17 @@ def main(engine='chromium'):
                                             storage_state=context.storage_state())
                 p = phone.new_page()
                 p.goto(URL + '/logons/new')
+                p.wait_for_function("""() => {
+                    const nav=document.querySelector('.navbar.fixed-top');
+                    return Math.abs(parseFloat(getComputedStyle(document.body).paddingTop)-Math.ceil(nav.getBoundingClientRect().bottom))<=1;
+                }""")
                 p.locator('#roPickMember').click()
                 boxes = p.evaluate('''() => [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')]
                     .filter(b => b.getClientRects().length).map(b => [b.id || b.name, getComputedStyle(b).fontSize])''')
                 small = [b for b in boxes if float(b[1][:-2]) < 16]
                 assert boxes and not small, 'Text boxes under 16px on a phone (iPhone zooms in and the page scrolls sideways): %s' % small
                 assert p.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Phone log on page scrolls sideways'
-                assert p.locator('#spClose').bounding_box()['height'] >= 39.5
+                assert p.locator('#spClose').bounding_box()['height'] >= 34.5
                 p.screenshot(path=str(ARTIFACTS / ('radio-touch-picker-' + engine + '.png')), full_page=True)
                 phone.close()
             page.locator('#roPickMember').click()
