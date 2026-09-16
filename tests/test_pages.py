@@ -244,8 +244,8 @@ class Pages(unittest.TestCase):
         self.assertIn('<option value="all" selected>📋 All</option>', page)
         self.assertIn('id="roDayOn" name="dayOn" checked', page)
         self.assertNotIn('id="roDayOn" name="dayOn" checked', self.a.get('/logons?status=all').get_data(as_text=True))  # a link for all: every day
-        self.assertIn('<option value="newest" selected>Newest first</option>', page)
-        self.assertIn('<option value="due">Due first</option>', page)
+        self.assertRegex(page, r'<option value="newest" selected>[^<]*Newest first</option>')
+        self.assertRegex(page, r'<option value="due">[^<]*Due first</option>')
         self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
         self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
@@ -259,7 +259,7 @@ class Pages(unittest.TestCase):
         for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):
             self.assertEqual(page.count('href="%s"' % href), 1, href)
         self.assertIn('data-navbar-controls="RadioLogs filters"', page)                             # lives in the navbar                    # outside what refreshes replace
-        self.assertIn('<option value="due" selected>Due first</option>', self.a.get('/logons?f=1&sort=due').get_data(as_text=True))
+        self.assertRegex(self.a.get('/logons?f=1&sort=due').get_data(as_text=True), r'<option value="due" selected>[^<]*Due first</option>')
         self.assertEqual(self.a.get('/logons?f=1&sort=sideways').status_code, 400)
         self.assertIn('data-record="%d"' % draft, page)
         self.assertIn('data-record="%d"' % watching, page)      # All: the watch is listed too

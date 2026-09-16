@@ -58,7 +58,8 @@ def main(engine='chromium'):
             combo = page.locator('[id="' + ident + 'Combo"]')
             if combo.count():
                 combo.click()
-                combo.fill('')
+                if not combo.evaluate('e=>e.readOnly'):
+                    combo.fill('')
                 page.locator('[id="' + ident + 'Choices"] [data-value="' + value + '"]').click()
             else:
                 select.select_option(value)
@@ -331,6 +332,8 @@ def main(engine='chromium'):
                 small = [b for b in boxes if float(b[1][:-2]) < 16]
                 assert boxes and not small, 'Text boxes under 16px on a phone (iPhone zooms in and the page scrolls sideways): %s' % small
                 assert p.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Phone log on page scrolls sideways'
+                assert p.locator('#spClose').bounding_box()['height'] >= 39.5
+                p.screenshot(path=str(ARTIFACTS / ('radio-touch-picker-' + engine + '.png')), full_page=True)
                 phone.close()
             page.locator('#roPickMember').click()
             expect(page.locator('#searchPicker')).to_be_visible()
@@ -745,6 +748,11 @@ def main(engine='chromium'):
                 expect(page.locator('#roDay')).to_have_value(day.isoformat())
                 expect(today_button).to_be_hidden() if day == date.today() else expect(today_button).to_be_visible()
             expect(page).to_have_url(re.compile(r'/logons\?.*day=' + (date.today() + timedelta(days=1)).isoformat()))
+            controls = [page.locator('#' + ident).bounding_box() for ident in ('roStatusCombo','roDay','roSortCombo','roSearch')]
+            assert max(b['y'] for b in controls) - min(b['y'] for b in controls) <= 2, controls
+            assert max(b['height'] for b in controls) - min(b['height'] for b in controls) <= 3, controls
+            expect(page.locator('#roStatusCombo')).to_have_attribute('readonly', '')
+            expect(page.locator('#roSortCombo')).to_have_attribute('readonly', '')
             page.screenshot(path=str(ARTIFACTS / ('radio-date-step-%s.png' % engine)))
             with page.expect_response(rows_for(day=today, q=vessel)):
                 today_button.click()

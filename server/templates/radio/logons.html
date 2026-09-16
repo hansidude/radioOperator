@@ -1,6 +1,6 @@
 {% extends base_template %}
 {% import 'radio/_ui.html' as ui %}
-{% from 'myMacro_filters.html' import search_controls, date_filter %}
+{% from 'myMacro_filters.html' import search_controls, date_filter, select_filter %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% import 'myMacro_record_view.html' as records_ui %}
 {% block page_title %}{{ brand }}{% endblock %}
@@ -25,17 +25,14 @@
       hx-sync="this:replace" hx-history="false">
   <input type="hidden" name="f" value="1">
   {{ ui.status_filter(filters.status) }}
-  <div class="form-check ro-toolbar-tick">
-    <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
-    <label class="form-check-label" for="roDayOn">Date</label>
+  <div class="d-flex flex-column">
+    <div class="form-check ro-toolbar-tick">
+      <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
+      <label class="form-check-label" for="roDayOn">Date</label>
+    </div>
+    {{ date_filter('roDay', 'day', filters.day.isoformat(), now.date().isoformat(), label='Call date', css_class='ro-toolbar-date') }}
   </div>
-  {{ date_filter('roDay', 'day', filters.day.isoformat(), now.date().isoformat(), label='Call date', css_class='ro-toolbar-date') }}
-  <label for="roSort">Sort</label>
-  <select class="form-select form-select-sm" id="roSort" name="sort">
-    <option value="newest"{% if filters.sort == 'newest' %} selected{% endif %}>Newest first</option>
-    <option value="oldest"{% if filters.sort == 'oldest' %} selected{% endif %}>Oldest first</option>
-    <option value="due"{% if filters.sort == 'due' %} selected{% endif %}>Due first</option>
-  </select>
+  {{ select_filter('roSort', 'sort', 'Sort', [('newest','Newest first'), ('oldest','Oldest first'), ('due','Due first')], filters.sort) }}
   {{ view_controls('roRecordView', paragraphs_rows=True, panel='roLogPanel') }}   {# owner: the table wraps its values by default #}
   {{ search_controls('roSearch', input1_attrs={'name': 'q', 'value': filters.search}) }}
 </form>

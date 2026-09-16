@@ -10,10 +10,10 @@
   {% from 'myMacro_record_view.html' import styles as record_styles, scripts as record_scripts %}
   {{ record_styles('radio_shared.static') }}
   {% for asset in ('navbar_controls.css', 'search_controls.css') %}
-  <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset, v='2') }}">
+  <link rel="stylesheet" href="{{ url_for('radio_shared.static', filename='css/' ~ asset, v='3') }}">
   {% endfor %}
   <script src="{{ url_for('radio_shared.static', filename='vendor/jquery-3.6.0/jquery.min.js') }}"></script>
-  <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js', v='3') }}"></script>
+  <script defer src="{{ url_for('radio_shared.static', filename='js/search_controls.js', v='4') }}"></script>
   {{ record_scripts('radio_shared.static') }}
   <script src="{{ url_for('radio_shared.static', filename='js/auto_grow.js', v='1') }}"></script>
   <script src="{{ url_for('radio_shared.static', filename='vendor/htmx-1.9.10/htmx.min.js') }}"></script>
