@@ -1025,12 +1025,18 @@ def main(engine='chromium'):
                         + '[data-column="time"] .dc-record-grid-value, [data-column="returnTime"] .dc-record-grid-value')]
                         .filter(v => v.scrollWidth > v.clientWidth + 1).map(v => v.textContent)""")
                     assert not cut, 'Date/time cut off at %spx: %s' % (width, cut)
-                if width == 390:                        # a list longer than the screen: scrolled to the end, the filters are still there
+                if width == 390:                        # a list longer than the screen: scrolled to the end, the filters are one tap away
                     # Bootstrap sets scroll-behavior: smooth; an instant scroll is where it says it is when read.
                     page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
                     assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
+                    # A phone's navbar is one line; its controls wait under the host's ⋯ page menu (Quackit CR-51/52).
+                    page_menu = page.get_by_role('button', name='Page menu', exact=True)
+                    expect(page_menu).to_be_in_viewport()
+                    page_menu.click()
                     expect(page.locator('#roStatusCombo')).to_be_in_viewport()
                     expect(page.locator('#roSearch')).to_be_in_viewport()
+                    page_menu.click()
+                    expect(page.locator('#roSearch')).to_be_hidden()
                     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
                     nav = page.locator('.navbar.fixed-top').evaluate('el => el.getBoundingClientRect().bottom')
                     first = page.locator('.dc-record-grid-row').first.evaluate('el => el.getBoundingClientRect().top')
