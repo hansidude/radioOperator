@@ -83,7 +83,7 @@
   <tr><td><span data-help-icon='[data-dc-record-names]'></span> Emoji only</td><td>Hides the column names and leaves each field's emoji: cards show emoji and value, the table drops its heading. Press again for the names. Remembered in this browser for this page.</td></tr>
   <tr><td><span data-help-icon='[data-dc-record-panel]'></span> Panel</td><td>Shows or hides the side panel, on the left of the list whether the page is at the usual width or full width: what the search matched, in which fields, as badges with counts. Search starts with it open, the other lists closed.</td></tr>
   <tr><td><span data-help-icon='[data-dc-record-size="smaller"]'></span> <span data-help-icon='[data-dc-record-size="larger"]'></span> <span data-help-icon='[data-dc-record-size="reset"]'></span></td><td>Smaller or larger text, 100% to 200%, shown between them; the reset button goes back to 100%.</td></tr>
-  <tr><td><span data-help-icon='[data-dc-record-width]'></span> Width</td><td>The whole page at the usual width (about 1200px, centred) or the full width of the screen.</td></tr>
+  <tr><td><span data-help-icon='[data-dc-page-width]' data-help-navbar></span> Width</td><td>In the navbar, on every page: the whole page at the usual width (about 1200px, centred) or the full width of the screen. Each page starts at its own width.</td></tr>
 </table>
 <p>Every list numbers its records from 1 (the <strong>#</strong> column, or the corner of a card); a search within a tab numbers what is left again from 1.</p>
 <p>Text size, width and the panel are remembered in this browser for each page. Cards and Paragraphs start fresh each time a page opens.</p>
@@ -160,9 +160,9 @@
 <script>
 (function () {
   GroupEngine.init({ key: 'radioHelp', root: '#roHelpGroups', itemSel: '.dc-record-empty', defaultCollapsed: false, hideEmpty: false });
-  // The icons in the tables are the real buttons' own.
+  // The icons in the tables are the real buttons' own: the demonstration's, or the navbar's (data-help-navbar).
   document.querySelectorAll('[data-help-icon]').forEach(function (slot) {
-    var button = document.querySelector('.ro-help-demo ' + slot.getAttribute('data-help-icon'));
+    var button = document.querySelector((slot.hasAttribute('data-help-navbar') ? '.navbar ' : '.ro-help-demo ') + slot.getAttribute('data-help-icon'));
     if (!button) throw new Error('Help: no button matches ' + slot.getAttribute('data-help-icon'));
     slot.innerHTML = button.innerHTML;
     slot.title = button.title;

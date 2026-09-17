@@ -348,7 +348,7 @@ def search_page():
     logons = L.records(cur, h.unit(), _now(), h.approaching_minutes, search=q,
                       status=None if status == 'all' else status) if len(q) >= 2 else []
     cur.close()
-    # ISSUE-1: panel counts and rows both match search AND status. A kind/field badge narrows those results further.
+    # CR-1: panel counts and rows both match search AND status. A kind/field badge narrows those results further.
     matched = dict(M.matched(found, q), logons=L.matched_fields(logons, q))
     everything = dict(found, logons=logons)
     kind, field = request.args.get('kind') or None, request.args.get('field') or None

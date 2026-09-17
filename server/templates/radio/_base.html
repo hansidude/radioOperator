@@ -34,9 +34,10 @@
       <span class="text-light">{% block page_title %}{% endblock %}</span>
       <ul class="navbar-nav flex-row flex-wrap gap-1 me-auto">{{ radio_ui.radio_menu(logout_url) }}</ul>
       {% block navbar_buttons %}{% endblock %}
+      {% from 'myMacro_record_view.html' import page_width_button %}{{ page_width_button() }}
     </div>
   </nav>
-  <div class="{% block body_wrap_class %}container-fluid{% endblock %}">{% block body %}{% endblock %}</div>
+  <div class="{% block body_wrap_class %}container-fluid{% endblock %}" data-dc-page>{% block body %}{% endblock %}</div>
 {% from 'myMacro_search_picker.html' import searchPickerModal %}
 {{ searchPickerModal() }}
 {% from 'myMacro_context.html' import combo_enhance %}

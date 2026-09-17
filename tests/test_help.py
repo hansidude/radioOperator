@@ -22,7 +22,7 @@ class Help(unittest.TestCase):
         for section in ('menu', 'log', 'views', 'status', 'logon', 'members', 'search', 'fields'):
             self.assertIn('id="%s"' % section, page)
         for control in ('data-dc-record-view="cards"', 'data-dc-record-view="paragraphs"', 'data-dc-record-names',
-                        'data-dc-record-panel aria-controls="roHelpPanel"', 'data-dc-record-size="larger"', 'data-dc-record-width',
+                        'data-dc-record-panel aria-controls="roHelpPanel"', 'data-dc-record-size="larger"', 'data-dc-page-width',
                         'data-grp-toggle-all="radioHelp"'):
             self.assertIn(control, page)                                          # the demonstration is the real controls
             self.assertIn("data-help-icon='[%s" % control.split(' ')[0].split('=')[0], page)   # and each is explained
@@ -30,7 +30,7 @@ class Help(unittest.TestCase):
         self.assertIn('with 🚫 Removed and the day', page)                          # what Remove keeps (owner, issue i)
         self.assertIn('⚠️ before its vessel name, rego or mobile means that is no longer so', page)   # old log ons (issue h)
         self.assertIn('href="/radio/help"', page)                                 # on the menu
-        self.assertIn('<div class="container-fluid mySpacing">', page)
+        self.assertIn('<div class="container-fluid mySpacing" data-dc-page>', page)
 
     def test_every_field_emoji_has_a_name_on_the_help_page(self):
         symbols = self.app.jinja_env.get_template('radio/_ui.html').module.FIELD_SYMBOLS

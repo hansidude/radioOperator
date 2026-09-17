@@ -99,7 +99,7 @@ class Members(unittest.TestCase):
         self.assertIn('<form id="vessels-new" method="post" action="/member/%d/vessels"' % i, new)
         self.assertNotIn('placeholder=', new)
         for form in ('/members/new', '/member/%d' % i, '/vessels/new', '/member/%d/vessels/new' % i):
-            self.assertIn('<div class="container-fluid mySpacing">', self.a.get(form).get_data(as_text=True))   # usual page width
+            self.assertIn('<div class="container-fluid mySpacing" data-dc-page>', self.a.get(form).get_data(as_text=True))   # usual page width
 
     def test_a_member_holds_many_of_each_and_removes_them_without_deleting(self):
         i = self.member()
@@ -605,7 +605,7 @@ class Members(unittest.TestCase):
         page = self.a.get('/radio/search').get_data(as_text=True)
         self.assertIn('Type two or more characters', page)
         self.assertIn('data-grp-toggle-all="radioSearch" data-grp-noun="kinds"', page)                 # collapse / expand all
-        self.assertIn('<div class="container-fluid mySpacing">', page)                                  # Quackit's usual page width
+        self.assertIn('<div class="container-fluid mySpacing" data-dc-page>', page)                                  # Quackit's usual page width
         self.assertIn('href="/radio/search"', self.a.get('/logons').get_data(as_text=True))          # on the RadioLogs navbar
         found = lambda q: self.a.get('/radio/search?q=' + q).get_data(as_text=True)
         self.assertIn('data-found="members"', found('EPIRB'))                                        # notes are searched
@@ -666,7 +666,7 @@ class Members(unittest.TestCase):
         self.assertIsNotNone(log.select_one('[data-dc-filter-value="discarded"]'))
 
     def test_search_status_and_field_counts_share_the_same_results(self):
-        # ISSUE-1's example: a registration OR a mobile matches 34, AND the selected status.
+        # CR-1's example: a registration OR a mobile matches 34, AND the selected status.
         ids = {}
         for status in ('draft', 'discarded'):
             for field, fields in [('registration', {'registration': 'AB34Q', 'mobile': '0400000001'}),
