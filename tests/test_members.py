@@ -745,7 +745,7 @@ class Members(unittest.TestCase):
             page = get(url)
             self.assertIn('data-dc-record-panel aria-controls="%s"' % panel_id, page)                    # the panel button
             self.assertIn('id="%s" class="dc-record-panel" aria-label="What the search matched" data-open="0"' % panel_id, page)   # starts closed
-            self.assertIn('The fields a search matches show here.', page)
+            self.assertNotIn('The fields a search matches show here.', page)                          # no hint text (Quackit CR-67)
             self.assertIn('#%s' % body_id, page)                                                         # refreshed with the rows (hx-select-oob)
             found = get(url + '?' + query)
             badge = '<span class="dc-record-panel-badge" title="%s: 1"  data-matched-field="%s">' % (label, field)   # plain: no group to open

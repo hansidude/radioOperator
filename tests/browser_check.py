@@ -899,7 +899,9 @@ def main(engine='chromium'):
                 visit(path)
                 expect(page.locator(panel_id)).to_be_hidden()
                 page.locator('[data-dc-record-panel]:visible').click()
-                expect(page.locator(panel_id)).to_be_visible()
+                # Open, though empty before a search: no hint text (Quackit CR-67), so it has no height yet.
+                expect(page.locator(panel_id).locator('..')).to_have_class(re.compile(r'\bdc-record-panel-open\b'))
+                expect(page.locator('[data-dc-record-panel]:visible')).to_have_attribute('aria-pressed', 'true')
                 with page.expect_response(lambda r: answer in r.url and 'q=' + token in r.url):          # the search's own answer
                     page.locator(search_box).fill(token)
                 section = page.locator('%s [data-matched="%s"]' % (panel_id, gid))
@@ -911,7 +913,7 @@ def main(engine='chromium'):
                 expect(badge).to_be_visible()
                 assert badge.evaluate('b => b.tagName') == 'SPAN', 'A badge with nothing to open should be plain'
                 page.reload()
-                expect(page.locator(panel_id)).to_be_visible()
+                expect(page.locator(panel_id).locator('..')).to_have_class(re.compile(r'\bdc-record-panel-open\b'))   # remembered
                 page.locator('[data-dc-record-panel]:visible').click()                          # closed again for the next run
                 expect(page.locator(panel_id)).to_be_hidden()
             # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
