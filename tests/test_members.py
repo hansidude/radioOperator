@@ -756,6 +756,10 @@ class Members(unittest.TestCase):
         for query, shown in (('q=ab123&status=draft', True), ('status=draft', True), ('q=ab123&status=all', False), ('', False)):
             with self.subTest(query=query):
                 panel = BeautifulSoup(get('/logons?' + query), 'html.parser').select_one('#roMatched')
+                if 'q=' in query:                                                # CR-66: headed, outlined filter groups
+                    headings = [h.get_text(strip=True) for h in panel.select('.dc-record-panel-group > .dc-record-panel-group-heading')]
+                    self.assertEqual(headings, ['Log-on status', 'Matched fields'])
+                    self.assertIsNotNone(panel.select_one('.dc-record-panel-group[role="group"][aria-label="Log-on status"] > .dc-record-panel-badges [data-dc-filter-target="roStatus"]'))
                 clear = panel.select_one(':scope > .dc-record-panel-clear')
                 if shown:
                     self.assertIs(panel.find(True), clear)

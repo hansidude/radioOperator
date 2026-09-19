@@ -248,20 +248,20 @@
   <section class="dc-record-panel-section" data-matched="{{ gid }}">
     {{ records_ui.panel_badge(symbol, label, rows|length, attrs, heading=True, button=filtering, active=on_kind and filter.field is none) }}
     {% if gid == 'logons' and status is not none %}
-    <div class="dc-record-panel-badges" aria-label="Log-on statuses">
+    {% call records_ui.panel_group('Log-on status') %}
     {% for value, state_name, state_text in FILTERS %}
       {% set count = namespace(n=0) %}
       {% for row in rows %}{% if value == 'all' or state(row)|lower == value or (value == 'loggedon' and state(row) == 'overdue') %}{% set count.n = count.n + 1 %}{% endif %}{% endfor %}
       {% if count.n or status == value %}{{ records_ui.panel_badge(STATES[state_name].symbol, state_text, count.n, {'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': value}, active=status == value) }}{% endif %}
     {% endfor %}
-    </div>
+    {% endcall %}
     {% endif %}
-    <div class="dc-record-panel-badges">
+    {% call records_ui.panel_group('Matched fields') %}
     {% for field, field_label, count in fields %}
       {% set field_attrs = attrs.copy() %}{% set _ = field_attrs.update({'data-ro-filter-field': field} if filtering else {}) %}{% set _ = field_attrs.update({'data-matched-field': field}) %}
       {{ records_ui.panel_badge(FIELD_SYMBOLS[field], field_label, count, field_attrs, button=filtering, active=on_kind and filter.field == field) }}
     {% endfor %}
-    </div>
+    {% endcall %}
   </section>
   {% else %}<div class="dc-record-empty">0 records match “{{ search }}”</div>
   {% endfor %}

@@ -71,7 +71,7 @@
     {% call records_ui.record_panel('roHelpPanel', 'Sample panel', open=False) %}
       <section class="dc-record-panel-section">
         {{ records_ui.panel_badge('🎫', 'Log ons', 2, heading=True, button=False) }}
-        <div class="dc-record-panel-badges">{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.vesselName, 'Vessel Name', 2, button=False) }}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.notes, 'Notes', 1, button=False) }}</div>
+        {% call records_ui.panel_group('Matched fields') %}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.vesselName, 'Vessel Name', 2, button=False) }}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS.notes, 'Notes', 1, button=False) }}{% endcall %}
       </section>
     {% endcall %}
     <div>{{ records_ui.record_grid(rows, columns, 'radioHelpSample') }}</div>
