@@ -237,7 +237,9 @@
 {% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1, status=None) %}
 <div id="{{ body_id }}">
 {# A filter applied: Clear filter first, above the kinds, near the badge that set it (owner, issue G). #}
-{% if filtering and filter is not none %}{{ records_ui.clear_filter({'data-ro-filter-clear': ''}, 'dc-record-panel-clear') }}{% endif %}
+{% if filtering and filter is not none %}{{ records_ui.clear_filter({'data-ro-filter-clear': ''}, 'dc-record-panel-clear') }}
+{# The log's status badges filter it too: the same Clear filter puts the status back to All (Quackit CR-64). #}
+{% elif status is not none and status != 'all' %}{{ records_ui.clear_filter({'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': 'all'}, 'dc-record-panel-clear') }}{% endif %}
 {% if search|length < min_chars %}<div class="dc-record-empty">The fields a search matches show here.</div>
 {% else %}
   {% for gid, symbol, label, rows, fields in sections if rows %}

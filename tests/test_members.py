@@ -752,6 +752,17 @@ class Members(unittest.TestCase):
             self.assertIn('data-matched="%s"' % gid, found)
             self.assertIn(badge, found)
         self.assertIn('data-matched-field="registration"', get('/logons/rows?partial=1&q=ab123'))          # and on the log's 30s refresh
+        # Quackit CR-64: a status filter on the log puts Clear filter first in its panel, back to All; none without one.
+        for query, shown in (('q=ab123&status=draft', True), ('status=draft', True), ('q=ab123&status=all', False), ('', False)):
+            with self.subTest(query=query):
+                panel = BeautifulSoup(get('/logons?' + query), 'html.parser').select_one('#roMatched')
+                clear = panel.select_one(':scope > .dc-record-panel-clear')
+                if shown:
+                    self.assertIs(panel.find(True), clear)
+                    self.assertEqual((clear['data-dc-filter-target'], clear['data-dc-filter-value']), ('roStatus', 'all'))
+                    self.assertEqual(' '.join(clear.stripped_strings), '× Clear filter')
+                else:
+                    self.assertIsNone(clear)
         self.assertIn('0 records match “zzzz”', get('/members?q=zzzz'))
 
     def test_the_search_panel_counts_each_field_the_way_the_search_matches(self):

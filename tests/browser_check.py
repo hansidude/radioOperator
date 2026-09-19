@@ -159,7 +159,7 @@ def main(engine='chromium'):
             expect(page.locator('#contextNavToggle')).to_have_count(1)
             expect(page).to_have_title('QUACKIT')
             page.goto(URL + '/members')
-            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Usual page width')   # Members starts wide
+            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_have_attribute('title', 'Usual page width')   # Members starts wide
             page.locator('a[href="/members/new"]').click()
             page.wait_for_url(re.compile('/members/new$'))
             usual_width('#ro-member-details', 'New member')
@@ -526,7 +526,8 @@ def main(engine='chromium'):
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search')
-            width_button = page.locator('[data-dc-page-width]:visible')                            # contained or full width, not remembered
+            width_button = page.locator('.app-navbar-actions [data-dc-page-width]')                            # contained or full width, not remembered;
+            # the navbar's: view_controls carries the same control after the text size buttons (Quackit CR-59)
             expect(width_button).to_have_attribute('title', 'Full width')
             width_button.click()
             expect(width_button).to_have_attribute('title', 'Usual page width')
@@ -534,11 +535,11 @@ def main(engine='chromium'):
             full = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid.mySpacing').getBoundingClientRect().width")
             assert full > 1700, 'Full width did not widen Search: %s' % full
             assert page.locator('#roFoundPanel').bounding_box()['x'] < 60, 'Full width: the panel is not at the left edge'
-            page.locator('[data-dc-page-width]:visible').click()
+            page.locator('.app-navbar-actions [data-dc-page-width]').click()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search back in its container')
             width_button.click()
             page.reload()                                                                       # a new page load starts at the usual width again
-            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Full width')
+            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_have_attribute('title', 'Full width')
             list_beside_panel('#roFoundPanel', '#roFound', 'Search after reload')
             page.locator('#roFindAll').fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
@@ -774,6 +775,20 @@ def main(engine='chromium'):
             expect(page.locator('#roSearch')).to_have_value(vessel)
             expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
+            # Quackit CR-64: the status filter puts Clear filter first in the log's panel; it puts the status back to All.
+            panel_button = page.locator('[data-dc-record-panel][aria-controls="roLogPanel"]')
+            panel_button.click()
+            log_clear = page.locator('#roMatched > .dc-record-panel-clear')
+            expect(log_clear).to_be_visible()
+            assert log_clear.evaluate('e => e === e.parentElement.firstElementChild')
+            with page.expect_response(rows_for(status='all', q=vessel)):
+                log_clear.click()
+            expect(page.locator('#roStatus')).to_have_value('all')
+            expect(log_clear).to_have_count(0)
+            with page.expect_response(rows_for(status='draft', q=vessel)):
+                choose(page.locator('#roStatus'), 'draft')
+            expect(log_clear).to_be_visible()
+            panel_button.click()                                                # closed again, as the page remembers it
             # A failed swap is shown, never a list that silently stops updating.
             failing = re.compile(r'/logons/rows\?')
             page.route(failing, lambda route: route.fulfill(status=500, body='verification failure'))
@@ -856,7 +871,7 @@ def main(engine='chromium'):
                     if 'radio/search' in path:
                         choose(page.locator('#roStatus'), 'all')
                     else:
-                        page.locator('[data-dc-filter-value="all"]').click()
+                        page.locator('.dc-record-panel-badge[data-dc-filter-value="all"]').click()   # the All badge; Clear filter above it does the same (CR-64)
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
                 for width in (1920,390):
                     page.set_viewport_size({'width':width,'height':1080 if width>767 else 844})

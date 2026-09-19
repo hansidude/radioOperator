@@ -250,7 +250,9 @@ class Pages(unittest.TestCase):
         self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
         for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
             self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
-        self.assertEqual(page.count('data-dc-page-width'), 1)                                        # one page width button, in the navbar
+        # The navbar's page width button, and the same control after the text size buttons (Quackit CR-59).
+        self.assertEqual(page.count('data-dc-page-width'), 2)
+        self.assertIn('data-dc-record-size="reset" aria-controls="roRecordView"', page[:page.rindex('data-dc-page-width')])
         self.assertNotIn('data-dc-record-width', page)
         self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
         self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)
