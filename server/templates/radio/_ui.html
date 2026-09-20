@@ -242,11 +242,15 @@
 {% elif status is not none and status != 'all' %}{{ records_ui.clear_filter({'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': 'all'}, 'dc-record-panel-clear') }}{% endif %}
 {# Nothing before a search: no hint text taking room (Quackit CR-67). #}
 {% if search|length >= min_chars %}
+{# Each kind's header folds away what the search matched in it (Quackit CR-81); with more than one kind, My Times'
+   collapse / expand all for them, under the status box. The shared owner brings the chevron and the remembering. #}
+{% set kinds = [] %}{% for gid, symbol, label, rows, fields in sections if rows %}{% set _ = kinds.append(gid) %}{% endfor %}
+{% if kinds|length > 1 %}{{ records_ui.collapse_all(body_id, 'kinds', 'dc-record-panel-collapse-all') }}{% endif %}
   {% for gid, symbol, label, rows, fields in sections if rows %}
   {% set attrs = {'data-ro-filter-kind': gid} if filtering else {} %}
   {% set on_kind = filter is not none and filter.kind == gid %}
-  <section class="dc-record-panel-section" data-matched="{{ gid }}">
-    {{ records_ui.panel_badge(symbol, label, rows|length, attrs, heading=True, button=filtering, active=on_kind and filter.field is none) }}
+  {% call records_ui.panel_section(body_id ~ '-' ~ gid, symbol, label, rows|length, attrs, button=filtering,
+                                   active=on_kind and filter.field is none, section_attrs={'data-matched': gid}) %}
     {% if gid == 'logons' and status is not none %}
     {% call records_ui.panel_group('Log-on status') %}
     {% for value, state_name, state_text in FILTERS %}
@@ -262,7 +266,7 @@
       {{ records_ui.panel_badge(FIELD_SYMBOLS[field], field_label, count, field_attrs, button=filtering, active=on_kind and filter.field == field) }}
     {% endfor %}
     {% endcall %}
-  </section>
+  {% endcall %}
   {% else %}<div class="dc-record-empty">0 records match “{{ search }}”</div>
   {% endfor %}
 {% endif %}

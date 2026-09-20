@@ -526,8 +526,11 @@ def main(engine='chromium'):
             page.locator('[data-found="contacts"] > .grp-header').click()
             expect(page.locator('#radioFoundContacts')).to_be_visible()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search')
-            width_button = page.locator('.app-navbar-actions [data-dc-page-width]')                            # contained or full width, not remembered;
-            # the navbar's: view_controls carries the same control after the text size buttons (Quackit CR-59)
+            width_button = page.locator('[data-dc-page-width]:visible')                                   # contained or full width, not remembered;
+            # view_controls carries the same control after the text size buttons (Quackit CR-59); exactly one width
+            # button shows, the page's own, the shell's navbar copy hiding itself behind it (Quackit CR-77)
+            expect(page.locator('[data-dc-page-width]')).to_have_count(2)
+            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_be_hidden()
             expect(width_button).to_have_attribute('title', 'Full width')
             width_button.click()
             expect(width_button).to_have_attribute('title', 'Usual page width')
@@ -535,11 +538,11 @@ def main(engine='chromium'):
             full = page.evaluate("() => document.getElementById('roFoundView').closest('.container-fluid.mySpacing').getBoundingClientRect().width")
             assert full > 1700, 'Full width did not widen Search: %s' % full
             assert page.locator('#roFoundPanel').bounding_box()['x'] < 60, 'Full width: the panel is not at the left edge'
-            page.locator('.app-navbar-actions [data-dc-page-width]').click()
+            page.locator('[data-dc-page-width]:visible').click()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search back in its container')
             width_button.click()
             page.reload()                                                                       # a new page load starts at the usual width again
-            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_have_attribute('title', 'Full width')
+            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Full width')
             list_beside_panel('#roFoundPanel', '#roFound', 'Search after reload')
             page.locator('#roFindAll').fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
@@ -570,6 +573,42 @@ def main(engine='chromium'):
             expect(page.locator('#roMatched [data-ro-filter-clear]')).to_have_count(0)
             expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
+            # Each kind's header folds away what it matched (Quackit CR-81): the shared chevron beside its count, and
+            # My Times' collapse / expand all under the status box. The heading badge still filters.
+            members_section = page.locator('#roMatched [data-matched="members"]')
+            chevron = members_section.locator('[data-dc-collapse-toggle]')
+            matched_fields = members_section.locator('.dc-record-panel-group')
+            collapse_all = page.locator('#roMatched [data-dc-collapse-all]')
+            expect(matched_fields).to_be_visible()
+            assert collapse_all.bounding_box()['y'] < page.locator('#roMatched [data-matched]').first.bounding_box()['y'], \
+                'Collapse all is not above the kinds'
+            assert page.evaluate('''() => {
+                const status = document.querySelector('#roFoundPanel #roStatus').closest('div');
+                const button = document.querySelector('#roMatched [data-dc-collapse-all]');
+                return status.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING;
+            }'''), 'Collapse all is not under the status box'
+            assert chevron.bounding_box()['x'] > members_section.locator('.dc-record-panel-badge-count').first.bounding_box()['x'], \
+                'The chevron is not beside the badge count'
+            expect(chevron).to_have_attribute('title', 'Collapse Members')
+            chevron.click()
+            expect(matched_fields).to_be_hidden()
+            expect(chevron).to_have_attribute('title', 'Expand Members')
+            expect(members_section.locator('.dc-record-panel-badge-heading')).to_be_visible()           # the header stays
+            expect(collapse_all).to_have_attribute('title', 'Collapse all kinds')                       # other kinds still open
+            with page.expect_response(lambda r: '/radio/search?' in r.url):
+                page.locator('#roFindAll').fill(token + ' ')                                            # swapped in with the search
+            expect(page.locator('#roMatched [data-matched="members"] .dc-record-panel-group')).to_be_hidden()   # and stays folded
+            collapse_all.click()
+            expect(page.locator('#roMatched .dc-record-panel-group:visible')).to_have_count(0)          # nothing showing under any header
+            expect(page.locator('#roMatched [data-matched]')).not_to_have_count(0)
+            expect(collapse_all).to_have_attribute('title', 'Expand all kinds')
+            collapse_all.click()
+            expect(page.locator('#roMatched [data-matched="members"] .dc-record-panel-group')).to_be_visible()
+            expect(collapse_all).to_have_attribute('title', 'Collapse all kinds')
+            page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading').click()  # the header still filters
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_be_visible()
+            page.locator('#roMatched [data-ro-filter-clear]').click()
+            expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
             members_badge = page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading')
             members_badge.click()                                                                   # a kind's badge
             expect(page.locator('#roFound [data-found]')).to_have_count(1)
