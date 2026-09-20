@@ -20,13 +20,18 @@
 <form id="roSearchForm" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Search controls" method="get" action="/radio/search"
       hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-select-oob="#roMatched" hx-swap="outerHTML"
       hx-trigger="change from:#roStatus, input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roFoundView', panel='roFoundPanel') }}
   {{ grp.collapseAllButton('radioSearch', 'kinds') }}
   <div>{{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}, label='Search') }}</div>
   {# The panel's filter: set by a badge, sent with the search, cleared by a new search or Clear filter. #}
   <input type="hidden" name="kind" id="roFilterKind" value="{{ filter.kind if filter else '' }}"{% if not filter %} disabled{% endif %}>
   <input type="hidden" name="field" id="roFilterField" value="{{ filter.field or '' if filter else '' }}"{% if not (filter and filter.field) %} disabled{% endif %}>
 </form>
+{# The view buttons head their own View group at the navbar's right end, as the register, Favourites and API tokens
+   do (CR-68), so the width button and the panel button after it end the line instead of sitting among the search
+   controls (Quackit CR-83). #}
+<div class="d-flex align-items-center flex-wrap gap-2 mb-2" data-navbar-controls="View" data-navbar-end>
+{{ view_controls('roFoundView', panel='roFoundPanel') }}
+</div>
 <div id="roFoundView">
 {# The panel: for each kind found, what the search matched in which field (members.matched, logons.matched_fields),
    as badges; a badge opens and scrolls to its kind. Swapped in with the results. #}

@@ -45,7 +45,7 @@ OWNERS = {'member': {'key': 'memberId', 'kinds': CHILDREN}, 'vessel': {'key': 'v
 LONG_TEXT = ('notes',)
 LABELS = dict({f: L.LABELS[f] for f in VESSEL_FIELDS if f in L.LABELS},
               vesselName='Vessel Name', registration='Rego', memberNumber='Member No.', name='Name', address='Address',
-              firstName='First name', lastName='Last name', mobile=L.LABELS['mobile'],
+              firstName='First name', lastName='Last name', fullName='Name', mobile=L.LABELS['mobile'],
               phone='Phone', email='Email', relationship='Relationship', colour='Colour', ais='AIS / MMSI',
               ownerName='Contact', ownerPhone='Phone', ownerEmail='Email', notes='Notes')
 PHONES = ('mobile', 'phone', 'ownerPhone')
@@ -122,18 +122,21 @@ def members(cur, unit, search=None):
     for r in rows:
         r['vessels'] = boats.get(r['id'], [])
         r['vesselNames'] = ', '.join(v['vesselName'] or v['registration'] for v in r['vessels'])
-    fields, extra, _ = LIST_SEARCH['members']
-    return _search(rows, search, fields, extra=extra)
+        # A member is searched by the name they are called, one field, so 'jane smith' still finds Jane Smith
+        # without the search reading two fields as one (CR-83).
+        r['fullName'] = ('%s %s' % (r['firstName'] or '', r['lastName'] or '')).strip()
+    fields, extra, extra_field = LIST_SEARCH['members']
+    return _search(rows, search, fields, extra=extra, extra_field=extra_field)
 
 
 def public_vessels(cur, unit, search=None):
     rows = _vessels(cur, unit, {}, public_only=True)
-    fields, extra, _ = LIST_SEARCH['public']
-    return _search(rows, search, fields, extra=extra)
+    fields, extra, extra_field = LIST_SEARCH['public']
+    return _search(rows, search, fields, extra=extra, extra_field=extra_field)
 
 
 # What the Members and Public vessels pages search: (fields, extra text, the field the extra counts as in the panel).
-LIST_SEARCH = {'members': (('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'vesselNames'),
+LIST_SEARCH = {'members': (('memberNumber', 'fullName', 'mobile', 'email', 'vesselNames'),
                            lambda r: ' '.join(v['registration'] or '' for v in r['vessels']), 'vesselRegos'),
                'public': (VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail'), None, None)}
 
@@ -189,9 +192,9 @@ def _held(cur, kind, by_member, by_vessel):
     return rows
 
 
-HOLDER, ACROSS = 'holder', 'across'
-MATCH_LABELS = dict(LABELS, vesselNames='Vessels', vesselRegos='Vessel regos', holder='Held by', across='Across fields')
-SEARCH = {'members': ('memberNumber', 'firstName', 'lastName', 'mobile', 'email', 'address', 'notes', 'vesselNames'),
+HOLDER = 'holder'
+MATCH_LABELS = dict(LABELS, vesselNames='Vessels', vesselRegos='Vessel regos', holder='Held by')
+SEARCH = {'members': ('memberNumber', 'fullName', 'mobile', 'email', 'address', 'notes', 'vesselNames'),
           'contacts': ('name', 'relationship', 'phone', 'email'),
           'vessels': VESSEL_FIELDS + ('ownerName', 'ownerPhone', 'ownerEmail', 'notes'),
           'trailers': ('registration', 'make', 'model', 'colour'),
@@ -221,9 +224,9 @@ def _found_extra(kind):
 
 
 def found_fields(kind):
-    """Every field the Search panel can name for a kind find searches: its own, the holder's name for a held
-    record, and 'across'."""
-    return SEARCH[kind] + ((HOLDER,) if _found_extra(kind) else ()) + (ACROSS,)
+    """Every field the Search panel can name for a kind find searches: its own, and the holder's name for a held
+    record. There is no bucket beside them: a search matches a field or it does not (CR-83)."""
+    return SEARCH[kind] + ((HOLDER,) if _found_extra(kind) else ())
 
 
 def narrow(found, q, kind, field=None):
@@ -295,30 +298,33 @@ def _matcher(search):
     return lambda text: needle in text.lower() or bool(loose and loose in re.sub(r'[\s\-]', '', text.lower()))
 
 
-def _search(rows, search, fields, extra=None):
+def _search(rows, search, fields, extra=None, extra_field=None):
+    """The rows one of `fields` (or the extra text) holds what was searched. Each field is read on its own, never
+    joined to the next: reading them together found text that is in no field - 'sasd123' beside a 10m length answered
+    a search for '31' - and left the panel naming no field for it (CR-83). Finding and naming the field are now the
+    same test, so the panel can always say which field it was."""
     if not (search or '').strip():
         return rows
     hit = _matcher(search)
-    return [r for r in rows if hit(' '.join(str(r[f]) for f in fields if r.get(f)) + ' ' + (extra(r) if extra else ''))]
+    return [r for r in rows if _row_fields(r, hit, fields, extra, extra_field or HOLDER)]
 
 
 def _matched_fields(rows, search, fields, extra=None, extra_field=None):
     """What `search` matched in rows _search found with the same fields: [(field, records)] in `fields` order, then
-    `extra_field` for the extra text (by default 'holder', the holder's name) and 'across' (a record matched only by
-    text running across its fields, a first and last name together)."""
+    `extra_field` for the extra text (by default 'holder', the holder's name). Every row _search found matched in at
+    least one of them, so the panel names a field for every record it counts (CR-83)."""
     extra_field = extra_field or HOLDER
     hit, counts = _matcher(search), {}
     for r in rows:
         for f in _row_fields(r, hit, fields, extra, extra_field):
             counts[f] = counts.get(f, 0) + 1
-    return [(f, counts[f]) for f in fields + (extra_field, ACROSS) if f in counts]
+    return [(f, counts[f]) for f in fields + (extra_field,) if f in counts]
 
 
 def _row_fields(r, hit, fields, extra, extra_field):
-    """The fields a search matched in one row it found: its own, the extra text's, or 'across' when only the
-    fields read together matched."""
-    own = [f for f in fields if r.get(f) and hit(str(r[f]))] + ([extra_field] if extra and hit(extra(r)) else [])
-    return own or [ACROSS]
+    """The fields a search matched in one row: its own and the extra text's. Empty means the row is not a match,
+    which is what _search asks. Every match names a field (CR-83)."""
+    return [f for f in fields if r.get(f) and hit(str(r[f]))] + ([extra_field] if extra and hit(extra(r)) else [])
 
 
 def children(cur, kind, owner_id, owner='member', removed_too=False):

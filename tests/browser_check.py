@@ -532,6 +532,16 @@ def main(engine='chromium'):
             expect(page.locator('[data-dc-page-width]')).to_have_count(2)
             expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_be_hidden()
             expect(width_button).to_have_attribute('title', 'Full width')
+            # Quackit CR-83: the view buttons head their own View group at the navbar's right end, as the register's
+            # do, so the width button and the panel button after it end the line instead of sitting among the search
+            # controls. The panel button stays the last of them (Quackit CR-73).
+            panel_button = page.locator('[data-dc-record-panel][aria-controls="roFoundPanel"]')
+            assert panel_button.evaluate('el => el === el.parentElement.lastElementChild'), 'The panel button is not the last view button'
+            assert width_button.evaluate('el => el.nextElementSibling === document.querySelector(\'[data-dc-record-panel][aria-controls="roFoundPanel"]\')'), \
+                'The width button is not immediately before the panel button'
+            search_box = page.locator('#roFindAll').bounding_box()
+            for control, name in ((width_button.bounding_box(), 'width'), (panel_button.bounding_box(), 'panel')):
+                assert control['x'] > search_box['x'], 'The %s button is left of the search box, not at the right end' % name
             width_button.click()
             expect(width_button).to_have_attribute('title', 'Usual page width')
             expect(width_button.locator('i')).to_have_class('bi bi-arrows-angle-contract')

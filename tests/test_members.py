@@ -633,7 +633,7 @@ class Members(unittest.TestCase):
         self.assertIn('title="Phone: 1"', matched)
         self.assertIn('<span role="img" aria-hidden="true">📱</span>', matched)
         self.assertIn('title="Held by: ', panel(found('Jane Smith')))                                  # a holder's name
-        self.assertIn('title="Across fields: 1"', panel(found('Jane Smith')))                          # first and last name together
+        self.assertIn('title="Name: 1"', panel(found('Jane Smith')))                                  # one field holds the whole name
         self.assertIn('title="Notes: 1"  data-ro-filter-kind="logons" data-ro-filter-field="notes" data-matched-field="notes"', panel(found('ramp')))   # log ons too
 
     def test_search_status_reuses_log_filter_and_preserves_other_kinds(self):
@@ -728,7 +728,7 @@ class Members(unittest.TestCase):
         self.assertIn('dc-record-panel-badge-active" title="Notes: 1"', notes)
         self.assertEqual(results(get('/radio/search?q=smith&kind=members&field=mobile')).count('data-record='), 0)   # no member matched smith in mobile
         self.assertIn('0 records match', get('/radio/search?q=smith&kind=members&field=mobile'))
-        self.assertIn('data-found="members"', results(get('/radio/search?q=jane%20smith&kind=members&field=across')))   # first and last name together
+        self.assertIn('data-found="members"', results(get('/radio/search?q=jane%20smith&kind=members&field=fullName')))   # the name is one field
         for bad in ('kind=boats', 'field=notes', 'kind=members&field=phone', 'kind=logons&field=holder'):
             self.assertEqual(self.a.get('/radio/search?q=smith&' + bad).status_code, 400, bad)
 
@@ -770,17 +770,23 @@ class Members(unittest.TestCase):
         self.assertIn('0 records match “zzzz”', get('/members?q=zzzz'))
 
     def test_the_search_panel_counts_each_field_the_way_the_search_matches(self):
-        rows = [{'firstName': 'Jane', 'lastName': 'Smith', 'mobile': '0412 345 678', 'holder': {'name': 'm1 Jane Smith'}},
-                {'firstName': 'Janet', 'lastName': 'Jones', 'mobile': '', 'holder': {'name': 'Blue Duck'}}]
-        fields = ('firstName', 'lastName', 'mobile')
-        self.assertEqual(M._matched_fields(rows, 'jane', fields), [('firstName', 2)])
+        rows = [{'fullName': 'Jane Smith', 'mobile': '0412 345 678', 'holder': {'name': 'm1 Jane Smith'}},
+                {'fullName': 'Janet Jones', 'mobile': '', 'holder': {'name': 'Blue Duck'}}]
+        fields = ('fullName', 'mobile')
+        self.assertEqual(M._matched_fields(rows, 'jane', fields), [('fullName', 2)])
         self.assertEqual(M._matched_fields(rows[:1], '0412345678', fields), [('mobile', 1)])             # spaces ignored, as the search does
-        self.assertEqual(M._matched_fields(rows[:1], 'jane smith', fields), [('across', 1)])
+        self.assertEqual(M._matched_fields(rows[:1], 'jane smith', fields), [('fullName', 1)])           # the name is one field, not two read together
+        # Quackit CR-83: nothing is found by text running across two fields, so every record counted names a field.
+        self.assertEqual(M._matched_fields(rows[:1], 'smith0412', fields), [])
+        self.assertEqual(M._search(rows[:1], 'smith0412', fields), [])
+        boat = [{'registration': 'sasd123', 'length': '10', 'vesselName': 'crazy champ'}]                # the reported vessel
+        self.assertEqual(M._search(boat, '31', ('vesselName', 'registration', 'length')), [])            # '31' is in no field of it
+        self.assertEqual(M._search(boat, 'sasd', ('vesselName', 'registration', 'length')), boat)
         self.assertEqual(M._matched_fields(rows[1:], 'duck', fields, extra=lambda r: r['holder']['name']), [('holder', 1)])
-        self.assertEqual(M.matched({'members': rows}, 'jane'), {'members': [('firstName', 'First name', 2)]})
+        self.assertEqual(M.matched({'members': rows}, 'jane'), {'members': [('fullName', 'Name', 2)]})
         found = {'members': rows, 'contacts': [], 'vessels': [], 'trailers': [], 'cars': []}             # as find returns them for 'jane'
-        self.assertEqual(M.narrow(found, 'jane', 'members', 'firstName')['members'], rows)
-        self.assertEqual(M.narrow(dict(found, members=rows[:1]), 'jane smith', 'members', 'across')['members'], rows[:1])
+        self.assertEqual(M.narrow(found, 'jane', 'members', 'fullName')['members'], rows)
+        self.assertEqual(M.narrow(dict(found, members=rows[:1]), 'jane smith', 'members', 'fullName')['members'], rows[:1])
         self.assertEqual(M.narrow(found, 'jane', 'members')['members'], rows)
         self.assertEqual(M.narrow(found, 'jane', 'members')['contacts'], [])
         self.assertRaises(L.Refused, M.narrow, found, 'jane', 'members', 'holder')                    # members have no holder
@@ -790,7 +796,7 @@ class Members(unittest.TestCase):
         self.assertEqual(L.matched_rows(logons, 'ab123', 'notes'), logons)
         self.assertRaises(L.Refused, L.matched_rows, logons, 'ab123', 'phone')
         symbols = self.app.jinja_env.get_template('radio/_ui.html').module.FIELD_SYMBOLS                  # every badge has its emoji
-        for field in set(sum(M.SEARCH.values(), ())) | set(L.SEARCH_FIELDS) | {M.HOLDER, M.ACROSS}:
+        for field in set(sum(M.SEARCH.values(), ())) | set(L.SEARCH_FIELDS) | {M.HOLDER}:
             self.assertTrue(symbols.get(field), field)
             self.assertIn(field, dict(M.MATCH_LABELS, **L.SEARCH_LABELS))
 
