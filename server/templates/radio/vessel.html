@@ -6,10 +6,9 @@
 {% block body_wrap_class %}container-fluid mySpacing{% endblock %}
 {% block page_title %}<i class="bi bi-life-preserver me-1"></i>{% if creating %}New public vessel{% else %}Public vessel {{ vessel.vesselName or vessel.registration }}{% endif %}{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Public vessel">
-  <div class="entity-nav-links">{{ entity_nav.parent_link('/vessels', 'Public vessels', 'life-preserver') }}</div>
-  {% if not creating %}{{ entity_nav.tabs('vesselTabs', 'Public vessel tabs', vessel_tabs, prefix='ro-vessel-', hash_tabs=True) }}{% endif %}
-</div>
+{{ entity_nav.page_toolbar('Public vessel',
+     parents=[{'url': '/vessels', 'label': 'Public vessels', 'icon': 'life-preserver'}],
+     tab_group=None if creating else {'id': 'vesselTabs', 'label': 'Public vessel tabs', 'entries': vessel_tabs, 'prefix': 'ro-vessel-', 'hash_tabs': True}) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}

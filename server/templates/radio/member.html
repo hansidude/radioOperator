@@ -6,10 +6,9 @@
 {% block body_wrap_class %}container-fluid mySpacing{% endblock %}
 {% block page_title %}<i class="bi bi-person-vcard me-1"></i>{% if creating %}New member{% else %}Member {{ member.memberNumber }}{% endif %}{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Member">
-  <div class="entity-nav-links">{{ entity_nav.parent_link('/members', 'Members', 'people') }}</div>
-  {% if not creating %}{{ entity_nav.tabs('memberTabs', 'Member tabs', tabs, prefix='ro-member-', hash_tabs=True) }}{% endif %}
-</div>
+{{ entity_nav.page_toolbar('Member',
+     parents=[{'url': '/members', 'label': 'Members', 'icon': 'people'}],
+     tab_group=None if creating else {'id': 'memberTabs', 'label': 'Member tabs', 'entries': tabs, 'prefix': 'ro-member-', 'hash_tabs': True}) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}

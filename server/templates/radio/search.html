@@ -2,11 +2,30 @@
 {% import 'radio/_ui.html' as ui %}
 {% import 'myMacro_groups.html' as grp %}
 {% import 'myMacro_record_view.html' as records_ui %}
+{% import 'myMacro_entity_nav.html' as entity_nav with context %}
 {% from 'myMacro_filters.html' import search_controls %}
 {% from 'myMacro_record_view.html' import view_controls %}
 {% block page_title %}<i class="bi bi-search me-1"></i>Search{% endblock %}
 {# Quackit's usual ~1200px page width (layout's mySpacing). #}
 {% block body_wrap_class %}container-fluid mySpacing{% endblock %}
+{% block navbar_buttons %}
+{#- Everything this page puts on the navbar goes through the one shared control, which owns the order: the search
+    form rides its own row, and the view buttons end the line with the width button and then the panel button last
+    (Quackit CR-83 points 2 and 4). This page no longer decides any of that.
+    The two hidden fields are the panel's filter: set by a badge, sent with the search, cleared by a new search. -#}
+{% set collapse_all %}{{ grp.collapseAllButton('radioSearch', 'kinds') }}{% endset %}
+{% set search_control %}<div>{{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}, label='Search') }}</div>{% endset %}
+{{ entity_nav.page_toolbar('Search',
+     filters=[{'role': 'search', 'control': search_control}],
+     form={'id': 'roSearchForm', 'action': '/radio/search',
+           'attrs': {'hx-get': '/radio/search', 'hx-target': '#roFound', 'hx-select': '#roFound',
+                     'hx-select-oob': '#roMatched', 'hx-swap': 'outerHTML',
+                     'hx-trigger': 'change from:#roStatus, input from:#roFindAll delay:300ms, submit',
+                     'hx-sync': 'this:replace', 'hx-history': 'false'}},
+     hidden=[{'name': 'kind', 'id': 'roFilterKind', 'value': filter.kind if filter else '', 'disabled': not filter},
+             {'name': 'field', 'id': 'roFilterField', 'value': (filter.field or '') if filter else '', 'disabled': not (filter and filter.field)}],
+     view={'target': 'roFoundView', 'panel': 'roFoundPanel', 'extra': collapse_all}) }}
+{% endblock %}
 {% block body %}
 {{ ui.styles() }}
 {# One box over every radio record: log ons, members, emergency contacts, vessels, trailers and cars, in any field,
@@ -17,21 +36,6 @@
                 ('contacts', ui.FIELD_SYMBOLS.name, 'Emergency contacts', found.contacts), ('vessels', ui.FIELD_SYMBOLS.vesselName, 'Vessels', found.vessels),
                 ('trailers', '🚚', 'Trailers', found.trailers), ('cars', '🚗', 'Cars', found.cars)] %}
 {% set SYMBOL = {} %}{% for gid, symbol, label, rows in SHOWN %}{% set _ = SYMBOL.update({gid: (symbol, label)}) %}{% endfor %}
-<form id="roSearchForm" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Search controls" method="get" action="/radio/search"
-      hx-get="/radio/search" hx-target="#roFound" hx-select="#roFound" hx-select-oob="#roMatched" hx-swap="outerHTML"
-      hx-trigger="change from:#roStatus, input from:#roFindAll delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ grp.collapseAllButton('radioSearch', 'kinds') }}
-  <div>{{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}, label='Search') }}</div>
-  {# The panel's filter: set by a badge, sent with the search, cleared by a new search or Clear filter. #}
-  <input type="hidden" name="kind" id="roFilterKind" value="{{ filter.kind if filter else '' }}"{% if not filter %} disabled{% endif %}>
-  <input type="hidden" name="field" id="roFilterField" value="{{ filter.field or '' if filter else '' }}"{% if not (filter and filter.field) %} disabled{% endif %}>
-</form>
-{# The view buttons head their own View group at the navbar's right end, as the register, Favourites and API tokens
-   do (CR-68), so the width button and the panel button after it end the line instead of sitting among the search
-   controls (Quackit CR-83). #}
-<div class="d-flex align-items-center flex-wrap gap-2 mb-2" data-navbar-controls="View" data-navbar-end>
-{{ view_controls('roFoundView', panel='roFoundPanel') }}
-</div>
 <div id="roFoundView">
 {# The panel: for each kind found, what the search matched in which field (members.matched, logons.matched_fields),
    as badges; a badge opens and scrolls to its kind. Swapped in with the results. #}

@@ -5,9 +5,8 @@
 {% block body_wrap_class %}container-fluid mySpacing{% endblock %}
 {% block page_title %}<i class="bi bi-{{ holder.icon }} me-1"></i>{{ 'New ' ~ spec.one if creating else spec.one|capitalize }} · {{ holder.name }}{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="{{ spec.label }}">
-  <div class="entity-nav-links">{{ entity_nav.parent_link('%s#%s' % (holder.url, kind), holder.name ~ ' · ' ~ spec.label, holder.icon) }}</div>
-</div>
+{{ entity_nav.page_toolbar(spec.label,
+     parents=[{'url': '%s#%s' % (holder.url, kind), 'label': holder.name ~ ' · ' ~ spec.label, 'icon': holder.icon}]) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}

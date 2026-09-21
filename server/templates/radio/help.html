@@ -58,7 +58,7 @@
 <h2 id="views">🃏 Views: table, cards and more</h2>
 <p>Every list (the log, Members, Public vessels, Search, a member's tabs) has the same view buttons beside its search. Try them on this sample:</p>
 <div class="ro-help-demo">
-  <div id="roHelpToolbar" class="dc-record-toolbar ro-toolbar">{{ records_ui.view_controls('roHelpView', panel='roHelpPanel') }}</div>
+  <div id="roHelpToolbar" class="dc-record-toolbar ro-toolbar">{{ records_ui.view_controls('roHelpView', panel='roHelpPanel', navbar=False) }}</div>
   {% set columns = [{'key': 'status', 'label': 'Status', 'heading': '', 'symbol': ui.FIELD_SYMBOLS.watchStatus, 'kind': 'index', 'own_symbol': True},
                     {'key': 'vesselName', 'label': 'Vessel Name', 'symbol': ui.FIELD_SYMBOLS.vesselName},
                     {'key': 'registration', 'label': 'Rego', 'symbol': ui.FIELD_SYMBOLS.registration},

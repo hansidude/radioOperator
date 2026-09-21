@@ -183,7 +183,10 @@ def main(engine='chromium'):
             # Contacts, vessels, trailers and cars: Quackit's shared record_grid rows, each opening its own page.
             def add_on_tab(kind, values, refused=None):
                 page.locator('[data-entity-tab="%s"]' % kind).click()
-                expect(page.locator('#ro-member-%s .dc-record-toolbar [data-dc-record-view="cards"]' % kind)).to_be_visible()
+                # The view buttons join the one View group at the navbar's right end wherever their toolbar sits
+                # (Quackit CR-83 point 4), so ask for the button that controls this tab's grid, not for where it
+                # was rendered. Under the standalone shell, which has no navbar host, it stays in the toolbar.
+                expect(page.locator('[data-dc-record-view="cards"][aria-controls="radioMember%sView"]' % kind.capitalize())).to_be_visible()
                 page.locator('#ro-member-%s a[href$="/%s/new"]' % (kind, kind)).click()
                 page.wait_for_url(re.compile(r'/member/[0-9]+/%s/new$' % kind))
                 expect(page.locator('[placeholder]')).to_have_count(0)
@@ -213,9 +216,11 @@ def main(engine='chromium'):
             expect(rows).to_have_count(2)
             expect(rows.nth(0)).to_be_visible()
             expect(rows.nth(1).locator('.dc-record-count')).to_have_text('2')
-            page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()                 # the shared view buttons
+            # The shared view buttons, which ride the navbar's one View group now (Quackit CR-83 point 4).
+            cards = page.locator('[data-dc-record-view="cards"][aria-controls="radioMemberVesselsView"]')
+            cards.click()
             expect(page.locator('#radioMemberVesselsView')).to_have_class(re.compile(r'\bdc-record-cards\b'))
-            page.locator('#ro-member-vessels [data-dc-record-view="cards"]').click()
+            cards.click()
             rows.nth(1).locator('a[title="Open vessel"]').click()                                 # a row opens its own page
             page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/[0-9]+$'))
             page.locator('input[name="hullColour"]').fill('white')

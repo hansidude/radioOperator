@@ -7,18 +7,26 @@
 {% block page_title %}<i class="bi bi-people me-1"></i>Members{% endblock %}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Members">
-  <a class="btn btn-primary btn-sm" href="/members/new"><i class="bi bi-plus-lg me-1"></i>New member</a>
-</div>
+{#- Links, filters and view buttons all go through the one shared control, which owns their order on every page
+    (Quackit CR-83 point 4). The view buttons end the line; the width and panel buttons end them. -#}
+{% set members_search %}{{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}{% endset %}
+{{ entity_nav.page_toolbar('Members',
+     links=[{'url': '/members/new', 'label': 'New member', 'icon': 'plus-lg', 'kind': 'create'}],
+     filters=[{'role': 'search', 'control': members_search}],
+     form={'id': 'roMemberFilters', 'action': '/members',
+           'attrs': {'hx-get': '/members',
+                     'hx-target': '#roMemberRows',
+                     'hx-select': '#roMemberRows',
+                     'hx-select-oob': '#roMemberMatched',
+                     'hx-swap': 'outerHTML',
+                     'hx-trigger': 'input from:#roMemberSearch delay:300ms, submit',
+                     'hx-sync': 'this:replace',
+                     'hx-history': 'false'}},
+     filters_class='ro-toolbar',
+     view={'target': 'roMemberView', 'panel': 'roMemberPanel'}) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
 {# The search is the server's, as on the log: typing swaps in the matching rows (DRY-CATALOG, htmx). #}
-<form id="roMemberFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Members filters" method="get" action="/members"
-      hx-get="/members" hx-target="#roMemberRows" hx-select="#roMemberRows" hx-select-oob="#roMemberMatched" hx-swap="outerHTML"
-      hx-trigger="input from:#roMemberSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roMemberView', panel='roMemberPanel') }}
-  {{ search_controls('roMemberSearch', input1_attrs={'name': 'q', 'value': search}) }}
-</form>
 <div id="roMemberView">{% call records_ui.record_panel('roMemberPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roMemberMatched', search, [('members', ui.WHO.member.symbol, 'Members', members, matched)]) }}{% endcall %}<div id="roMemberRows">{{ ui.members_grid(members, 'radioMembers') }}</div></div>
 {% endblock %}

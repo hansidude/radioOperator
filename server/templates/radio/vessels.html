@@ -7,17 +7,25 @@
 {% block page_title %}<i class="bi bi-life-preserver me-1"></i>Public vessels{% endblock %}
 {% block body_wrap_class %}container-fluid dc-record-wide{% endblock %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Public vessels">
-  <a class="btn btn-primary btn-sm" href="/vessels/new"><i class="bi bi-plus-lg me-1"></i>New public vessel</a>
-</div>
+{#- Links, filters and view buttons all go through the one shared control, which owns their order on every page
+    (Quackit CR-83 point 4). The view buttons end the line; the width and panel buttons end them. -#}
+{% set public_search %}{{ search_controls('roVesselSearch', input1_attrs={'name': 'q', 'value': search}) }}{% endset %}
+{{ entity_nav.page_toolbar('Public vessels',
+     links=[{'url': '/vessels/new', 'label': 'New public vessel', 'icon': 'plus-lg', 'kind': 'create'}],
+     filters=[{'role': 'search', 'control': public_search}],
+     form={'id': 'roVesselFilters', 'action': '/vessels',
+           'attrs': {'hx-get': '/vessels',
+                     'hx-target': '#roVesselRows',
+                     'hx-select': '#roVesselRows',
+                     'hx-select-oob': '#roVesselMatched',
+                     'hx-swap': 'outerHTML',
+                     'hx-trigger': 'input from:#roVesselSearch delay:300ms, submit',
+                     'hx-sync': 'this:replace',
+                     'hx-history': 'false'}},
+     filters_class='ro-toolbar',
+     view={'target': 'roVesselView', 'panel': 'roVesselPanel'}) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
-<form id="roVesselFilters" class="dc-record-toolbar ro-toolbar" data-navbar-controls="Public vessel filters" method="get" action="/vessels"
-      hx-get="/vessels" hx-target="#roVesselRows" hx-select="#roVesselRows" hx-select-oob="#roVesselMatched" hx-swap="outerHTML"
-      hx-trigger="input from:#roVesselSearch delay:300ms, submit" hx-sync="this:replace" hx-history="false">
-  {{ view_controls('roVesselView', panel='roVesselPanel') }}
-  {{ search_controls('roVesselSearch', input1_attrs={'name': 'q', 'value': search}) }}
-</form>
 <div id="roVesselView">{% call records_ui.record_panel('roVesselPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roVesselMatched', search, [('public', ui.WHO.public.symbol, 'Public vessels', vessels, matched)]) }}{% endcall %}<div id="roVesselRows">{{ ui.vessels_grid(vessels, 'radioVessels', '0 public vessels') }}</div></div>
 {% endblock %}
