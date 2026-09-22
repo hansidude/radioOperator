@@ -1100,14 +1100,23 @@ def main(engine='chromium'):
                     # Bootstrap sets scroll-behavior: smooth; an instant scroll is where it says it is when read.
                     page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
                     assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
-                    # A phone's navbar is one line; its controls wait under the host's ⋯ page menu (Quackit CR-51/52).
-                    page_menu = page.get_by_role('button', name='Page menu', exact=True)
-                    expect(page_menu).to_be_in_viewport()
-                    page_menu.click()
+                    # A phone's navbar is one line; its controls wait under the host's one menu, ☰ (Quackit CR-51/52, CR-90):
+                    # the site list, then the page's entries folded to their names, Filters holding its Search part.
+                    site_menu = page.get_by_role('button', name='Toggle navigation', exact=True)
+                    expect(site_menu).to_be_in_viewport()
+                    expect(page.get_by_role('button', name='Page menu', exact=True)).to_be_hidden()
+                    site_menu.click()
+                    expect(page.locator('#navbarNav')).to_have_class(re.compile(r'\bshow\b'))
+                    names = [n.strip().lower() for n in page.locator('#appPageMenu .app-page-menu-heading:visible').all_inner_texts()]
+                    assert names == ['page', 'filters', 'view'], names
+                    page.locator('#appPageMenu .app-page-menu-heading', has_text='Filters').click()
                     expect(page.locator('#roStatusCombo')).to_be_in_viewport()
-                    expect(page.locator('#roSearch')).to_be_in_viewport()
-                    page_menu.click()
                     expect(page.locator('#roSearch')).to_be_hidden()
+                    page.locator('#appPageMenu [data-navbar-menu="Search"] > .app-page-menu-heading').click()
+                    expect(page.locator('#roSearch')).to_be_in_viewport()
+                    site_menu.click()
+                    expect(page.locator('#roSearch')).to_be_hidden()
+                    expect(page.locator('#navbarNav')).not_to_have_class(re.compile(r'\bshow\b'))
                     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
                     nav = page.locator('.navbar.fixed-top').evaluate('el => el.getBoundingClientRect().bottom')
                     first = page.locator('.dc-record-grid-row').first.evaluate('el => el.getBoundingClientRect().top')
