@@ -1414,5 +1414,4 @@ def main(engine='chromium'):
 
 
 if __name__ == '__main__':
-    for engine in ('chromium', 'firefox'):
-        main(engine)
+    main('firefox')
