@@ -12,20 +12,20 @@
 {% block page_title %}{% if creating %}New log on{% else %}{{ 'Draft' if draft else 'Log on' }} {{ reference(logon) }}{% endif %}{% endblock %}
 {# Yellow as quackit's Update button (lists/editList.html): it changes the record. One button, shown twice. #}
 {% macro save_button(id='', size='') %}<button type="button" class="btn btn-warning {{ size }}"{% if id %} id="{{ id }}"{% endif %} data-save-record><i class="bi bi-floppy me-1"></i>Save</button>{% endmacro %}
+{% macro save_status() %}<span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>{% endmacro %}
 {% block navbar_buttons %}
-<div class="entity-nav" role="navigation" aria-label="Log on">
-  <div class="entity-nav-links">
-    {% if not creating %}{{ ui.status_badge(dict(logon, condition=condition)) }}{% endif %}
-  </div>
-  <div class="btn-group btn-group-sm ro-view-tabs" id="logonViewTabs" role="group" aria-label="Log on views">
-    <button type="button" class="btn btn-outline-secondary active" data-ro-tab="entry" aria-controls="ro-entry-pane" aria-pressed="true"><i class="bi bi-pencil-square me-1"></i>Log on</button>
-    {# The member or public vessel this log on is tied to, as its own page's content: only once one is picked. #}
-    <button type="button" class="btn btn-outline-secondary" data-ro-tab="who" aria-controls="ro-who-pane" aria-pressed="false" id="roWhoTab"{% if not (member or who_public) %} hidden{% endif %}><span data-ro-who-label>{% if who_public %}{{ ui.WHO.public.symbol }} Public vessel{% else %}{{ ui.WHO.member.symbol }} Member{% endif %}</span></button>
-    {% if not creating %}<button type="button" class="btn btn-outline-secondary" data-ro-tab="history" aria-controls="ro-history-pane" aria-pressed="false"><i class="bi bi-clock-history me-1"></i>History</button>{% endif %}
-  </div>
-  {% if open %}{{ save_button('saveRecord', 'btn-sm') }}{% endif %}
-  <span id="saveStatus" class="small text-secondary" role="status" aria-live="polite">{% if creating %}Not saved{% elif open %}Saved{% else %}Closed: read only{% endif %}</span>
-</div>
+{# Quackit's shared page_toolbar and tabs() (Quackit CR-141). The Member / Public vessel tab is the record this log on is
+   tied to, as its own page's content: hidden until one is picked, relabelled by the script below. The address names the
+   open tab (hash_tabs), so a reload after saving reopens it. Save and its status sit in page_toolbar's status slot (owner,
+   CR-141 Q2 option 1), before the tabs. #}
+{% set who_tab = {'key': 'who', 'label': 'Public vessel' if who_public else 'Member', 'symbol': ui.WHO.public.symbol if who_public else ui.WHO.member.symbol, 'hidden': not (member or who_public)} %}
+{% set status = [] %}
+{% if not creating %}{% set _ = status.append(ui.status_badge(dict(logon, condition=condition))) %}{% endif %}
+{% if open %}{% set _ = status.append(save_button('saveRecord', 'btn-sm')) %}{% endif %}
+{% set _ = status.append(save_status()) %}
+{{ entity_nav.page_toolbar('Log on', status=status,
+     tab_group={'id': 'logonViewTabs', 'label': 'Log on views', 'prefix': 'ro-logon-', 'hash_tabs': True,
+                'entries': [('entry', 'Log on', 'pencil-square'), who_tab] + ([] if creating else [('history', 'History', 'clock-history')])}) }}
 {% endblock %}
 {% block body %}
 {{ ui.styles() }}
@@ -44,7 +44,7 @@
 {% if not creating %}<div id="stale" class="alert alert-warning py-1 px-2 small mt-2" role="alert" hidden>This log on changed elsewhere while you were editing. <a href="/logon/{{ logon.id }}">Reload</a> to see the current values; your last edit was not saved.</div>{% endif %}
 
 {# The operator's main entry point: the paper radio log fields in the five working rows requested by the unit (DAT-6). #}
-<section id="ro-entry-pane" class="ro-workspace-pane" data-ro-pane="entry">
+<section id="ro-logon-entry" class="ro-workspace-pane" data-ro-pane="entry">
   <div class="ro-entry-shell">
     {# The first question on a log on: a member, tied to their record and their vessel, or a public user, tied to a
        public vessel (spec CAP-24). Chosen through Quackit's shared search picker, without leaving the page. #}
@@ -104,13 +104,13 @@
   </div>
 </section>
 
-<section id="ro-who-pane" class="ro-workspace-pane d-none" data-ro-pane="who">
+<section id="ro-logon-who" class="ro-workspace-pane d-none" data-ro-pane="who">
   {# data-navbar-local: the loaded page's controls (history search, list search) stay in the tab, never in this
      page's navbar beside the log on's own, however quickly it arrives. #}
   <div id="roWhoPanel" data-navbar-local{% if member %} hx-get="/member/{{ member.id }}/panel" hx-trigger="load" hx-swap="innerHTML"{% elif who_public %} hx-get="/vessel/{{ vessel.id }}/panel" hx-trigger="load" hx-swap="innerHTML"{% endif %}></div>
 </section>
 
-{% if not creating %}<section id="ro-history-pane" class="ro-workspace-pane d-none" data-ro-pane="history">
+{% if not creating %}<section id="ro-logon-history" class="ro-workspace-pane d-none" data-ro-pane="history">
   {# The entry form uses the whole screen; History reads at quackit's usual page width (layout's mySpacing). #}
   <div class="container-fluid mySpacing px-0">
   {% if history is none %}<p class="text-secondary">This host keeps no change history.</p>
@@ -122,29 +122,6 @@
   </div>
 </section>
 {% endif %}
-<script>
-(function () {
-  var group = document.getElementById('logonViewTabs');
-  if (!group) return;
-  var buttons = Array.prototype.slice.call(group.querySelectorAll('[data-ro-tab]'));
-  window.roShowLogonPane = function (name, updateHash) {
-    if (!buttons.some(function (button) { return button.dataset.roTab === name && !button.hidden; })) name = 'entry';
-    buttons.forEach(function (button) {
-      var active = button.dataset.roTab === name;
-      button.classList.toggle('active', active);
-      button.setAttribute('aria-pressed', String(active));
-      var pane = document.getElementById(button.getAttribute('aria-controls'));
-      if (pane) pane.classList.toggle('d-none', !active);
-    });
-    if (updateHash && window.history && window.history.replaceState) window.history.replaceState(null, '', '#' + name);
-    window.dispatchEvent(new Event('resize'));
-  };
-  buttons.forEach(function (button) {
-    button.addEventListener('click', function () { window.roShowLogonPane(button.dataset.roTab, true); });
-  });
-  window.roShowLogonPane(window.location.hash.slice(1) || 'entry', false);
-})();
-</script>
 <script>
 (function () {
   var id = {{ 'null' if creating else logon.id }}, version = {{ logon.version }}, creating = {{ 'true' if creating else 'false' }};
@@ -205,8 +182,10 @@
     if (b) {
       var el = document.getElementById('f-' + b.dataset.focus);
       if (el) {
+        // The box's tab opens first, as a click on it would (the shared tabs(): the address follows).
         var pane = el.closest('[data-ro-pane]');
-        if (pane && window.roShowLogonPane) window.roShowLogonPane(pane.dataset.roPane, true);
+        var tab = pane && document.querySelector('#logonViewTabs [data-entity-tab="' + pane.dataset.roPane + '"]');
+        if (tab && !tab.classList.contains('active')) tab.click();
         el.focus(); el.select && el.select();
       }
     }
@@ -313,7 +292,7 @@
     VESSEL_BOXES.forEach(function (name) { box(name).readOnly = !!(currentMember || currentVessel); });
     refreshBadges();
     showWho(currentMember ? '/member/' + currentMember.id + '/panel' : currentVessel ? '/vessel/' + currentVessel.id + '/panel' : null,
-            currentMember ? WHO_MEMBER + ' Member' : WHO_PUBLIC + ' Public vessel');
+            currentMember ? WHO_MEMBER : WHO_PUBLIC, currentMember ? 'Member' : 'Public vessel');
     checked = null;
     check();
   }
@@ -330,15 +309,18 @@
     if (!q.length) { whoNow.innerHTML = ''; return; }
     htmx.ajax('GET', '/logons/who?' + q.join('&'), { target: whoNow, swap: 'innerHTML' });
   }
-  // The Member / Public vessel tab: the picked record's own page content, loaded in place (Quackit's htmx).
-  var whoTab = document.getElementById('roWhoTab'), whoPanel = document.getElementById('roWhoPanel');
+  // The Member / Public vessel tab: the picked record's own page content, loaded in place (Quackit's htmx). The shared
+  // tabs() owns the tab (Quackit CR-141); this only shows, hides and relabels it. Hiding it while it is open opens the
+  // Log on tab, as tabs() does for any hidden open tab.
+  var whoTab = document.querySelector('#logonViewTabs [data-entity-tab="who"]'), whoPanel = document.getElementById('roWhoPanel');
+  if (!whoTab) throw new Error('The log on page has no Member / Public vessel tab (#logonViewTabs, who).');
   var whoUrl = whoPanel.getAttribute('hx-get');
-  function showWho(url, label) {
-    whoTab.querySelector('[data-ro-who-label]').textContent = label;
+  function showWho(url, symbol, label) {
+    whoTab.querySelector('[data-entity-tab-symbol]').textContent = symbol;
+    whoTab.querySelector('[data-entity-tab-label]').textContent = label;
     whoTab.hidden = !url;
     if (!url) {
       whoPanel.innerHTML = '';
-      if (whoTab.classList.contains('active')) window.roShowLogonPane('entry', true);
       whoUrl = null;
       return;
     }
@@ -489,11 +471,15 @@
     });
   });
 
-  if (open && !document.activeElement.matches('[data-field]')) {
+  // The first box of the open tab: after the shared tabs() has opened the tab the address names (on DOMContentLoaded,
+  // its listener added first, in the navbar).
+  function focusFirst() {
+    if (!open || document.activeElement.matches('[data-field]')) return;
     var activePane = document.querySelector('[data-ro-pane]:not(.d-none)');
     var first = activePane && activePane.querySelector('[data-field]');
     if (first) first.focus();
   }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', focusFirst); else focusFirst();
 })();
 </script>
 {% import 'myMacro_search_picker.html' as picker %}

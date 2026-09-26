@@ -374,7 +374,7 @@ class Members(unittest.TestCase):
 
     def test_a_picked_member_or_public_vessel_gets_its_own_tab_on_the_log_on_page(self):
         new = self.a.get('/logons/new').get_data(as_text=True)
-        self.assertIn('id="roWhoTab" hidden', new)                                  # nothing picked: no tab
+        self.assertIn('data-entity-tab="who" aria-controls="ro-logon-who" aria-pressed="false" hidden>', new)   # nothing picked: no tab
         self.assertNotIn('data-ro-clear=', new)                                       # and nothing to remove
         self.assertNotRegex(new, r'id="f-registration"[^>]* readonly')                # nothing picked: typed freely
         self.assertIn('<option value="person" >In person</option>', new)              # how they logged on
@@ -383,7 +383,8 @@ class Members(unittest.TestCase):
         self.vessel(m)
         r = self.logon(memberNumber='m00001', registration='AB123Q')
         page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
-        self.assertIn('id="roWhoTab"><span data-ro-who-label>👤 Member</span>', page)
+        self.assertIn('data-entity-tab="who" aria-controls="ro-logon-who" aria-pressed="false">', page)   # shown: the shared tabs()
+        self.assertIn('data-entity-tab-symbol>👤</span><span data-entity-tab-label>Member</span>', page)
         self.assertIn('data-ro-clear="member"', page)                                 # shown: something to remove
         self.assertIn('hx-get="/member/%d/panel" hx-trigger="load" hx-swap="innerHTML"' % m, page)
         panel = self.a.get('/member/%d/panel' % m).get_data(as_text=True)
@@ -399,7 +400,7 @@ class Members(unittest.TestCase):
                                                'ownerPhone': '0411222333'}, headers={'Accept': 'application/json'}).json['id']
         r = self.logon(registration='PUB01')
         page = self.a.get('/logon/%d' % r.json['id']).get_data(as_text=True)
-        self.assertIn('<span data-ro-who-label>🌐 Public vessel</span>', page)
+        self.assertIn('data-entity-tab-symbol>🌐</span><span data-entity-tab-label>Public vessel</span>', page)
         self.assertIn('hx-get="/vessel/%d/panel"' % pub, page)
         vpanel = self.a.get('/vessel/%d/panel' % pub).get_data(as_text=True)
         self.assertIn('value="Alex Public"', vpanel)
@@ -420,7 +421,7 @@ class Members(unittest.TestCase):
         row = L.get(self.db(), row['id'])
         self.assertEqual((row['memberNumber'], row['memberId'], row['vesselId'], row['registration']), (None, None, None, None))
         page = self.a.get('/logon/%d' % row['id']).get_data(as_text=True)
-        self.assertIn('id="roWhoTab" hidden', page)
+        self.assertIn('data-entity-tab="who" aria-controls="ro-logon-who" aria-pressed="false" hidden>', page)
 
     # ---- what is no longer so (owner, issues h and i) ----
 

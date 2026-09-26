@@ -139,7 +139,7 @@ class Pages(unittest.TestCase):
             self.assertIn('id="f-%s" class="form-control is-invalid"' % name, page)
         self.assertIn('id="f-mobile" class="form-control" data-field', page)              # heard, so not red
         self.assertEqual(page.count(' data-save-record><i class="bi bi-floppy'), 2)         # navbar and the bottom row
-        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-history-pane"')]
+        entry = page[page.index('id="ro-logon-entry"'):page.index('id="ro-logon-history"')]
         self.assertIn('action="/logon/%d/discard"' % i, entry)          # discard sits on the Log on tab's bottom row
         self.assertEqual(page.count('/discard"'), 1)
         self.assertIn('<label for="f-vesselName"><span class="ro-field-symbol" aria-hidden="true">🛥️</span> Vessel Name</label>', page)
@@ -178,24 +178,24 @@ class Pages(unittest.TestCase):
     def test_a_log_on_has_a_history_tab_and_no_summary_line(self):
         i = self.new()
         page = self.a.get('/logon/%d' % i).get_data(as_text=True)
-        self.assertIn('data-ro-tab="history" aria-controls="ro-history-pane"', page)
+        self.assertIn('data-entity-tab="history" aria-controls="ro-logon-history"', page)   # Quackit's shared tabs() (CR-141)
         self.assertIn('This host keeps no change history.', page)             # this test host keeps none: said, not blank
         self.assertNotIn('<strong>This system</strong>', page)                  # the summary line is gone
-        self.assertNotIn('data-ro-tab="history"', self.a.get('/logons/new').get_data(as_text=True))
+        self.assertNotIn('data-entity-tab="history"', self.a.get('/logons/new').get_data(as_text=True))
         for column in ('etaRaw', 'callTimeRaw', 'watchStatus', 'acceptedBy', 'mobile', 'pob'):
             self.assertIn(column, L.HISTORY_LABELS)
 
     def test_capture_page_leads_with_the_five_operator_rows(self):
         page = self.a.get('/logon/%d' % self.new()).get_data(as_text=True)
-        entry = page[page.index('id="ro-entry-pane"'):page.index('id="ro-history-pane"')]
-        self.assertIn('data-ro-tab="entry"', page)
-        self.assertIn('id="ro-history-pane" class="ro-workspace-pane d-none"', page)
+        entry = page[page.index('id="ro-logon-entry"'):page.index('id="ro-logon-history"')]
+        self.assertIn('data-entity-tab="entry"', page)
+        self.assertIn('id="ro-logon-history" class="ro-workspace-pane d-none"', page)
         for tab in ('contact', 'vessel', 'identity', 'record'):                   # set aside until they are done properly
-            self.assertNotIn('data-ro-tab="%s"' % tab, page)
+            self.assertNotIn('data-entity-tab="%s"' % tab, page)
             self.assertNotIn('id="ro-%s-pane"' % tab, page)
         self.assertIn('<span class="ro-status-now" data-status="draft">', page)     # the log's symbol and word, large
         self.assertIn('>Draft</span>', page)
-        self.assertNotIn('data-ro-tab="watch"', page)
+        self.assertNotIn('data-entity-tab="watch"', page)
         self.assertNotIn('id="ro-watch-pane"', page)
         self.assertEqual(entry.count('class="capture-row row g-3"'), 5)
         rows = entry.split('class="capture-row row g-3"')[1:]
@@ -231,8 +231,8 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logons').get_data(as_text=True)
 
         # One toolbar, not a tab per status, and not a renderer per status either.
-        self.assertNotIn('data-ro-tab="drafts"', page)
-        self.assertNotIn('data-ro-tab="overdue"', page)
+        self.assertNotIn('data-entity-tab="drafts"', page)
+        self.assertNotIn('data-entity-tab="overdue"', page)
         self.assertIn('id="roStatus"', page)
         for value in ('all', 'draft', 'loggedon', 'overdue', 'closed'):
             self.assertIn('value="%s"' % value, page)

@@ -364,7 +364,7 @@ def main(engine='chromium'):
             member_row = results.locator('.dc-record-grid-row', has_text=member_no).first
             expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value')).to_have_text('0412 345 678')
             expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_have_text('📱')   # emoji, field
-            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_be_hidden()   # quiet rows (CR-151): Emoji only shows it
+            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_be_visible()   # rows show a field's emoji before its value (Quackit CR-154)
             expect(member_row.locator('[data-column="number"] .dc-record-grid-value-symbol')).to_have_count(0)   # the 👤 badge is its own
             expect(member_row.locator('[data-column="vessels"]')).to_contain_text(vessel)
             expect(member_row.locator('.dc-record-count')).not_to_have_text('')                    # numbered
@@ -384,7 +384,7 @@ def main(engine='chromium'):
             for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model'):
                 expect(page.locator('#f-' + name)).not_to_be_editable()                          # the record's, not typed
             expect(page.locator('#f-mobile')).to_be_editable()                                    # the caller's number
-            who_tab = page.locator('#roWhoTab')                                                   # the member's own page, in a tab
+            who_tab = page.locator('#logonViewTabs [data-entity-tab="who"]')                                                   # the member's own page, in a tab
             expect(who_tab).to_be_visible()
             expect(who_tab).to_have_text(re.compile('Member'))
             who_tab.click()
@@ -401,7 +401,7 @@ def main(engine='chromium'):
             panel.locator('#ro-member-vessels .dc-search-reset').first.click()
             panel.locator('[data-entity-tab="history"]').click()
             expect(panel.locator('#ro-member-history .dc-history .badge', has_text='Vessel')).not_to_have_count(0)
-            expect(panel.locator('#ro-member-history [data-history-toolbar]')).to_be_visible()      # its controls stay in the tab
+            expect(panel.locator('#ro-member-history [data-history-count]')).to_be_visible()        # its controls (Quackit CR-137's filter_row) stay in the tab
             expect(page.locator('#appNavbarControls #roWhoPanel, #appNavbarControls [aria-label="Member history controls"]')).to_have_count(0)
             page.screenshot(path=str(ARTIFACTS / ('radio-who-member-tab-%s.png' % engine)), full_page=True)
             panel.locator('[data-entity-tab="vessels"]').click()                                 # correct the vessel on the tab
@@ -410,7 +410,7 @@ def main(engine='chromium'):
             panel.locator('input[name="hullColour"]').fill('green')
             panel.locator('form button.btn-warning').first.click()
             expect(panel.locator('#radioMemberVessels')).to_be_attached()                         # back on the member, in place
-            page.locator('[data-ro-tab="entry"]').click()
+            page.locator('#logonViewTabs [data-entity-tab="entry"]').click()
             expect(page.locator('#f-hullColour')).to_have_value('green')                          # the log on box follows the record
             expect(page).to_have_url(re.compile('/logons/new(#.*)?$'))
             page.locator('#roWhoNow [data-ro-clear="vessel"]').click()                            # a wrong vessel goes, the member stays
@@ -463,7 +463,7 @@ def main(engine='chromium'):
             expect(panel.locator('#public-ownerName')).to_have_value('Verify Public ' + token)
             panel.locator('[data-entity-tab="contacts"]').click()                                # its contacts, in the tab
             expect(panel.locator('#radioVesselContacts .dc-record-grid-row')).to_contain_text('Verify Public Contact ' + token)
-            page.locator('[data-ro-tab="entry"]').click()
+            page.locator('#logonViewTabs [data-entity-tab="entry"]').click()
             page.locator('#roWhoNow [data-ro-clear="vessel"]').click()                            # a public user's vessel is the pick: all goes
             for name in ('memberNumber', 'vesselName', 'registration', 'length', 'hullColour', 'make', 'model', 'vesselId'):
                 expect(page.locator('#f-' + name)).to_have_value('')
@@ -689,8 +689,8 @@ def main(engine='chromium'):
             visit('/logons')
             page.locator('a[href="/logons/new"]').click()
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
-            expect(page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions [data-save-record]')).to_be_visible()
-            expect(page.locator('#ro-entry-pane .capture-row')).to_have_count(5)
+            expect(page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions [data-save-record]')).to_be_visible()
+            expect(page.locator('#ro-logon-entry .capture-row')).to_have_count(5)
             expect(page.locator('form form')).to_have_count(0)
             expect(page.locator('#f-callTime')).to_have_value('')
             expect(page.locator('#f-callTime')).to_have_class(re.compile('is-invalid'))
@@ -708,11 +708,11 @@ def main(engine='chromium'):
             page.locator('#f-callTime').fill(fields['callTime'])
             choose(page.locator('#f-channel'), 'phone')                                             # how they logged on
             expect(page.locator('#f-channel option')).to_have_text(['—', 'Radio', 'Phone', 'In person'])
-            expect(page.locator('[data-ro-tab="contact"], [data-ro-tab="identity"], [data-ro-tab="record"]')).to_have_count(0)
+            expect(page.locator('#logonViewTabs [data-entity-tab="contact"], #logonViewTabs [data-entity-tab="identity"], #logonViewTabs [data-entity-tab="record"]')).to_have_count(0)
             page.wait_for_timeout(400)  # detect unwanted debounced autosave
             assert len(writes) == before, 'Typing wrote a record'
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
-            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
+            expect(page.locator('#ro-logon-entry .is-invalid')).to_have_count(1)                # only POB, held back
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
             dialogs = []
             def dismiss_leave(dialog):
@@ -731,9 +731,9 @@ def main(engine='chromium'):
                 if name not in ('callDay', 'etaDay'):   # settled times read back 4-digit: 13:45 shows 1345
                     shown = {'callTime': value.replace(':', ''), 'eta': value.replace(':', ''), 'mobile': '0412 345 678'}.get(name, value)
                     expect(page.locator('#f-' + name)).to_have_value(shown)   # times 4-digit, mobile written 0412 345 678
-            expect(page.locator('#ro-entry-pane .is-invalid')).to_have_count(1)                # only POB, held back
+            expect(page.locator('#ro-logon-entry .is-invalid')).to_have_count(1)                # only POB, held back
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))
-            actions = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')
+            actions = page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions')
             expect(actions.locator('button.btn-warning[data-save-record]')).to_be_visible()   # yellow Save
             expect(actions.locator('form[action$="/accept"]')).to_have_count(0)                  # no Accept: saving complete logs on
             expect(page.locator('#f-pob')).to_have_class(re.compile('is-invalid'))             # still needed, so still a draft
@@ -972,10 +972,10 @@ def main(engine='chromium'):
                 expect(page.locator(panel_id)).to_be_hidden()
             # A draft shows what stops acceptance only as red boxes, cleared as they are typed into.
             visit('/logon/%s' % layout_records[0])
-            expect(page.locator('#ro-entry-pane .ro-gate')).to_have_count(0)
-            bottom = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')
+            expect(page.locator('#ro-logon-entry .ro-gate')).to_have_count(0)
+            bottom = page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions')
             expect(bottom.locator('[data-save-record]')).to_be_visible()                 # Save, Accept, Discard in one row
-            expect(page.locator('#ro-entry-pane textarea[name="reason"]')).to_be_visible()           # Reason above the buttons
+            expect(page.locator('#ro-logon-entry textarea[name="reason"]')).to_be_visible()           # Reason above the buttons
             expect(bottom.get_by_role('button', name='Discard draft')).to_be_visible()
             expect(page.locator('.ro-status-now')).to_contain_text('📝')                       # its status, as on the log
             expect(page.locator('.ro-status-now')).to_contain_text('Draft')
@@ -1212,8 +1212,8 @@ def main(engine='chromium'):
             assert abs(font() - base) < 0.3, 'Reset did not return to 100%'
             assert page.evaluate("Object.keys(localStorage).filter(k => k.indexOf('dc-record-size:') === 0).length") == 0
             visit('/logon/%s' % record)
-            page.locator('[data-ro-tab="history"]').click()                                    # a tab puts #history in the address
-            page.locator('[data-ro-tab="entry"]').click()
+            page.locator('#logonViewTabs [data-entity-tab="history"]').click()                                    # a tab puts #history in the address
+            page.locator('#logonViewTabs [data-entity-tab="entry"]').click()
             page.locator('#f-pob').fill(fields['pob'])                                          # the last required value
             expect(page.locator('#saveStatus')).to_have_text('Unsaved changes')
             assert '#' in page.url, 'The tab should be in the address, as it is after any tab click'
@@ -1224,7 +1224,7 @@ def main(engine='chromium'):
             expect(page.locator('#f-channel')).to_have_value('phone')                             # how they logged on, kept
             expect(page.locator('#roWhoNow [data-who]')).to_have_count(0)                         # nothing picked: typed as heard
             page.screenshot(path=str(ARTIFACTS / ('radio-logon-status-%s.png' % engine)), full_page=True)
-            bottoms = page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
+            bottoms = page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions > *').evaluate_all('els => els.map(e => Math.round(e.getBoundingClientRect().bottom))')
             assert max(bottoms) - min(bottoms) < 12, 'Save, Note and Log off are not on one line: %s' % bottoms
             expect(page.locator('#capture textarea')).to_have_count(1)                            # one notes box on the log on
             expect(page.locator('#logoffNote')).to_have_count(0)
@@ -1236,9 +1236,9 @@ def main(engine='chromium'):
             expect(page.locator('#f-notes')).not_to_have_css('height', '%spx' % three)             # it grows with the text
             assert note_height() > three + 30, 'The Note box did not grow: %s -> %s' % (three, note_height())
             page.locator('#f-notes').fill('')
-            expect(page.locator('#ro-entry-pane [placeholder]')).to_have_count(0)
-            expect(page.locator('#ro-entry-pane .ro-entry-shell > .ro-primary-actions')).not_to_contain_text('Logged on and watched')
-            expect(page.locator('#ro-entry-pane select[name="reason"]')).to_have_count(0)
+            expect(page.locator('#ro-logon-entry [placeholder]')).to_have_count(0)
+            expect(page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions')).not_to_contain_text('Logged on and watched')
+            expect(page.locator('#ro-logon-entry select[name="reason"]')).to_have_count(0)
             watching = True
             page.locator('#f-pob').fill('')                                                     # a log on cannot lose POB
             save(400)
@@ -1291,11 +1291,11 @@ def main(engine='chromium'):
             expect(page.locator('.ro-status-now')).to_contain_text('✅')
             expect(page.locator('.ro-status-now')).to_contain_text('Logged off')
             # History: quackit's LogOns_history in the shared viewer, the whole life of this record.
-            page.locator('[data-ro-tab="history"]').click()
-            history = page.locator('#ro-history-pane .dc-history')
+            page.locator('#logonViewTabs [data-entity-tab="history"]').click()
+            history = page.locator('#ro-logon-history .dc-history')
             expect(history).to_be_visible()
-            # The viewer's toolbar (search, sort, count) rides in the navbar, as on every quackit history page.
-            expect(page.locator('#appNavbarControls [data-history-toolbar] [data-history-count]')).to_have_text(re.compile(r'^([4-9]|\d\d+) events$'))
+            # The viewer's Filters row (search, sort, count; Quackit CR-137's filter_row) rides in the navbar, as on every quackit history page.
+            expect(page.locator('#appNavbarControls [data-history-count][data-history-for]')).to_have_text(re.compile(r'^([4-9]|\d\d+) events$'))
             expect(history).to_contain_text('Saved by second operator')                         # the second operator's edit
             expect(history).to_contain_text('Going to')                                         # labelled, not the column name
             expect(history).to_contain_text('Logged on by')
@@ -1306,10 +1306,10 @@ def main(engine='chromium'):
             expect(history.locator('.dc-history-field', has_text='POB').first).to_contain_text('👥')   # fields with the log's symbols
             page.screenshot(path=str(ARTIFACTS / ('radio-history-%s.png' % engine)), full_page=True)
             check_symbol_artwork()
-            widths = page.evaluate('''() => ({history: document.querySelector('#ro-history-pane .dc-history').getBoundingClientRect().width,
+            widths = page.evaluate('''() => ({history: document.querySelector('#ro-logon-history .dc-history').getBoundingClientRect().width,
                                                form: document.querySelector('#capture').getBoundingClientRect().width || innerWidth,
                                                view: innerWidth,
-                                               cap: getComputedStyle(document.querySelector('#ro-history-pane .mySpacing')).maxWidth})''')
+                                               cap: getComputedStyle(document.querySelector('#ro-logon-history .mySpacing')).maxWidth})''')
             assert widths['history'] < widths['view'] - 300, 'History is not in the usual page width: %s' % widths
             # An old log on whose vessel is removed and whose member's mobile changes since: the log keeps what it was given
             # and marks it ⚠️, why in the tooltip; the log on page notes it and shows the vessel as removed (owner, issues h, i).
@@ -1334,7 +1334,7 @@ def main(engine='chromium'):
                     linked_row = page.locator('[data-record="%s"]' % old_logon.json()['id'])
                     field = linked_row.locator('[data-column="%s"]' % column)
                     expect(field).to_have_attribute('href', target)
-                    # Rows show a field's emoji only in Emoji only (CR-151, quiet rows), so on desktop its words open it.
+                    # On desktop the field's words open it (its emoji shows beside them, Quackit CR-154).
                     symbol = '.dc-record-grid-symbol' if width == 390 else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value')
                     field.locator(symbol).click()
                     page.wait_for_url(re.compile(re.escape(target) + r'(?:#details)?$'))

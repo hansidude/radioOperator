@@ -265,8 +265,9 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 
 ### Clean-up
 
-- [ ] The log on page has its own tab script (`logon.html`, `data-ro-tab`); member and vessel pages use Quackit's
-      `entity_nav.tabs`. Move the log on page onto the shared tabs.
+- [x] The log on page has its own tab script (`logon.html`, `data-ro-tab`); member and vessel pages use Quackit's
+      `entity_nav.tabs`. Move the log on page onto the shared tabs. Done by Quackit CR-141 (2026-09-27): `page_toolbar`
+      and `tabs()` with a hidden, relabelled who tab and `hash_tabs`; Save and its status in page_toolbar's `status`.
 
 - [ ] **Set aside on 2026-09-13, to be redone properly:** the log on page's Contact, Vessel, Identity and Record
       tabs (owner: *"all these fields are shit"*). Out of sight until then: departure, radio
@@ -295,7 +296,7 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Quackit's history viewer (`history_changes.css`) still has `overflow-wrap: anywhere` for values, so a long word can
       split there.
 - [ ] Listboard at 390px is ~44px too wide: its own toolbar icons (`bi-calendar-range`, `bi-text-paragraph`), Quackit.
-- [ ] **Next Radio gate will fail (Quackit CR-137, 2026-09-26):** Quackit's history viewer lost its own
+- [x] **Next Radio gate will fail (Quackit CR-137, 2026-09-26):** (done 2026-09-27, with Quackit CR-141) Quackit's history viewer lost its own
       `[data-history-toolbar]`; its controls are now the shared `filter_row` + `sort_filter`, marked
       `data-history-for`. `tests/browser_check.py:404` and `:1298` still look for `[data-history-toolbar]`
       (and `[data-history-count]` inside it). Point them at the new markup when the Radio gate is next run.
