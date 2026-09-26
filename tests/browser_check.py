@@ -1069,8 +1069,9 @@ def main(engine='chromium'):
                         overflow: nodes.some(spills),
                         lines: !mobile || [...el.querySelectorAll('.dc-record-grid-value')].every(v => getComputedStyle(v).whiteSpace === 'nowrap'),
                         visibleBlanks: [...el.querySelectorAll('.dc-record-grid-blank')].some(n => n.getBoundingClientRect().height > 0),
-                        aligned: rows.every(r => [...r.children].every((cell, i) =>
-                            Math.abs(cell.getBoundingClientRect().left - head.children[i].getBoundingClientRect().left) < 3))};
+                        // Columns moved to the muted second line (Quackit CR-151) have no place under the headings.
+                        aligned: rows.every(r => [...r.children].every((cell, i) => cell.matches('.dc-record-grid-more, .dc-record-grid-dropped')
+                            || Math.abs(cell.getBoundingClientRect().left - head.children[i].getBoundingClientRect().left) < 3))};
                 }""")
                 assert metrics['grid'], 'Shared grid stylesheet is missing: %s' % metrics
                 assert not metrics['overflow'], 'List/cell overflow at %spx: %s' % (width, metrics)
@@ -1078,13 +1079,11 @@ def main(engine='chromium'):
                 assert not metrics['twoLineNames'], 'Column names on two lines at %spx: %s' % (width, metrics['twoLineNames'])
                 if width >= 1920:                       # the operator's normal screen (owner, 2026-09-14): always rows
                     assert not metrics['mobile'], 'Desktop unexpectedly switched to cards at %spx' % width
-                if width >= 768 and not metrics['stacked']:
-                    assert not metrics['mobile'], 'Tablet switched to cards without the rows overflowing at %spx' % width
+                if width >= 768:
+                    # A table stays a table wider than a phone (Quackit CR-151): columns that do not fit move to a second line.
+                    assert not metrics['stacked'] and not metrics['mobile'], 'Rows turned into cards at %spx: %s' % (width, metrics)
                     # Row heights are not capped here: the table opens with Paragraphs on, so long values wrap.
                     assert metrics['aligned'], 'Headers and row columns do not align at %spx' % width
-                elif width >= 768:
-                    assert metrics['rowsWouldOverflow'], 'Cards chosen at %spx although the rows fit: %s' % (width, metrics)
-                    assert metrics['lines'], 'Cards for rows that did not fit are not one line per field at %spx' % width
                 else:
                     assert metrics['mobile'] and not metrics['visibleBlanks'], 'Phone layout: %s' % metrics
                     assert metrics['lines'], 'Phone cards are not one line per field by default at %spx' % width
