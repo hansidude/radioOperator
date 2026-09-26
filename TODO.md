@@ -295,3 +295,7 @@ Owner: *"i want an really clever column selector"*, *"i want the column widths t
 - [ ] Quackit's history viewer (`history_changes.css`) still has `overflow-wrap: anywhere` for values, so a long word can
       split there.
 - [ ] Listboard at 390px is ~44px too wide: its own toolbar icons (`bi-calendar-range`, `bi-text-paragraph`), Quackit.
+- [ ] **Next Radio gate will fail (Quackit CR-137, 2026-09-26):** Quackit's history viewer lost its own
+      `[data-history-toolbar]`; its controls are now the shared `filter_row` + `sort_filter`, marked
+      `data-history-for`. `tests/browser_check.py:404` and `:1298` still look for `[data-history-toolbar]`
+      (and `[data-history-count]` inside it). Point them at the new markup when the Radio gate is next run.
