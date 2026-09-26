@@ -364,7 +364,7 @@ def main(engine='chromium'):
             member_row = results.locator('.dc-record-grid-row', has_text=member_no).first
             expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value')).to_have_text('0412 345 678')
             expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_have_text('📱')   # emoji, field
-            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_be_visible()
+            expect(member_row.locator('[data-column="mobile"] .dc-record-grid-value-symbol')).to_be_hidden()   # quiet rows (CR-151): Emoji only shows it
             expect(member_row.locator('[data-column="number"] .dc-record-grid-value-symbol')).to_have_count(0)   # the 👤 badge is its own
             expect(member_row.locator('[data-column="vessels"]')).to_contain_text(vessel)
             expect(member_row.locator('.dc-record-count')).not_to_have_text('')                    # numbered
@@ -1101,14 +1101,15 @@ def main(engine='chromium'):
                     page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
                     assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
                     # A phone's navbar is one line; its controls wait under the host's one menu, ☰ (Quackit CR-51/52, CR-90):
-                    # the site list, then the page's entries folded to their names, Filters holding its Search part.
+                    # the site list folded under MENU (Quackit CR-113), then the page's entries folded to their names,
+                    # Filters holding its Search part.
                     site_menu = page.get_by_role('button', name='Toggle navigation', exact=True)
                     expect(site_menu).to_be_in_viewport()
                     expect(page.get_by_role('button', name='Page menu', exact=True)).to_be_hidden()
                     site_menu.click()
                     expect(page.locator('#navbarNav')).to_have_class(re.compile(r'\bshow\b'))
                     names = [n.strip().lower() for n in page.locator('#appPageMenu .app-page-menu-heading:visible').all_inner_texts()]
-                    assert names == ['page', 'filters', 'view'], names
+                    assert names == ['menu', 'page', 'filters', 'view'], names
                     page.locator('#appPageMenu .app-page-menu-heading', has_text='Filters').click()
                     expect(page.locator('#roStatusCombo')).to_be_in_viewport()
                     expect(page.locator('#roSearch')).to_be_hidden()
@@ -1334,7 +1335,8 @@ def main(engine='chromium'):
                     linked_row = page.locator('[data-record="%s"]' % old_logon.json()['id'])
                     field = linked_row.locator('[data-column="%s"]' % column)
                     expect(field).to_have_attribute('href', target)
-                    symbol = '.dc-record-grid-symbol' if width == 390 else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value-symbol')
+                    # Rows show a field's emoji only in Emoji only (CR-151, quiet rows), so on desktop its words open it.
+                    symbol = '.dc-record-grid-symbol' if width == 390 else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value')
                     field.locator(symbol).click()
                     page.wait_for_url(re.compile(re.escape(target) + r'(?:#details)?$'))
                 visit('/logons?f=1&status=all&dayOn=0&q=' + token)
@@ -1360,7 +1362,7 @@ def main(engine='chromium'):
             assert float(old_row.locator('[data-column="mobile"] .ro-not-current-value').evaluate('e => getComputedStyle(e).opacity')) < 1, 'Not current value is not faded'
             old_row.screenshot(path=str(ARTIFACTS / ('radio-not-current-%s.png' % engine)))       # the row: the whole log is too tall
             expect(old_row.locator('[data-column="vesselName"]')).to_have_attribute('href', member_href + '#vessels')
-            old_row.locator('[data-column="vesselName"] .dc-record-grid-value-symbol').click()
+            old_row.locator('[data-column="vesselName"] .dc-record-grid-value').click()            # its words: quiet rows hide the emoji (CR-151)
             page.wait_for_url(re.compile(re.escape(member_href) + r'#vessels$'))
             expect(page.locator('#radioMemberVessels .ro-removed').filter(has_text=kept_name)).to_have_count(1)
             visit('/logon/%s' % old_logon.json()['id'])
