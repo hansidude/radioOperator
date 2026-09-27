@@ -1,4 +1,5 @@
 """The standalone app: no host, one user, the pages and the API on a SQLite file."""
+import re
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,13 @@ class Standalone(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.data, (shared / asset).read_bytes())
                 response.close()
+            # The standalone shell asks for the navbar and search files at the versions Quackit's layout asks for, so a
+            # browser holding an older copy fetches the one that knows the current markup (Quackit CR-157's Search part).
+            layout = (shared.parent / 'templates' / 'layout.html').read_text()
+            for asset in ('css/navbar_controls.css', 'css/search_controls.css', 'js/search_controls.js', 'js/navbar_controls.js'):
+                version = re.search(r"filename='%s', v='([^']+)'" % re.escape(asset), layout)
+                self.assertTrue(version, 'layout.html loads %s without a version' % asset)
+                self.assertIn('/radio-shared/static/%s?v=%s"' % (asset, version.group(1)), page)
             for asset in ('vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f6df.svg',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg'):

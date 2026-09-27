@@ -14,6 +14,42 @@ URL = os.environ.get('RADIO_URL', 'http://localhost:80').rstrip('/')
 if URL not in ('http://localhost:80', 'http://host.docker.internal:80'):
     raise SystemExit('Use quackit/verify radio; only the port 80 dev stack is supported.')
 ARTIFACTS = Path('/artifacts')
+FOLDED_HEADINGS = ('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " app-page-menu-folded ")]'
+                   '/button[contains(@class, "app-page-menu-heading")]')
+SEARCH_PART = 'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " dc-search-part ")][1]'
+
+
+def unfold(locator):
+    """Open what folds this control, as a user would, and return it: Quackit's tools/browser_editor_check.py unfold().
+    Quackit CR-157: filter_row's Search part starts folded at every width behind its one heading button; on a phone
+    (CR-90) the ☰ menu's Filters entry folds it too, and its heading comes first (document order), so ☰ is opened
+    first by the caller there. An open fold is left open; a control under no fold is returned as it is."""
+    for heading in locator.locator(FOLDED_HEADINGS).element_handles():
+        heading.click()
+    return locator
+
+
+def search_toggle(field):
+    """The one heading button of the Search part holding this search field (Quackit CR-157, filter_row)."""
+    return field.locator(SEARCH_PART).locator('xpath=./button[contains(@class, "app-page-menu-heading")]')
+
+
+def expect_search_starts_folded(field):
+    """Quackit CR-157 (owner: search fields "collapsed on every page"): a page's search starts folded behind its
+    part's one toggle, the field out of sight; as Quackit's search_part_problems() checks its own pages."""
+    part = field.locator(SEARCH_PART)
+    expect(part).to_have_class(re.compile(r'\bapp-page-menu-folded\b'))
+    expect(part.locator('xpath=./button')).to_have_count(1)
+    expect(search_toggle(field)).to_have_attribute('aria-expanded', 'false')
+    expect(field).to_be_hidden()
+
+
+def expect_search_flagged(field, terms):
+    """Quackit CR-157: folded with a term in force, the toggle is marked active and names the term, never out of sight."""
+    toggle = search_toggle(field)
+    expect(toggle).to_have_attribute('aria-expanded', 'false')
+    expect(toggle).to_have_class(re.compile(r'\bactive\b'))
+    expect(toggle.locator('[data-dc-search-summary]')).to_have_text(terms)
 
 
 def main(engine='chromium'):
@@ -517,15 +553,16 @@ def main(engine='chromium'):
             visit('/logons')
             page.locator('.navbar a[href="/radio/search"]').first.click()                          # the Search page, from the log
             page.wait_for_url(re.compile('/radio/search$'))
+            expect_search_starts_folded(page.locator('#roFindAll'))                                 # Quackit CR-157: folded, one toggle
             with page.expect_response(lambda r: '/radio/search?' in r.url):
-                page.locator('#roFindAll').fill(token)
+                unfold(page.locator('#roFindAll')).fill(token)
             for kind in ('members', 'contacts', 'vessels'):
                 expect(page.locator('#roFound [data-found="%s"]' % kind)).to_be_visible()
             page.locator('[data-found="contacts"] > .grp-header').click()                           # a kind collapses
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
             expect(page.locator('#radioFoundMembers')).to_be_visible()
             with page.expect_response(lambda r: '/radio/search?' in r.url):
-                page.locator('#roFindAll').fill(token + ' ')
+                unfold(page.locator('#roFindAll')).fill(token + ' ')
             expect(page.locator('#roFound [data-found="contacts"]')).to_have_class(re.compile(r'\bcollapsed\b'))   # and stays collapsed on the next search
             expect(page.locator('#radioFoundContacts')).to_be_hidden()
             page.locator('[data-found="contacts"] > .grp-header').click()
@@ -559,7 +596,7 @@ def main(engine='chromium'):
             page.reload()                                                                       # a new page load starts at the usual width again
             expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Full width')
             list_beside_panel('#roFoundPanel', '#roFound', 'Search after reload')
-            page.locator('#roFindAll').fill(token)
+            unfold(page.locator('#roFindAll')).fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
             # The panel (view_controls + record_panel): what the search matched, as badges beside the results.
             panel = page.locator('#roFoundPanel')
@@ -611,7 +648,7 @@ def main(engine='chromium'):
             expect(members_section.locator('.dc-record-panel-badge-heading')).to_be_visible()           # the header stays
             expect(collapse_all).to_have_attribute('title', 'Collapse all kinds')                       # other kinds still open
             with page.expect_response(lambda r: '/radio/search?' in r.url):
-                page.locator('#roFindAll').fill(token + ' ')                                            # swapped in with the search
+                unfold(page.locator('#roFindAll')).fill(token + ' ')                                    # swapped in with the search
             expect(page.locator('#roMatched [data-matched="members"] .dc-record-panel-group')).to_be_hidden()   # and stays folded
             collapse_all.click()
             expect(page.locator('#roMatched .dc-record-panel-group:visible')).to_have_count(0)          # nothing showing under any header
@@ -633,7 +670,7 @@ def main(engine='chromium'):
             page.locator('#roMatched [data-matched="members"] .dc-record-panel-badge-heading').click()
             expect(page.locator('#roFound .dc-record-filter-applied')).to_be_visible()
             with page.expect_response(lambda r: '/radio/search?' in r.url and 'kind=' not in r.url):
-                page.locator('#roFindAll').fill(token + '  ')                                        # a new search takes it off
+                unfold(page.locator('#roFindAll')).fill(token + '  ')                                # a new search takes it off
             expect(page.locator('#roFound .dc-record-filter-applied')).to_have_count(0)
             expect(page.locator('#roFound [data-found="contacts"]')).to_be_visible()
             panel_button = page.locator('[data-dc-record-panel]:visible')
@@ -656,7 +693,7 @@ def main(engine='chromium'):
             expect(page.locator('#roFoundPanel')).to_be_hidden()
             page.locator('[data-dc-record-panel]:visible').click()
             expect(page.locator('#roFoundPanel')).to_be_visible()
-            page.locator('#roFindAll').fill(token)
+            unfold(page.locator('#roFindAll')).fill(token)
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()             # refreshed with the search
             visit('/radio/search?q=' + token)
             expect(page.locator('#roMatched [data-matched="members"]')).to_be_visible()
@@ -777,7 +814,7 @@ def main(engine='chromium'):
                     return parts.path == '/logons/rows' and all(query.get(k) == v for k, v in want.items())
                 return match
             with page.expect_response(rows_for(q='NO-MATCH-' + token)):
-                page.locator('#roSearch').fill('NO-MATCH-' + token)
+                unfold(page.locator('#roSearch')).fill('NO-MATCH-' + token)                         # Quackit CR-157: opened first
             expect(page.locator('#radioRecords')).to_have_text('0 drafts')
             with page.expect_response(rows_for(q='', status='draft')):
                 page.get_by_role('button', name='Reset search', exact=True).click()
@@ -785,7 +822,7 @@ def main(engine='chromium'):
             expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
             with page.expect_response(rows_for(q=vessel)):
-                page.locator('#roSearch').fill(vessel)
+                unfold(page.locator('#roSearch')).fill(vessel)
             expect(page).to_have_url(re.compile(r'/logons\?.*q=' + vessel))
             # The reported bug: choosing a status must change the list straight away.
             with page.expect_response(rows_for(status='loggedon', q=vessel)):
@@ -827,6 +864,7 @@ def main(engine='chromium'):
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             page.reload()
             expect(page.locator('#roSearch')).to_have_value(vessel)
+            expect_search_flagged(page.locator('#roSearch'), vessel)                          # folded again, the restored search named on its toggle
             expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
             # Quackit CR-64: the status filter puts Clear filter first in the log's panel; it puts the status back to All.
@@ -917,10 +955,10 @@ def main(engine='chromium'):
                     expect(page.locator('#roMatched [data-matched="logons"]')).to_have_count(0)
                     expect(page.locator('#roFoundPanel #roStatusCombo')).to_be_visible()
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
-                        page.locator('#roFindAll-reset').click()
+                        unfold(page.locator('#roFindAll-reset')).click()
                     expect(page.locator('#roStatus')).to_have_value('closed')
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
-                        page.locator('#roFindAll').fill(token)
+                        unfold(page.locator('#roFindAll')).fill(token)
                 with page.expect_response(lambda r: answer in r.url and 'status=all' in r.url):
                     if 'radio/search' in path:
                         choose(page.locator('#roStatus'), 'all')
@@ -956,8 +994,11 @@ def main(engine='chromium'):
                 # Open, though empty before a search: no hint text (Quackit CR-67), so it has no height yet.
                 expect(page.locator(panel_id).locator('..')).to_have_class(re.compile(r'\bdc-record-panel-open\b'))
                 expect(page.locator('[data-dc-record-panel]:visible')).to_have_attribute('aria-pressed', 'true')
+                expect_search_starts_folded(page.locator(search_box))                                   # Quackit CR-157: folded, one toggle
                 with page.expect_response(lambda r: answer in r.url and 'q=' + token in r.url):          # the search's own answer
-                    page.locator(search_box).fill(token)
+                    unfold(page.locator(search_box)).fill(token)
+                search_toggle(page.locator(search_box)).click()                                          # folded with a term in force:
+                expect_search_flagged(page.locator(search_box), token)                                   # flagged, the term on its toggle
                 section = page.locator('%s [data-matched="%s"]' % (panel_id, gid))
                 expect(section).to_be_visible()
                 rows = page.locator('%s .dc-record-grid-row' % rows_id)
