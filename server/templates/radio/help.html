@@ -8,9 +8,8 @@
 {% block body %}
 {{ ui.styles() }}
 <style>
-.ro-help h2{font-size:1.15rem;font-weight:600;margin:1.6rem 0 .5rem;padding-bottom:.35rem;border-bottom:1px solid var(--bs-border-color)}
-.ro-help h3{font-size:1rem;font-weight:600;margin:1rem 0 .35rem}
-.ro-help table{font-size:.9rem}
+.ro-help h2{font-weight:600;margin:1.6rem 0 .5rem;padding-bottom:.35rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-help h3{font-weight:600;margin:1rem 0 .35rem}
 .ro-help td:first-child{white-space:nowrap}
 .ro-help [data-help-icon]{display:inline-flex;align-items:center;justify-content:center;min-width:1.8rem;padding:.1rem .3rem;border:1px solid var(--bs-border-color);border-radius:.25rem}
 .ro-help-demo{padding:.6rem;border:1px dashed var(--bs-border-color);border-radius:.375rem;margin:.5rem 0 1rem}
@@ -44,7 +43,7 @@
 <p>One list of log ons, newest call first. The toolbar under the menu narrows it; everything chosen is kept in the address, so a refresh or a bookmark shows the same view.</p>
 <table class="table table-sm align-middle">
   <tr><td>Status</td><td>{% for value, state, label in ui.FILTERS %}{{ ui.STATES[state].symbol }} {{ label }}{{ ', ' if not loop.last }}{% endfor %}.</td></tr>
-  <tr><td>Date</td><td>Ticked, only calls on that date. Untick it to see every day. The log opens on today. <i class="bi bi-chevron-left"></i> and <i class="bi bi-chevron-right"></i> move a day; <strong>Today</strong> shows when on another day and goes back.</td></tr>
+  <tr><td>Call date</td><td>With <strong>Only this day</strong> ticked, only calls on that date. Untick it to see every day. The log opens on today. <i class="bi bi-chevron-left"></i> and <i class="bi bi-chevron-right"></i> move a day; <strong>Today</strong> shows when on another day and goes back.</td></tr>
   <tr><td>Sort</td><td>Newest first, Oldest first, or Due first: overdue at the top, then the nearest deadline; drafts and closed log ons after.</td></tr>
   <tr><td>Search</td><td>Member No., vessel name, rego, mobile (with or without spaces), destination, departure point, Trip ID No. and notes. <i class="bi bi-arrow-counterclockwise"></i> clears it.</td></tr>
 </table>
@@ -82,11 +81,10 @@
   <tr><td><span data-help-icon='[data-dc-record-view="paragraphs"]'></span> Paragraphs</td><td>In the table: long values wrap onto more lines (between words, never inside one) instead of ending in ….</td></tr>
   <tr><td><span data-help-icon='[data-dc-record-names]'></span> Emoji only</td><td>Hides the column names and leaves each field's emoji: cards show emoji and value, the table drops its heading. Press again for the names. Remembered in this browser for this page.</td></tr>
   <tr><td><span data-help-icon='[data-dc-record-panel]'></span> Panel</td><td>Shows or hides the side panel, on the left of the list whether the page is at the usual width or full width: what the search matched, in which fields, as badges with counts. Search starts with it open, the other lists closed.</td></tr>
-  <tr><td><span data-help-icon='[data-dc-record-size="smaller"]'></span> <span data-help-icon='[data-dc-record-size="larger"]'></span> <span data-help-icon='[data-dc-record-size="reset"]'></span></td><td>Smaller or larger text, 100% to 200%, shown between them; the reset button goes back to 100%.</td></tr>
   <tr><td><span data-help-icon='[data-dc-page-width]' data-help-navbar></span> Width</td><td>In the navbar, on every page: the whole page at the usual width (about 1200px, centred) or the full width of the screen. Each page starts at its own width.</td></tr>
 </table>
 <p>Every list numbers its records from 1 (the <strong>#</strong> column, or the corner of a card); a search within a tab numbers what is left again from 1.</p>
-<p>Text size, width and the panel are remembered in this browser for each page. Cards and Paragraphs start fresh each time a page opens.</p>
+<p>The panel is remembered in this browser for each page. Cards and Paragraphs start fresh each time a page opens.</p>
 
 <h2 id="status">🚦 Status symbols</h2>
 <table class="table table-sm align-middle">

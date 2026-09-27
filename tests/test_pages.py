@@ -193,7 +193,7 @@ class Pages(unittest.TestCase):
         for tab in ('contact', 'vessel', 'identity', 'record'):                   # set aside until they are done properly
             self.assertNotIn('data-entity-tab="%s"' % tab, page)
             self.assertNotIn('id="ro-%s-pane"' % tab, page)
-        self.assertIn('<span class="ro-status-now" data-status="draft">', page)     # the log's symbol and word, large
+        self.assertIn('<span class="ro-status-now" data-status="draft">', page)     # the log's symbol and word
         self.assertIn('>Draft</span>', page)
         self.assertNotIn('data-entity-tab="watch"', page)
         self.assertNotIn('id="ro-watch-pane"', page)
@@ -208,7 +208,7 @@ class Pages(unittest.TestCase):
             for field in fields:
                 self.assertIn('id="f-%s"' % field, row.split('capture-row row g-3', 1)[0])
         self.assertNotIn('id="queuePane"', page)
-        self.assertIn('font-size:1.2rem', page)
+        self.assertNotIn('font-size', page)                                  # the one font and size are Quackit's (CR-160)
         self.assertNotIn('<table', page)
         self.assertNotIn('placeholder=', page)                              # nothing written inside a box; labels go on top
         self.assertIn('<label for="discardReason">Reason</label><textarea id="discardReason" name="reason" form="discardForm" class="form-control" rows="3" data-auto-grow', entry)
@@ -248,11 +248,10 @@ class Pages(unittest.TestCase):
         self.assertRegex(page, r'<option value="due">[^<]*Due first</option>')
         self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
         self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
-        for step in ('smaller', 'larger', 'reset'):                                               # shared text size buttons
-            self.assertIn('data-dc-record-size="%s" aria-controls="roRecordView"' % step, page)
-        # The navbar's page width button, and the same control after the text size buttons (Quackit CR-59).
+        self.assertNotIn('data-dc-record-size', page)                                               # one text size (Quackit CR-160)
+        # The navbar's page width button, and the same control after the view buttons (Quackit CR-59).
         self.assertEqual(page.count('data-dc-page-width'), 2)
-        self.assertIn('data-dc-record-size="reset" aria-controls="roRecordView"', page[:page.rindex('data-dc-page-width')])
+        self.assertIn('data-dc-record-names aria-controls="roRecordView"', page[:page.rindex('data-dc-page-width')])
         self.assertNotIn('data-dc-record-width', page)
         self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
         self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)

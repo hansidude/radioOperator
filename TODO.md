@@ -20,9 +20,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 
 ### Shared list views (every table/card list: the log, Members, Public vessels, Search, member tabs)
 
-- Quackit's `record_grid` with `view_controls`: **Cards** (at any width), **Paragraphs** (row values wrap), text size
-  A− / A+ / reset (remembered), **width** (usual ~1200px container or full width, remembered per page) and, where a
-  page has one, the **panel** button (remembered per page). No Lines button (owner, 2026-09-14): cards, however they
+- Quackit's `record_grid` with `view_controls`: **Cards** (at any width), **Paragraphs** (row values wrap), **width**
+  (usual ~1200px container or full width, remembered per page) and, where a page has one, the **panel** button (remembered per page). No Lines button (owner, 2026-09-14): cards, however they
   come, are always a line per field, its name on one line and its value ending in ….
 - **Words never split** (owner: *"never ever break something mid-word"*): text wraps only between words (record_grid's
   `words`, no `overflow-wrap: anywhere`), a badge is one piece, column names (headings and card labels) are one line.
@@ -108,8 +107,8 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
 - A member: Member No. issued automatically as `m00001`, first name and last name (both required), Mobile Phone
   Number (the log on's rule: 10 digits, shown `0412 345 678`), email, address, notes (a text box that grows). Listed by last name. Tabs (Quackit's
   shared `entity_nav.tabs`): Details, Emergency contacts, Vessels, Trailers, Cars, History. Any number of
-  each. Each of those four tabs is a list like the log (Quackit's `record_grid`: one row each, Cards / Paragraphs /
-  text size, search over the rows) with an Add button; a row opens its own page to edit or Remove it. Remove
+  each. Each of those four tabs is a list like the log (Quackit's `record_grid`: one row each, Cards / Paragraphs,
+  search over the rows) with an Add button; a row opens its own page to edit or Remove it. Remove
   makes a row inactive, never deletes it. The Members and Public vessels lists have the same view buttons.
 - **Removed stays visible** (owner, issue i, 2026-09-15): a removed contact, vessel, trailer or car stays on its tab after the
   current ones, shown by each tab's **Status** choice (Current, the start; 🚫 Removed; All — Quackit's row filter `choices`,

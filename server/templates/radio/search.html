@@ -58,7 +58,7 @@
       {% if filter.field %}{% for field, field_label, count in matched[filter.kind] if field == filter.field %}{{ records_ui.panel_badge(ui.FIELD_SYMBOLS[field], field_label, count, button=False) }}{% endfor %}{% endif %}
     {% endcall %}
   {% endif %}
-  {% if not total %}<div class="dc-record-empty ro-zero">0 records match “{{ search }}”</div>{% endif %}
+  {% if not total %}<div class="dc-record-empty">0 records match “{{ search }}”</div>{% endif %}
   {# Each kind is a collapsible group (Quackit's myMacro_groups): the blue header with its count; a group collapsed
      stays collapsed for the next search in this browser. #}
   {% macro found_group(gid, shown, rows) %}

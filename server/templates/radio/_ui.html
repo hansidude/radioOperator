@@ -4,11 +4,10 @@
 
 {% macro styles() %}
 <style>
-.ro-status-now{font-size:1.05rem;font-weight:600}
+.ro-status-now{font-weight:600}
 .ro-status-now .dc-record-badge{padding:.1rem .5rem}
-.ro-gaps{font-size:.82rem}
 .ro-gaps ol{display:flex;flex-wrap:wrap;gap:.3rem;padding:0;margin:.2rem 0 0;list-style:none}
-.ro-gaps button{font-size:.75rem;padding:.05rem .45rem}
+.ro-gaps button{padding:.05rem .45rem}
 .ro-gaps .A{--bs-btn-border-color:var(--bs-danger);--bs-btn-color:var(--bs-danger)}
 .ro-gaps .B{--bs-btn-border-color:var(--bs-warning);--bs-btn-color:var(--bs-warning)}
 .ro-form fieldset{border:0;padding:0;margin:0}
@@ -26,61 +25,57 @@
 .ro-record-card.discarded,.ro-record-card.ro-removed{border-left-color:var(--bs-secondary);border-left-style:dashed;opacity:.6}
 /* What a record no longer is (owner, issues h and i): the value faded after its ⚠️, and a removed vessel's badge. */
 .ro-not-current-value,.ro-who-badge.ro-removed>.dc-record-badge:first-child{opacity:.6}
-.ro-not-current-note{color:var(--bs-warning-text-emphasis);font-size:.78rem;margin-top:.15rem}
+.ro-not-current-note{color:var(--bs-warning-text-emphasis);margin-top:.15rem}
 .ro-record-card.ro-current{outline:2px solid var(--bs-primary);outline-offset:2px}
 /* Layout comes from dc-record-toolbar; only the control widths are radio's. */
 .ro-toolbar select,.ro-toolbar .ro-toolbar-date{width:auto;min-width:7.5rem}
 .ro-toolbar .ro-toolbar-tick{display:flex;align-items:center;gap:.3rem;margin:0;min-height:0;padding-left:1.4rem}
-/* The empty state is dc-record-empty; a zero count is just said louder. */
-.ro-zero{font-size:1.05rem}
 .ro-alerts{margin:.4rem 0}
-.ro-alert{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font-size:.85rem;border-left:4px solid var(--bs-danger);background:rgba(220,53,69,.12);padding:.3rem .6rem;margin:.2rem 0;border-radius:.2rem}
+.ro-alert{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;border-left:4px solid var(--bs-danger);background:rgba(220,53,69,.12);padding:.3rem .6rem;margin:.2rem 0;border-radius:.2rem}
 .ro-alert .who{font-weight:600}
 .ro-alert form{margin-left:auto}
 .ro-alert .undelivered{color:var(--bs-danger);font-weight:600}
 @keyframes ro-flash{0%,100%{background:rgba(220,53,69,.12)}50%{background:rgba(220,53,69,.45)}}
 .ro-alert.unseen{animation:ro-flash 1.6s ease-in-out infinite}
-.ro-verify{font-size:.82rem;border-left:3px solid var(--bs-border-color);padding:.2rem .6rem;margin:.5rem 0}
+.ro-verify{border-left:3px solid var(--bs-border-color);padding:.2rem .6rem;margin:.5rem 0}
 .ro-verify.conflict{border-color:var(--bs-danger)}
 .ro-verify.verified{border-color:var(--bs-success)}
 .ro-verify.partial{border-color:var(--bs-warning)}
 .ro-verify ul{margin:.2rem 0 0;padding-left:1.1rem}
 .ro-verify li{margin:.1rem 0}
 .ro-find{position:relative;max-width:48rem}
-.ro-find>input{width:100%;font-size:1rem;min-height:2.8rem}
+.ro-find>input{width:100%;min-height:2.8rem}
 .ro-hits{position:absolute;z-index:1030;left:0;top:calc(100% + .3rem);width:100%;max-height:60vh;overflow:auto;background:var(--bs-body-bg);border:1px solid var(--bs-border-color);border-radius:.35rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.3);padding:.35rem}
 .ro-search-card{display:flex;align-items:center;gap:.6rem;padding:.55rem .65rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-search-card:last-child{border-bottom:0}
-.ro-search-card .k{font-size:.68rem;text-transform:uppercase;color:var(--bs-secondary-color)}
+.ro-search-card .k{text-transform:uppercase;color:var(--bs-secondary-color)}
 .ro-search-card .body{flex:1 1 auto;min-width:0}
-.ro-form legend{float:none;width:auto;font-size:.72rem;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
-.ro-form label{font-size:.72rem;margin-bottom:0;color:var(--bs-secondary-color)}
-.ro-form .form-control,.ro-form .form-select{font-size:.85rem;padding:.2rem .45rem}
+.ro-form legend{float:none;width:auto;font-weight:600;color:var(--bs-secondary-color);padding:0 .3rem;margin:0}
+.ro-form label{margin-bottom:0}
+.ro-form .form-control,.ro-form .form-select{padding:.2rem .45rem}
 .ro-workspace-pane{width:100%;padding:.25rem 0 1rem}
 .ro-primary-form .capture-row{padding:.65rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-primary-form .capture-row:first-child{padding-top:.25rem}
 .ro-primary-form .ro-notes-row{padding:.65rem 0 .9rem}
-.ro-primary-form label,.ro-action-text label{display:block;font-size:1rem;font-weight:600;color:var(--bs-body-color);margin:0 0 .35rem}
-.ro-primary-form .form-control,.ro-primary-form .form-select{min-height:3.15rem;font-size:1.2rem;line-height:1.35;padding:.65rem .75rem}
-.ro-primary-form textarea.form-control{min-height:6rem}
+.ro-primary-form label,.ro-action-text label{display:block;margin:0 0 .35rem}
+.ro-primary-form .form-control,.ro-primary-form .form-select{min-height:3.15rem;line-height:1.35;padding:.65rem .75rem}
 .ro-primary-form .mandatory .form-control{background-color:var(--bs-tertiary-bg)}
 /* Orange: worth asking for, blocks nothing (logons.check_fields). Red always wins. */
 .form-control.ro-hint{border-color:var(--bs-orange)}
 .form-control.ro-hint:focus{border-color:var(--bs-orange);box-shadow:0 0 0 .25rem rgba(253,126,20,.25)}
-.ro-primary-form .ro-picker-button{min-width:3.4rem;font-size:1.15rem}
+.ro-primary-form .ro-picker-button{min-width:3.4rem}
 .ro-native-picker{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .ro-action-text{padding-top:1rem}
-.ro-action-text .form-control{font-size:1.2rem;line-height:1.35;padding:.65rem .75rem;overflow:hidden}
+.ro-action-text .form-control{line-height:1.35;padding:.65rem .75rem;overflow:hidden}
 .ro-primary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:1rem 0}
-.ro-primary-actions .btn{font-size:1rem;padding:.55rem .9rem}
-.ro-primary-actions .form-control,.ro-primary-actions .form-select{font-size:1rem;min-height:2.75rem}
-.ro-section-title{font-size:1.05rem;font-weight:600;margin:0 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--bs-border-color)}
+.ro-primary-actions .btn{padding:.55rem .9rem}
+.ro-primary-actions .form-control,.ro-primary-actions .form-select{min-height:2.75rem}
+.ro-section-title{font-weight:600;margin:0 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--bs-border-color)}
 .ro-detail-form .row{margin-bottom:1rem}
-.ro-detail-form label{display:block;font-size:.9rem;font-weight:600;margin-bottom:.3rem}
-.ro-detail-form .form-control,.ro-detail-form .form-select{font-size:1rem;min-height:2.8rem}
+.ro-detail-form label{display:block;margin-bottom:.3rem}
+.ro-detail-form .form-control,.ro-detail-form .form-select{min-height:2.8rem}
 @media (max-width:575.98px){
   .ro-workspace-pane{padding-top:.6rem}
-  .ro-primary-form .form-control,.ro-primary-form .form-select{font-size:1.1rem}
   .ro-record-card{align-items:flex-start}
   .ro-card-meta{flex-basis:100%}
   .ro-card-field{white-space:normal}
@@ -88,19 +83,18 @@
 
 }
 .ro-record-form{padding:.5rem 0 1rem;border-bottom:1px solid var(--bs-border-color)}
-.ro-record-form label{display:block;font-size:1rem;font-weight:600;margin:0 0 .35rem}
-.ro-record-form .form-control{font-size:1.1rem;min-height:2.9rem}
+.ro-record-form label{display:block;margin:0 0 .35rem}
+.ro-record-form .form-control{min-height:2.9rem}
 .ro-field-symbol{font-weight:400}
 .ro-who-badge{display:inline-flex;align-items:center;gap:.1rem;margin-right:.35rem}
 .ro-who-clear{padding:.05rem .35rem;color:var(--bs-danger)}
 .ro-primary-form .form-control[readonly]{background-color:var(--bs-secondary-bg)}
 .ro-who-row{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;padding:.25rem 0 .9rem;border-bottom:1px solid var(--bs-border-color)}
-.ro-who-row>label{display:block;flex-basis:100%;font-size:1rem;font-weight:600;margin:0}
-.ro-who-row .btn{font-size:1rem;padding:.55rem .9rem}
-.ro-who-now{font-size:1.05rem}
+.ro-who-row>label{display:block;flex-basis:100%;margin:0}
+.ro-who-row .btn{padding:.55rem .9rem}
 .ro-new-record{padding-top:.5rem}
 .ro-panel-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.25rem 0 .75rem}
-.ro-idents{font-size:.78rem}.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
+.ro-idents .old{text-decoration:line-through;color:var(--bs-secondary-color)}
 </style>
 {% endmacro %}
 

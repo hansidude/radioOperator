@@ -29,7 +29,7 @@ class Standalone(unittest.TestCase):
                 version = re.search(r"filename='%s', v='([^']+)'" % re.escape(asset), layout)
                 self.assertTrue(version, 'layout.html loads %s without a version' % asset)
                 self.assertIn('/radio-shared/static/%s?v=%s"' % (asset, version.group(1)), page)
-            for asset in ('vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
+            for asset in ('fonts/RobotoMono.woff2', 'vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f6df.svg',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg'):
                 response = c.get('/radio-shared/static/' + asset)

@@ -50,7 +50,7 @@
        public vessel (spec CAP-24). Chosen through Quackit's shared search picker, without leaving the page. #}
     <div class="ro-who-row" id="roWho">
       <label>Member or public user</label>
-      <span class="ro-who-now" id="roWhoNow">{{ ui.who_badges(member, vessel if pick_locked else None, open) }}</span>
+      <span id="roWhoNow">{{ ui.who_badges(member, vessel if pick_locked else None, open) }}</span>
       {% if open %}<button type="button" class="btn btn-outline-primary" id="roPickMember">{{ ui.WHO.member.symbol }} Member</button>
       <button type="button" class="btn btn-outline-primary" id="roPickPublic">{{ ui.WHO.public.symbol }} Public user</button>
       <button type="button" class="btn btn-outline-primary" id="roPickAnyVessel">{{ ui.FIELD_SYMBOLS.vesselName }} Vessel</button>
@@ -59,11 +59,11 @@
     </div>
     {% if open %}
     <section class="ro-new-record" id="roNewVesselPanel" hidden>
-      <p class="ro-section-title">New vessel for <span data-ro-member-name></span></p>
+      <h3 class="ro-section-title">New vessel for <span data-ro-member-name></span></h3>
       {{ ui.record_form('roNewVessel', '', kinds.vessels.fields, member_labels, {}, {}, submit='Save vessel', json=True) }}
     </section>
     <section class="ro-new-record" id="roNewPublicPanel" hidden>
-      <p class="ro-section-title">New public vessel</p>
+      <h3 class="ro-section-title">New public vessel</h3>
       {{ ui.record_form('roNewPublic', '/vessels/new', kinds.public.fields, member_labels, {}, {}, submit='Save public vessel', json=True) }}
     </section>
     {% endif %}

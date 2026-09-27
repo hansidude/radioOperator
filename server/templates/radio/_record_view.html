@@ -6,7 +6,7 @@
 
 {# in_place: inside the log on page's tab, every form saves without leaving the page and a record opens in the tab. #}
 {# A member's or public vessel's contacts (and a member's vessels, trailers, cars): one row each through Quackit's shared
-   record_grid, with its view buttons (cards, paragraphs, text size) and the shared search over the rows, and an Add
+   record_grid, with its view buttons (cards, paragraphs) and the shared search over the rows, and an Add
    button. A row opens its own page, or with in_place its form inside the log on page's tab. #}
 {% macro children_pane(owner, owner_id, kind, spec, labels, rows, in_place=False) %}
 {% set owner_url = '/%s/%d' % (owner, owner_id) %}
@@ -26,7 +26,7 @@
 
 {% macro member_panes(member, children, history, kinds, labels, failed, in_place=False) %}
 <section id="ro-member-details" class="ro-workspace-pane">
-  <p class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</p>
+  <h3 class="ro-section-title">{{ ui.WHO.member.symbol }} {{ member.memberNumber }}</h3>
   {{ ui.record_form('member', '/member/%d#details' % member.id, kinds.member.fields, labels, member, failed, version=member.version, json=in_place) }}
 </section>
 {% for kind in ('contacts', 'vessels', 'trailers', 'cars') %}
@@ -47,7 +47,7 @@
 {% macro vessel_panes(vessel, history, kind, labels, failed, creating=False, in_place=False, children=None, kinds=None) %}
 {# For a public user the vessel is the record: the boat, and who to reach about it. #}
 <section id="ro-vessel-details" class="ro-workspace-pane">
-  <p class="ro-section-title">{{ ui.WHO.public.symbol }} {{ ui.WHO.public.label }}</p>
+  <h3 class="ro-section-title">{{ ui.WHO.public.symbol }} {{ ui.WHO.public.label }}</h3>
   {{ ui.record_form('public', '/vessels/new' if creating else '/vessel/%d#details' % vessel.id, kind.fields, labels, vessel, failed,
                     version=None if creating else vessel.version, json=in_place) }}
 </section>

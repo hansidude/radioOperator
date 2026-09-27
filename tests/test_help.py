@@ -22,7 +22,7 @@ class Help(unittest.TestCase):
         for section in ('menu', 'log', 'views', 'status', 'logon', 'members', 'search', 'fields'):
             self.assertIn('id="%s"' % section, page)
         for control in ('data-dc-record-view="cards"', 'data-dc-record-view="paragraphs"', 'data-dc-record-names',
-                        'data-dc-record-panel aria-controls="roHelpPanel"', 'data-dc-record-size="larger"', 'data-dc-page-width',
+                        'data-dc-record-panel aria-controls="roHelpPanel"', 'data-dc-page-width',
                         'data-grp-toggle-all="radioHelp"'):
             self.assertIn(control, page)                                          # the demonstration is the real controls
             self.assertIn("data-help-icon='[%s" % control.split(' ')[0].split('=')[0], page)   # and each is explained

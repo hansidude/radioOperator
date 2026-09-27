@@ -325,7 +325,9 @@ def main(engine='chromium'):
             check_symbol_artwork()
             vessels_grid = page.locator('#ro-member-vessels .dc-record-grid')                    # two short vessels: tight from the left
             tight = vessels_grid.evaluate("g => [g.clientWidth, g.querySelector('.dc-record-grid-row').getBoundingClientRect().width]")
-            assert tight[1] < tight[0] - 200, 'Columns spread across the width instead of tight from the left: %s' % tight
+            # Spread, the tracks fill the grid; tight, the row ends where its columns do. Not a fixed margin: the headers
+            # are the one normal size (CR-160), so how short of the width they end follows that size.
+            assert tight[1] < tight[0] - 40, 'Columns spread across the width instead of tight from the left: %s' % tight
             visit('/members?q=' + token)
             expect(page.locator('#radioMembers .dc-record-grid-row')).to_have_count(1)
             expect(page.locator('#radioMembers')).to_contain_text(vessel)
@@ -387,7 +389,7 @@ def main(engine='chromium'):
             expect(page.locator('#spCrumb')).to_contain_text('👤 member: choosing')
             expect(page.locator('#searchPicker [placeholder]')).to_have_count(0)                # a label on top, nothing inside
             size = page.locator('#searchPicker > .card').evaluate('''card => {                     // a contained page wide, 80% tall
-                const probe = document.createElement('div'); probe.style.width = '120ch'; card.appendChild(probe);
+                const probe = document.createElement('div'); probe.style.width = 'var(--dc-page-width)'; card.appendChild(probe);   // the usual page width (CR-160)
                 const box = card.getBoundingClientRect(), out = {w: box.width, h: box.height, ch: probe.getBoundingClientRect().width,
                                                                  vw: innerWidth, vh: innerHeight};
                 probe.remove(); return out; }''')
@@ -569,7 +571,7 @@ def main(engine='chromium'):
             expect(page.locator('#radioFoundContacts')).to_be_visible()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search')
             width_button = page.locator('[data-dc-page-width]:visible')                                   # contained or full width, not remembered;
-            # view_controls carries the same control after the text size buttons (Quackit CR-59); exactly one width
+            # view_controls carries the same control after the view buttons (Quackit CR-59); exactly one width
             # button shows, the page's own, the shell's navbar copy hiding itself behind it (Quackit CR-77)
             expect(page.locator('[data-dc-page-width]')).to_have_count(2)
             expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_be_hidden()
@@ -1222,36 +1224,6 @@ def main(engine='chromium'):
             got = heights()                                                                 # Paragraphs off: the paper's one-line rows
             assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
             expect(view).to_have_class('')                                                    # (Cards off, Paragraphs off)
-            # Text size: A+ to 200% grows the list's text, remembered in this browser across a reload; reset returns to 100%.
-            readout = page.locator('[data-dc-record-size-readout][aria-controls="roRecordView"]')
-            larger = page.get_by_role('button', name='Larger text')
-            time_value = page.locator('#radioRecords [data-column="time"] .dc-record-grid-value').first
-            font = lambda: time_value.evaluate('el => parseFloat(getComputedStyle(el).fontSize)')
-            expect(readout).to_have_text('100%')
-            expect(page.get_by_role('button', name='Reset text size')).to_be_disabled()
-            base = font()
-            for _ in range(4):
-                larger.click()
-            expect(readout).to_have_text('200%')
-            expect(larger).to_be_disabled()
-            assert abs(font() - 2 * base) < 0.6, 'Text did not double at 200%%: %s -> %s' % (base, font())
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Page overflows at 200%'
-            page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()
-            page.screenshot(path=str(ARTIFACTS / ('radio-cards-200-%s.png' % engine)), full_page=True)
-            spill = grid_rows.evaluate_all('''rows => rows.filter(r => {
-                const b = r.querySelector('.dc-record-grid-action .btn').getBoundingClientRect(), c = r.getBoundingClientRect();
-                return b.top < c.top - 1 || b.bottom > c.bottom + 1 || b.right > c.right + 1; }).length''')
-            assert spill == 0, '%s open buttons spill out of their cards at 200%%' % spill
-            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Cards overflow at 200%'
-            page.reload()
-            expect(readout).to_have_text('200%')                                              # remembered
-            assert abs(font() - 2 * base) < 0.6, 'Remembered size not applied after reload'
-            page.get_by_role('button', name='Smaller text').click()
-            expect(readout).to_have_text('175%')
-            page.get_by_role('button', name='Reset text size').click()
-            expect(readout).to_have_text('100%')
-            assert abs(font() - base) < 0.3, 'Reset did not return to 100%'
-            assert page.evaluate("Object.keys(localStorage).filter(k => k.indexOf('dc-record-size:') === 0).length") == 0
             visit('/logon/%s' % record)
             page.locator('#logonViewTabs [data-entity-tab="history"]').click()                                    # a tab puts #history in the address
             page.locator('#logonViewTabs [data-entity-tab="entry"]').click()

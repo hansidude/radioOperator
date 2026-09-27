@@ -25,7 +25,7 @@ def install_standalone_ui(app):
                  'myMacro_groups.html', 'myMacro_confirm.html', 'myMacro_context.html',
                  '../static/css/record_views.css', '../static/css/navbar_controls.css',
                  '../static/css/search_controls.css', '../static/js/ui_symbols.js',
-                 '../static/vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
+                 '../static/fonts/RobotoMono.woff2', '../static/vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
                  '../static/vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg',
                  '../static/js/search_controls.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js',

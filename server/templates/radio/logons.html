@@ -16,7 +16,7 @@
 {% set date_control %}<div class="d-flex flex-column">
     <div class="form-check ro-toolbar-tick">
       <input class="form-check-input" type="checkbox" value="1" id="roDayOn" name="dayOn"{% if filters.dayOn %} checked{% endif %}>
-      <label class="form-check-label" for="roDayOn">Date</label>
+      <label class="form-check-label" for="roDayOn">Only this day</label>
     </div>
     {{ date_filter('roDay', 'day', filters.day.isoformat(), now.date().isoformat(), label='Call date', css_class='ro-toolbar-date') }}
   </div>{% endset %}
