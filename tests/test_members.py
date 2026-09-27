@@ -739,13 +739,13 @@ class Members(unittest.TestCase):
         self.a.post('/vessels/new', data={'vesselName': 'Blue Duck', 'registration': 'PUB01', 'ownerName': 'Alex Public', 'ownerPhone': '0411222333'})
         self.logon(registration='AB123Q', notes='Called from the ramp')
         get = lambda url: self.a.get(url).get_data(as_text=True)
-        cases = [('/logons', 'roLogPanel', 'roMatched', 'q=ab123', 'logons', 'registration', 'Vessel Rego. No.'),
-                 ('/members', 'roMemberPanel', 'roMemberMatched', 'q=ab123', 'members', 'vesselRegos', 'Vessel regos'),
-                 ('/vessels', 'roVesselPanel', 'roVesselMatched', 'q=0411222333', 'public', 'ownerPhone', 'Phone')]
-        for url, panel_id, body_id, query, gid, field, label in cases:
+        cases = [('/logons', 'roLogPanel', 'Log ons: filters and index', 'roMatched', 'q=ab123', 'logons', 'registration', 'Vessel Rego. No.'),
+                 ('/members', 'roMemberPanel', 'What the search matched', 'roMemberMatched', 'q=ab123', 'members', 'vesselRegos', 'Vessel regos'),
+                 ('/vessels', 'roVesselPanel', 'What the search matched', 'roVesselMatched', 'q=0411222333', 'public', 'ownerPhone', 'Phone')]
+        for url, panel_id, panel_label, body_id, query, gid, field, label in cases:
             page = get(url)
             self.assertIn('data-dc-record-panel aria-controls="%s"' % panel_id, page)                    # the panel button
-            self.assertIn('id="%s" class="dc-record-panel" aria-label="What the search matched" data-open="0"' % panel_id, page)   # starts closed
+            self.assertIn('id="%s" class="dc-record-panel" aria-label="%s" data-open="0"' % (panel_id, panel_label), page)   # starts closed
             self.assertNotIn('The fields a search matches show here.', page)                          # no hint text (Quackit CR-67)
             self.assertIn('#%s' % body_id, page)                                                         # refreshed with the rows (hx-select-oob)
             found = get(url + '?' + query)
@@ -769,6 +769,27 @@ class Members(unittest.TestCase):
                 else:
                     self.assertIsNone(clear)
         self.assertIn('0 records match “zzzz”', get('/members?q=zzzz'))
+        # Quackit CR-165: the log's panel is never blank. With no search it holds the Log-on status badges, each counted
+        # under every status so another stays to pick while one is chosen, and an index of the rows by trip and vessel.
+        self.logon(registration='CR165Q', vesselName='Panel Duck', notes='')
+        drafts = len(BeautifulSoup(get('/logons?status=draft'), 'html.parser').select('#radioRecords [data-record]'))
+        self.assertGreater(drafts, 0)
+        for query in ('', 'status=draft', 'status=closed'):
+            with self.subTest(query=query):
+                for url in ('/logons?' + query, '/logons/rows?partial=1&' + query):
+                    panel = BeautifulSoup(get(url), 'html.parser').select_one('#roMatched')
+                    group = panel.select_one('.dc-record-panel-group[aria-label="Log-on status"]')
+                    self.assertIsNotNone(group, url)
+                    badges = {b['data-dc-filter-value']: b for b in group.select('[data-dc-filter-target="roStatus"]')}
+                    self.assertIn('all', badges, url)
+                    self.assertIn('draft', badges, url)                                    # counted under any status
+                    self.assertEqual(badges['draft'].select_one('.dc-record-panel-badge-count').text, str(drafts), url)
+                    active = [v for v, b in badges.items() if b.get('aria-pressed') == 'true']
+                    self.assertEqual(active, [query.split('=')[1] if query else 'all'], url)
+                    self.assertEqual([h.get_text(strip=True) for h in panel.select('.dc-record-panel-group-heading')], ['Log-on status'], url)   # no search, no matched fields
+        toc = BeautifulSoup(get('/logons'), 'html.parser').select_one('#roLogPanel > [data-dc-record-toc]')
+        self.assertEqual((toc['data-dc-record-toc'], toc['data-dc-record-toc-columns']), ('radioRecords', 'trip vesselName'))
+        self.assertIsNone(BeautifulSoup(get('/logons/rows?partial=1'), 'html.parser').select_one('#roMatched [data-dc-record-toc]'))   # outside what a refresh swaps
 
     def test_the_search_panel_counts_each_field_the_way_the_search_matches(self):
         rows = [{'fullName': 'Jane Smith', 'mobile': '0412 345 678', 'holder': {'name': 'm1 Jane Smith'}},

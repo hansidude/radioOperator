@@ -224,20 +224,25 @@
    how many records, then a badge per field the search matched in them (members.matched / list_matched,
    logons.matched_fields) with how many. sections: (gid, symbol, label, rows, matched fields). `filtering`: the badges
    are filter buttons (data-ro-filter-kind / -field) and `filter` ({kind, field} or none) is the one applied; without
-   it the badges are plain. `body_id` is what a refresh swaps (hx-select-oob). #}
-{% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1, status=None) %}
+   it the badges are plain. `body_id` is what a refresh swaps (hx-select-oob).
+   `status` (the log's): the Log-on status badges, shown with or without a search, so the log's panel always holds its
+   filters (Quackit CR-165); `status_rows` are the rows under every other filter but any status, which they count, so
+   each status keeps its count while another is chosen, as the code request register's do. #}
+{% macro matched_panel(body_id, search, sections, filtering=False, filter=None, min_chars=1, status=None, status_rows=None) %}
+{% if status is not none and status_rows is none %}{{ {}['matched_panel: status needs status_rows, the rows under any status']() }}{% endif %}
 <div id="{{ body_id }}">
 {# A filter applied: Clear filter first, above the kinds, near the badge that set it (owner, issue G). #}
 {% if filtering and filter is not none %}{{ records_ui.clear_filter({'data-ro-filter-clear': ''}, 'dc-record-panel-clear') }}
 {# The log's status badges filter it too: the same Clear filter puts the status back to All (Quackit CR-64). #}
 {% elif status is not none and status != 'all' %}{{ records_ui.clear_filter({'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': 'all'}, 'dc-record-panel-clear') }}{% endif %}
-{# Nothing before a search: no hint text taking room (Quackit CR-67). #}
-{% if search|length >= min_chars %}
-{# Each kind's header folds away what the search matched in it (Quackit CR-81); with more than one kind, My Times'
+{# Nothing before a search but the log's status badges: no hint text taking room (Quackit CR-67). #}
+{% set searched = search|length >= min_chars %}
+{% if searched or status is not none %}
+{# Each kind's header folds away what is under it (Quackit CR-81); with more than one kind, My Times'
    collapse / expand all for them, under the status box. The shared owner brings the chevron and the remembering. #}
-{% set kinds = [] %}{% for gid, symbol, label, rows, fields in sections if rows %}{% set _ = kinds.append(gid) %}{% endfor %}
+{% set kinds = [] %}{% for gid, symbol, label, rows, fields in sections if rows or (gid == 'logons' and status is not none) %}{% set _ = kinds.append(gid) %}{% endfor %}
 {% if kinds|length > 1 %}{{ records_ui.collapse_all(body_id, 'kinds', 'dc-record-panel-collapse-all') }}{% endif %}
-  {% for gid, symbol, label, rows, fields in sections if rows %}
+  {% for gid, symbol, label, rows, fields in sections if rows or (gid == 'logons' and status is not none) %}
   {% set attrs = {'data-ro-filter-kind': gid} if filtering else {} %}
   {% set on_kind = filter is not none and filter.kind == gid %}
   {% call records_ui.panel_section(body_id ~ '-' ~ gid, symbol, label, rows|length, attrs, button=filtering,
@@ -246,17 +251,19 @@
     {% call records_ui.panel_group('Log-on status') %}
     {% for value, state_name, state_text in FILTERS %}
       {% set count = namespace(n=0) %}
-      {% for row in rows %}{% if value == 'all' or state(row)|lower == value or (value == 'loggedon' and state(row) == 'overdue') %}{% set count.n = count.n + 1 %}{% endif %}{% endfor %}
+      {% for row in status_rows %}{% if value == 'all' or state(row)|lower == value or (value == 'loggedon' and state(row) == 'overdue') %}{% set count.n = count.n + 1 %}{% endif %}{% endfor %}
       {% if count.n or status == value %}{{ records_ui.panel_badge(STATES[state_name].symbol, state_text, count.n, {'data-dc-filter-target': 'roStatus', 'data-dc-filter-value': value}, active=status == value) }}{% endif %}
     {% endfor %}
     {% endcall %}
     {% endif %}
+    {% if searched %}
     {% call records_ui.panel_group('Matched fields') %}
     {% for field, field_label, count in fields %}
       {% set field_attrs = attrs.copy() %}{% set _ = field_attrs.update({'data-ro-filter-field': field} if filtering else {}) %}{% set _ = field_attrs.update({'data-matched-field': field}) %}
       {{ records_ui.panel_badge(FIELD_SYMBOLS[field], field_label, count, field_attrs, button=filtering, active=on_kind and filter.field == field) }}
     {% endfor %}
     {% endcall %}
+    {% endif %}
   {% endcall %}
   {% else %}<div class="dc-record-empty">0 records match “{{ search }}”</div>
   {% endfor %}

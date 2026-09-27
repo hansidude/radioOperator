@@ -255,7 +255,7 @@ class Pages(unittest.TestCase):
         self.assertNotIn('data-dc-record-width', page)
         self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
         self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)
-        self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="What the search matched" data-open="0">', page)
+        self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="Log ons: filters and index" data-open="0">', page)
         self.assertIn('</aside><div id="roLiveRecords">', page)
         self.assertIn('<title>Radio Logs</title>', page)                                           # the program's own menu
         for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):

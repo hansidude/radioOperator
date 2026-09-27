@@ -53,6 +53,8 @@
 <div id="roLiveAlerts">{{ ui.alert_list(alerts, health) }}</div>
 {{ ui.alert_alarm() }}
 {# The chosen view lives on roRecordView, outside roLiveRecords, so a refresh keeps it. #}
-{# The side panel: what Find matched in which field; starts closed, the log keeps its room. #}
-<div id="roRecordView">{% call records_ui.record_panel('roLogPanel', 'What the search matched', open=False) %}{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)], status=filters.status) }}{% endcall %}<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
+{# The side panel: the Log-on status badges, what Find matched in which field, and an index of the rows showing by trip
+   and vessel (Quackit CR-165); starts closed, the log keeps its room. The index sits outside roMatched: record_view.js
+   rebuilds it whenever the rows are swapped in. #}
+<div id="roRecordView">{% call records_ui.record_panel('roLogPanel', 'Log ons: filters and index', open=False) %}{{ ui.matched_panel('roMatched', filters.search or '', [('logons', ui.FIELD_SYMBOLS.tripRef, 'Log ons', records, matched)], status=filters.status, status_rows=status_rows) }}{{ records_ui.record_toc('radioRecords', columns=['trip', 'vesselName']) }}{% endcall %}<div id="roLiveRecords">{{ ui.record_list(records, now, reference, empty='0 ' ~ ui.EMPTY_LABELS[filters.status]) }}</div></div>
 {% endblock %}

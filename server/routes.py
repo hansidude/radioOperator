@@ -133,6 +133,16 @@ def _alerts(cur, h):
     return alerts, W.health(cur, now, h.watch_stale_seconds)
 
 
+def _log_rows(cur, h, f):
+    """The log's rows under the toolbar's filters, and the rows under the same filters but any status, which the
+    panel's Log-on status badges count (Quackit CR-165), so each status keeps its count while another is chosen."""
+    def rows(status):
+        return L.records(cur, h.unit(), _now(), h.approaching_minutes, status=status,
+                         day=f['day'] if f['dayOn'] else None, search=f['search'], sort=f['sort'])
+    every = rows(None)
+    return (every if f['status'] == 'all' else rows(f['status'])), every
+
+
 # ---------- pages ----------
 
 @bp.route('/logons')
@@ -140,14 +150,11 @@ def logons_page():
     """The radio log: one collection, whatever the toolbar is filtering it to."""
     h, (conn, cur) = _open()
     f = _filters()
-    rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
-                     status=None if f['status'] == 'all' else f['status'],
-                     day=f['day'] if f['dayOn'] else None,
-                     search=f['search'], sort=f['sort'])
+    rows, status_rows = _log_rows(cur, h, f)
     alerts, health = _alerts(cur, h)
     cur.close()
-    return _page('logons.html', records=rows, filters=f, alerts=alerts, health=health, matched=L.matched_fields(rows, f['search']),
-                 window=h.approaching_minutes, reference=L.reference)
+    return _page('logons.html', records=rows, status_rows=status_rows, filters=f, alerts=alerts, health=health,
+                 matched=L.matched_fields(rows, f['search']), window=h.approaching_minutes, reference=L.reference)
 
 
 @bp.route('/logons/rows')
@@ -160,13 +167,10 @@ def logons_rows():
         cur.close()
         return redirect('/logons')
     f = _filters()
-    rows = L.records(cur, h.unit(), _now(), h.approaching_minutes,
-                     status=None if f['status'] == 'all' else f['status'],
-                     day=f['day'] if f['dayOn'] else None,
-                     search=f['search'], sort=f['sort'])
+    rows, status_rows = _log_rows(cur, h, f)
     alerts, health = _alerts(cur, h)
     cur.close()
-    response = make_response(_page('_queue.html', records=rows, filters=f, alerts=alerts, health=health,
+    response = make_response(_page('_queue.html', records=rows, status_rows=status_rows, filters=f, alerts=alerts, health=health,
                                    matched=L.matched_fields(rows, f['search']),
                                    current=request.args.get('current', type=int), window=h.approaching_minutes,
                                    reference=L.reference))

@@ -894,6 +894,26 @@ def main(engine='chromium'):
             page.unroute(failing)
             page.locator('#dcHtmxError button').click()
             expect(page.locator('#dcHtmxError')).to_be_hidden()
+            # Quackit CR-165: with no search the log's panel is not blank: the Log-on status badges and an index of the
+            # rows showing, by trip and vessel, whose entry scrolls to its row.
+            plain = context.new_page()
+            plain.goto(URL + '/logons?status=all&day=' + today)
+            plain.locator('[data-dc-record-panel][aria-controls="roLogPanel"]:visible').click()
+            expect(plain.locator('#roLogPanel')).to_be_visible()
+            expect(plain.locator('#roMatched [aria-label="Log-on status"] [data-dc-filter-value="all"]')).to_have_attribute('aria-pressed', 'true')
+            expect(plain.locator('#roMatched [aria-label="Log-on status"] [data-dc-filter-value="draft"]')).to_be_visible()
+            rows_showing = plain.locator('#radioRecords > [data-record]').count()
+            assert rows_showing > 0, 'the log shows no rows for today'
+            entries = plain.locator('#roLogPanel .dc-record-toc-entry')
+            expect(entries).to_have_count(rows_showing)
+            entry = plain.locator('#roLogPanel .dc-record-toc-entry[data-dc-record-jump="%s"]' % record)
+            expect(entry).to_contain_text(vessel)
+            expect(entry).to_contain_text('T-')
+            entry.click()
+            expect(plain.locator('#radioRecords > [data-record="%s"]' % record)).to_have_class(re.compile('dc-record-jumped'))
+            plain.screenshot(path=str(ARTIFACTS / ('radio-log-panel-%s.png' % engine)))
+            plain.locator('[data-dc-record-panel][aria-controls="roLogPanel"]:visible').click()   # closed again, as it was
+            plain.close()
             # The 30s poll, on a fake clock, without waiting 30 real seconds (WAT-3, minimal).
             poll = context.new_page()
             poll.clock.install()
