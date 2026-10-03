@@ -36,7 +36,7 @@ reuse, verification (`./verify`) and rollout. History lives in the commit log an
   results (yellow **Filter applied** bar, Clear filter); on the log, Members and Public vessels it starts closed and
   the badges are plain (`_ui.matched_panel`, `members.matched` / `list_matched` / `narrow`, `logons.matched_fields` /
   `matched_rows`).
-- **🔎 Search** (`/radio/search`): one box over log ons, members, emergency contacts, vessels, trailers and cars, any
+- **🔎 Search** (`/radio/search`): one box, open immediately, over log ons, members, emergency contacts, vessels, trailers and cars, any
   field including notes, each kind a collapsible group (collapse / expand all; remembered), usual ~1200px width; rows
   open their record (`members.find`, `logons.records`).
 - The member, public vessel and contact / vessel / trailer / car pages (new and edit) are at the usual ~1200px width.

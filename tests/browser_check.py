@@ -39,7 +39,7 @@ def expect_search_starts_folded(field):
     part's one toggle, the field out of sight; as Quackit's search_part_problems() checks its own pages."""
     part = field.locator(SEARCH_PART)
     expect(part).to_have_class(re.compile(r'\bapp-page-menu-folded\b'))
-    expect(part.locator('xpath=./button')).to_have_count(1)
+    expect(part.locator('xpath=./button[contains(@class, "app-page-menu-heading")]')).to_have_count(1)
     expect(search_toggle(field)).to_have_attribute('aria-expanded', 'false')
     expect(field).to_be_hidden()
 
@@ -49,7 +49,7 @@ def expect_search_flagged(field, terms):
     toggle = search_toggle(field)
     expect(toggle).to_have_attribute('aria-expanded', 'false')
     expect(toggle).to_have_class(re.compile(r'\bactive\b'))
-    expect(toggle.locator('[data-dc-search-summary]')).to_have_text(terms)
+    expect(toggle.locator('[data-dc-search-summary]')).to_have_text('Searching for: ' + terms)
 
 
 def main(engine='chromium'):
@@ -555,7 +555,7 @@ def main(engine='chromium'):
             visit('/logons')
             page.locator('.navbar a[href="/radio/search"]').first.click()                          # the Search page, from the log
             page.wait_for_url(re.compile('/radio/search$'))
-            expect_search_starts_folded(page.locator('#roFindAll'))                                 # Quackit CR-157: folded, one toggle
+            expect(page.locator('#roFindAll')).to_be_visible()                                     # CR-236: Search opens ready to type
             with page.expect_response(lambda r: '/radio/search?' in r.url):
                 unfold(page.locator('#roFindAll')).fill(token)
             for kind in ('members', 'contacts', 'vessels'):
@@ -595,9 +595,11 @@ def main(engine='chromium'):
             page.locator('[data-dc-page-width]:visible').click()
             list_beside_panel('#roFoundPanel', '#roFound', 'Search back in its container')
             width_button.click()
-            page.reload()                                                                       # a new page load starts at the usual width again
-            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Full width')
-            list_beside_panel('#roFoundPanel', '#roFound', 'Search after reload')
+            page.reload()                                                                       # Quackit CR-226: width is remembered per page
+            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Usual page width')
+            assert page.evaluate("document.getElementById('roFoundView').closest('.container-fluid.mySpacing').getBoundingClientRect().width") > 1700
+            width_button.click()
+            list_beside_panel('#roFoundPanel', '#roFound', 'Search after reload, back at usual width')
             unfold(page.locator('#roFindAll')).fill(token)
             expect(page.locator('#roFound [data-found="members"]')).to_be_visible()
             # The panel (view_controls + record_panel): what the search matched, as badges beside the results.

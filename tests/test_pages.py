@@ -6,6 +6,7 @@ from datetime import date
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from bs4 import BeautifulSoup
 from flask import Flask, g, session
 from server import identity as ID
 from server import logons as L
@@ -246,8 +247,8 @@ class Pages(unittest.TestCase):
         self.assertNotIn('id="roDayOn" name="dayOn" checked', self.a.get('/logons?status=all').get_data(as_text=True))  # a link for all: every day
         self.assertRegex(page, r'<option value="newest" selected>[^<]*Newest first</option>')
         self.assertRegex(page, r'<option value="due">[^<]*Due first</option>')
-        self.assertIn('data-dc-record-view="cards" aria-controls="roRecordView"', page)          # shared view buttons
-        self.assertIn('data-dc-record-view="paragraphs" data-rows="1" data-cards="0" aria-controls="roRecordView"', page)   # rows wrap by default
+        self.assertIsNotNone(BeautifulSoup(page, 'html.parser').select_one('[data-dc-record-view="cards"][aria-controls="roRecordView"][data-dc-remember-view]'))          # shared view buttons
+        self.assertIsNotNone(BeautifulSoup(page, 'html.parser').select_one('[data-dc-record-view="paragraphs"][data-rows="1"][data-cards="0"][aria-controls="roRecordView"]'))   # rows wrap by default
         self.assertNotIn('data-dc-record-size', page)                                               # one text size (Quackit CR-160)
         # The navbar's page width button, and the same control after the view buttons (Quackit CR-59).
         self.assertEqual(page.count('data-dc-page-width'), 2)
@@ -255,7 +256,7 @@ class Pages(unittest.TestCase):
         self.assertNotIn('data-dc-record-width', page)
         self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
         self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)
-        self.assertIn('<div id="roRecordView"><aside id="roLogPanel" class="dc-record-panel" aria-label="Log ons: filters and index" data-open="0">', page)
+        self.assertIsNotNone(BeautifulSoup(page, 'html.parser').select_one('#roRecordView > aside#roLogPanel.dc-record-panel[aria-label="Log ons: filters and index"][data-open="0"][data-dc-collapse="roLogPanel"]'))
         self.assertIn('</aside><div id="roLiveRecords">', page)
         self.assertIn('<title>Radio Logs</title>', page)                                           # the program's own menu
         for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):

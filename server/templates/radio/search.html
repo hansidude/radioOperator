@@ -15,7 +15,7 @@
     The two hidden fields are the panel's filter: set by a badge, sent with the search, cleared by a new search. -#}
 {% set collapse_all %}{{ grp.collapseAllButton('radioSearch', 'kinds') }}{% endset %}
 {% set search_control %}<div>{{ search_controls('roFindAll', input1_attrs={'name': 'q', 'value': search}, label='Search') }}</div>{% endset %}
-{{ entity_nav.page_toolbar('Search',
+{{ entity_nav.page_toolbar('Search', search_open=True,
      filters=[{'role': 'search', 'control': search_control}],
      form={'id': 'roSearchForm', 'action': '/radio/search',
            'attrs': {'hx-get': '/radio/search', 'hx-target': '#roFound', 'hx-select': '#roFound',

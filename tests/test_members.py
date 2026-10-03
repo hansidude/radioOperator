@@ -203,7 +203,7 @@ class Members(unittest.TestCase):
                 cell = soup.select_one('#radioRecords [data-record="%d"] [data-column="%s"]' % (logon, column))
                 self.assertEqual(cell.name, 'a', (path, column))
                 self.assertEqual(cell['href'], destination)
-                self.assertIsNotNone(cell.select_one('.dc-record-grid-value-symbol, .dc-record-symbol'))
+                self.assertIsNotNone(cell.select_one('.dc-record-grid-value-symbol, .dc-record-grid-symbol, .dc-record-symbol'))
                 self.assertEqual(self.a.get(destination).status_code, 200)
 
         public = self.a.post('/vessels/new', data={'vesselName': 'Public boat', 'registration': 'PB123',
