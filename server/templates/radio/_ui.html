@@ -319,7 +319,8 @@
               'trip': r.tripRef or '', 'action': action}
   }] %}
 {% endfor %}
-{{ records_ui.record_grid(display.rows, COLUMNS, 'radioRecords', empty) }}
+{#- CR-276 point 3: the page that lists log ons has its own search; the grid draws none of its own. -#}
+{{ records_ui.record_grid(display.rows, COLUMNS, 'radioRecords', empty, search=False) }}
 {% endmacro %}
 
 {% macro cell(v) %}{{ v if v is not none else '' }}{% endmacro %}
