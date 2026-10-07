@@ -713,7 +713,9 @@ def main(engine='chromium'):
                             wrap: getComputedStyle(c.querySelector('.dc-record-grid-value')).whiteSpace,
                             label: getComputedStyle(c.querySelector('.dc-record-grid-label')).whiteSpace}))''')
             assert len(cells) >= 3 and all(b['top'] >= a['top'] + a['height'] - 1 for a, b in zip(cells, cells[1:])), 'Cards: fields are not a line each: %s' % cells
-            assert all(c['height'] < 32 and c['wrap'] == 'nowrap' and c['label'] == 'nowrap' for c in cells), 'Cards: a field runs past one line: %s' % cells
+            # The shared cards let a long field name wrap within 45% of the line (record_views.css .dc-record-grid-label); the
+            # value stays on one line and each field stays one line high.
+            assert all(c['height'] < 32 and c['wrap'] == 'nowrap' for c in cells), 'Cards: a field runs past one line: %s' % cells
             page.locator('[data-dc-record-view="cards"]:visible').click()
             toggle_all = page.locator('[data-grp-toggle-all="radioSearch"]:visible')                 # myTimes' collapse / expand all
             expect(toggle_all).to_have_attribute('title', 'Collapse all kinds')
