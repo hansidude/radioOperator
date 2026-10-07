@@ -888,8 +888,9 @@ def main(engine='chromium'):
                 log_clear.click()
             expect(page.locator('#roStatus')).to_have_value('all')
             expect(log_clear).to_have_count(0)
-            with page.expect_response(rows_for(status='draft', q=vessel)):
-                choose(page.locator('#roStatus'), 'draft')
+            with page.expect_response(rows_for(status='draft', q=vessel)):   # the panel's own status badge sets the filter (Quackit CR-75/CR-278): the navbar's Status is not shown while the panel covers it
+                page.locator('#roMatched [data-dc-filter-target="roStatus"][data-dc-filter-value="draft"]').click()
+            expect(page.locator('#roStatus')).to_have_value('draft')
             expect(log_clear).to_be_visible()
             panel_button.click()                                                # closed again, as the page remembers it
             # A failed swap is shown, never a list that silently stops updating.
