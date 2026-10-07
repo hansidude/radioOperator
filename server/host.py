@@ -37,6 +37,8 @@ def install_standalone_ui(app):
     app.register_blueprint(Blueprint('radio_shared', __name__,
                                     static_folder=str(templates.parent / 'static'),
                                     static_url_path='/radio-shared/static'))
+    # Quackit's shared macros load their own scripts from this endpoint (page_script; Quackit sets 'static').
+    app.jinja_env.globals['shared_static_endpoint'] = 'radio_shared.static'
 
 
 class Host:

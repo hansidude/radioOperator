@@ -16,7 +16,8 @@ class Standalone(unittest.TestCase):
             shared = Path(__file__).resolve().parents[2] / 'dflask' / 'static'
             page = c.get('/logons').get_data(as_text=True)
             for asset in ('css/record_views.css', 'css/navbar_controls.css',
-                          'css/search_controls.css', 'js/search_controls.js', 'js/ui_symbols.js', 'js/record_view.js', 'js/auto_grow.js'):
+                          'css/search_controls.css', 'js/search_controls.js', 'js/ui_symbols.js', 'js/record_view.js', 'js/auto_grow.js',
+                          'js/controls.js'):
                 self.assertIn('/radio-shared/static/' + asset, page)
                 response = c.get('/radio-shared/static/' + asset)
                 self.assertEqual(response.status_code, 200)
@@ -29,6 +30,13 @@ class Standalone(unittest.TestCase):
                 version = re.search(r"filename='%s', v='([^']+)'" % re.escape(asset), layout)
                 self.assertTrue(version, 'layout.html loads %s without a version' % asset)
                 self.assertIn('/radio-shared/static/%s?v=%s"' % (asset, version.group(1)), page)
+            # Quackit CR-271 Q3: the shared macros' own scripts (the tabs, the search, the combo boxes) are controls.js
+            # blocks, loaded by page_script from the shared_static_endpoint this shell sets: the same served file.
+            for path in ('/logons', '/logons/new'):
+                runs = re.findall(r'<script src="([^"]*)" data-dc-run="([\w-]+)"', c.get(path).get_data(as_text=True))
+                self.assertTrue(runs, path + ' renders no shared macro script')
+                for src, run in runs:
+                    self.assertTrue(src.startswith('/radio-shared/static/js/'), '%s: %s loads from %s' % (path, run, src))
             for asset in ('fonts/RobotoMono.woff2', 'vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f6df.svg',
                           'vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg'):
