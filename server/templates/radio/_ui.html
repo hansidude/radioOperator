@@ -497,7 +497,7 @@
 {# The open button column of a list whose rows have their own page. #}
 {% set OPEN_COLUMN = [{'key': 'action', 'label': '', 'width': '2.5rem', 'kind': 'action'}] %}
 {# open=False: no open button (the log on's search picker, where a click picks the row). #}
-{% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False, holders=False, open=True) %}
+{% macro children_grid(owner_url, kind, spec, labels, rows, key, in_place=False, holders=False, open=True, search=None) %}
 {% set grid = namespace(columns=[], rows=[]) %}
 {% for f in spec.fields %}{% set grid.columns = grid.columns + [{'key': f, 'label': labels[f], 'symbol': FIELD_SYMBOLS.get(f, '')}] %}{% endfor %}
 {% if holders %}{% set grid.columns = grid.columns + [{'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True}] %}{% endif %}
@@ -512,7 +512,7 @@
   {% if c.removedOn %}{% set _ = cells.update({'removed': removed_badge(c.removedOn)}) %}{% else %}{% set _ = cells.update({'action': action}) %}{% endif %}
   {% set grid.rows = grid.rows + [{'id': c.id, 'cells': cells, 'css_class': 'ro-record-card ro-removed' if c.removedOn else ''}] %}
 {% endfor %}
-{{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower) }}
+{{ records_ui.record_grid(grid.rows, grid.columns, key, '0 ' ~ spec.label|lower, search=search) }}
 {% endmacro %}
 
 {# Who holds a record found on the Search page: 👤 a member or 🌐 a public vessel. #}
@@ -522,7 +522,7 @@
 {%- endmacro %}
 
 {# Members as the Members page lists them; the Search page shows the same rows. #}
-{% macro members_grid(members, key, empty='0 members', open=True) %}
+{% macro members_grid(members, key, empty='0 members', open=True, search=None) %}
 {% set display = namespace(rows=[]) %}
 {% for m in members %}
   {% set number %}<span class="dc-record-index">{{ records_ui.symbol(WHO.member.symbol, WHO.member.label, value=m.memberNumber) }}</span>{% endset %}
@@ -536,12 +536,12 @@
   {'key': 'lastName', 'label': 'Last name', 'symbol': FIELD_SYMBOLS.lastName},
   {'key': 'mobile', 'label': 'Mobile', 'symbol': FIELD_SYMBOLS.mobile},
   {'key': 'email', 'label': 'Email', 'symbol': FIELD_SYMBOLS.email},
-  {'key': 'vessels', 'label': 'Vessels', 'symbol': FIELD_SYMBOLS.vesselName}] + OPEN_COLUMN[:1 if open else 0], key, empty) }}
+  {'key': 'vessels', 'label': 'Vessels', 'symbol': FIELD_SYMBOLS.vesselName}] + OPEN_COLUMN[:1 if open else 0], key, empty, search=search) }}
 {% endmacro %}
 
 {# Vessels, a member's or public, with who holds them: the Public vessels page and the Search page. A member's vessel
    opens on its member, a public vessel on its own page. #}
-{% macro vessels_grid(vessels, key, empty='0 vessels', open=True) %}
+{% macro vessels_grid(vessels, key, empty='0 vessels', open=True, search=None) %}
 {% set display = namespace(rows=[]) %}
 {% for v in vessels %}
   {% set name %}<span class="dc-record-index">{{ v.vesselName or '' }}</span>{% endset %}
@@ -556,7 +556,7 @@
   {'key': 'holder', 'label': 'Held by', 'symbol': FIELD_SYMBOLS.holder, 'own_symbol': True},
   {'key': 'owner', 'label': 'Contact', 'symbol': FIELD_SYMBOLS.ownerName},
   {'key': 'phone', 'label': 'Phone', 'symbol': FIELD_SYMBOLS.ownerPhone},
-  {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails}] + OPEN_COLUMN[:1 if open else 0], key, empty) }}
+  {'key': 'details', 'label': 'Vessel details', 'symbol': FIELD_SYMBOLS.vesselDetails}] + OPEN_COLUMN[:1 if open else 0], key, empty, search=search) }}
 {% endmacro %}
 
 {# Phone numbers the log on's 📱 Mobile picker found (members.mobile_picks): the number and whose it is, one column

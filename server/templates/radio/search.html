@@ -68,12 +68,14 @@
   <div>{{ body }}</div>
   {% endcall %}
   {% endmacro %}
-  {% if logons %}{% call found_group('logons', SYMBOL.logons, logons) %}{{ ui.record_list(logons, now, reference) }}{% endcall %}{% endif %}
-  {% if found.members %}{% call found_group('members', SYMBOL.members, found.members) %}{{ ui.members_grid(found.members, 'radioFoundMembers') }}{% endcall %}{% endif %}
-  {% if found.contacts %}{% call found_group('contacts', SYMBOL.contacts, found.contacts) %}{{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True) }}{% endcall %}{% endif %}
-  {% if found.vessels %}{% call found_group('vessels', SYMBOL.vessels, found.vessels) %}{{ ui.vessels_grid(found.vessels, 'radioFoundVessels') }}{% endcall %}{% endif %}
-  {% if found.trailers %}{% call found_group('trailers', SYMBOL.trailers, found.trailers) %}{{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True) }}{% endcall %}{% endif %}
-  {% if found.cars %}{% call found_group('cars', SYMBOL.cars, found.cars) %}{{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True) }}{% endcall %}{% endif %}
+  {# The found grids are searched by the page's one Search (roFindAll, the server): no Search part of their own, which the
+   navbar would hoist out of #roFound and leave behind when the status swap drops the grid (CR-279: one Search a page). #}
+{% if logons %}{% call found_group('logons', SYMBOL.logons, logons) %}{{ ui.record_list(logons, now, reference) }}{% endcall %}{% endif %}
+  {% if found.members %}{% call found_group('members', SYMBOL.members, found.members) %}{{ ui.members_grid(found.members, 'radioFoundMembers', search=False) }}{% endcall %}{% endif %}
+  {% if found.contacts %}{% call found_group('contacts', SYMBOL.contacts, found.contacts) %}{{ ui.children_grid('', 'contacts', kinds.contacts, labels, found.contacts, 'radioFoundContacts', holders=True, search=False) }}{% endcall %}{% endif %}
+  {% if found.vessels %}{% call found_group('vessels', SYMBOL.vessels, found.vessels) %}{{ ui.vessels_grid(found.vessels, 'radioFoundVessels', search=False) }}{% endcall %}{% endif %}
+  {% if found.trailers %}{% call found_group('trailers', SYMBOL.trailers, found.trailers) %}{{ ui.children_grid('', 'trailers', kinds.trailers, labels, found.trailers, 'radioFoundTrailers', holders=True, search=False) }}{% endcall %}{% endif %}
+  {% if found.cars %}{% call found_group('cars', SYMBOL.cars, found.cars) %}{{ ui.children_grid('', 'cars', kinds.cars, labels, found.cars, 'radioFoundCars', holders=True, search=False) }}{% endcall %}{% endif %}
 {% endif %}
 </div></div>
 {{ grp.groupStyles() }}
