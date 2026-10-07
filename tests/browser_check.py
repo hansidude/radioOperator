@@ -94,6 +94,12 @@ def main(engine='chromium'):
         def choose(select, value):
             ident = select.get_attribute('id')
             combo = page.locator('[id="' + ident + 'Combo"]')
+            # Quackit CR-75/CR-278: while a record panel covers a filter, its badges set it and the navbar's own field is
+            # not shown: a user chooses on the badge. Elsewhere the combo (or the select) is clicked, and must be visible.
+            badge = page.locator('.dc-record-panel-badge[data-dc-filter-target="' + ident + '"][data-dc-filter-value="' + value + '"]')
+            if combo.count() and not combo.is_visible() and badge.count() and badge.is_visible():
+                badge.click()
+                return
             if combo.count():
                 combo.click()
                 if not combo.evaluate('e=>e.readOnly'):
