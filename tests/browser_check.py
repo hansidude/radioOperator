@@ -281,7 +281,7 @@ def main(engine='chromium'):
             # Status: Current by default, Removed and All bring removed ones back, numbered from 1 (owner, issue p).
             status = page.locator('#ro-member-vessels select[id$="-vessels-choice"]')
             expect(status).to_have_value('current')
-            expect(page.locator('#ro-member-vessels label[for$="-vessels-choiceCombo"]')).to_have_text('Status')
+            expect(page.locator('#ro-member-vessels label[for$="-vessels-choiceCombo"]')).to_have_text(re.compile(r'Status\s*$'))   # with its field symbol (ui_symbols.js)
             expect(removed_row).to_be_hidden()
             expect(current_row).to_be_visible()
             choose(status, 'removed')
