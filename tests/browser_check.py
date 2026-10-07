@@ -810,7 +810,7 @@ def main(engine='chromium'):
             expect(row.locator('[data-column="member"]')).to_contain_text('Public')             # nothing picked: a public user
             expect(row.locator('[data-column="member"]').get_by_role('img', name='Public user', exact=True)).to_be_visible()
             expect(page.locator('.dc-record-grid-head')).to_contain_text('Logon date')           # headings are words (issue E)
-            expect(row.locator('[data-column="returnTime"] .dc-record-grid-value-symbol')).to_have_text('⏰')   # emoji inside the field
+            expect(row.locator('[data-column="returnTime"] .dc-record-grid-value-symbol')).to_have_text('🕒')   # emoji inside the field: the shared registry's symbol for a Time column (record_grid resolves fields by label)
             row_box, last_box = row.bounding_box(), row.locator('[data-column="action"]').bounding_box()
             assert abs(row_box['x'] + row_box['width'] - last_box['x'] - last_box['width']) < 2, (row_box, last_box)   # the row ends at its last column
             # The toolbar swaps the list in place through the shared htmx: no Apply button, no reload.
