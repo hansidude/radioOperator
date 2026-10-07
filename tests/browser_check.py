@@ -1139,8 +1139,9 @@ def main(engine='chromium'):
                         rowsWouldOverflow = el.scrollWidth > el.clientWidth + 1;
                         el.classList.add('dc-record-grid-stacked');
                     }
-                    // A column name is one line: a row heading's words, or a card's label's words, all on the same line.
-                    const names = mobile ? [...el.querySelectorAll('.dc-record-grid-row:first-of-type .dc-record-grid-label')] : [...head.children];
+                    // A row heading's words are all on one line. A card's field name may wrap within its 45% of the line
+                    // (Quackit CR-252–254, record_views.css .dc-record-grid-label), its words never split.
+                    const names = mobile ? [] : [...head.children];
                     const twoLineNames = names.filter(n => new Set([...n.querySelectorAll('.dc-record-word')]
                         .map(w => Math.round(w.getBoundingClientRect().top))).size > 1).map(n => n.textContent.trim());
                     return {mobile, stacked, rowsWouldOverflow, split, twoLineNames, grid: rows.every(r => getComputedStyle(r).display === 'grid'),
