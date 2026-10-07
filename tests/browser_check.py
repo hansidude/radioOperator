@@ -34,20 +34,22 @@ def search_toggle(field):
     return field.locator(SEARCH_PART).locator('xpath=./button[contains(@class, "app-page-menu-heading")]')
 
 
-def expect_search_starts_folded(field):
-    """Quackit CR-157 (owner: search fields "collapsed on every page"): a page's search starts folded behind its
-    part's one toggle, the field out of sight; as Quackit's search_part_problems() checks its own pages."""
+def expect_search_starts_open(field):
+    """Quackit CR-279 (owner: "dont collapse it on big screen! on mobile yes"): on a wide screen a page's search starts
+    open behind its part's one toggle, the field in sight (CR-157's fold is the phone's); as Quackit's
+    search_part_problems() checks its own pages."""
     part = field.locator(SEARCH_PART)
-    expect(part).to_have_class(re.compile(r'\bapp-page-menu-folded\b'))
+    expect(part).not_to_have_class(re.compile(r'\bapp-page-menu-folded\b'))
     expect(part.locator('xpath=./button[contains(@class, "app-page-menu-heading")]')).to_have_count(1)
-    expect(search_toggle(field)).to_have_attribute('aria-expanded', 'false')
-    expect(field).to_be_hidden()
+    expect(search_toggle(field)).to_have_attribute('aria-expanded', 'true')
+    expect(field).to_be_visible()
 
 
-def expect_search_flagged(field, terms):
-    """Quackit CR-157: folded with a term in force, the toggle is marked active and names the term, never out of sight."""
+def expect_search_flagged(field, terms, open=False):
+    """Quackit CR-157: with a term in force the toggle is marked active and names the term, folded (the term never out of
+    sight) or open (CR-279: a wide screen's search is open after a reload)."""
     toggle = search_toggle(field)
-    expect(toggle).to_have_attribute('aria-expanded', 'false')
+    expect(toggle).to_have_attribute('aria-expanded', 'true' if open else 'false')
     expect(toggle).to_have_class(re.compile(r'\bactive\b'))
     expect(toggle.locator('[data-dc-search-summary]')).to_have_text('Searching for: ' + terms)
 
@@ -873,7 +875,7 @@ def main(engine='chromium'):
             expect(row.get_by_role('img', name='Draft', exact=True)).to_be_visible()
             page.reload()
             expect(page.locator('#roSearch')).to_have_value(vessel)
-            expect_search_flagged(page.locator('#roSearch'), vessel)                          # folded again, the restored search named on its toggle
+            expect_search_flagged(page.locator('#roSearch'), vessel, open=True)               # open on a wide screen (CR-279), the restored search named on its toggle
             expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
             # Quackit CR-64: the status filter puts Clear filter first in the log's panel; it puts the status back to All.
@@ -1023,7 +1025,7 @@ def main(engine='chromium'):
                 # Open, though empty before a search: no hint text (Quackit CR-67), so it has no height yet.
                 expect(page.locator(panel_id).locator('..')).to_have_class(re.compile(r'\bdc-record-panel-open\b'))
                 expect(page.locator('[data-dc-record-panel]:visible')).to_have_attribute('aria-pressed', 'true')
-                expect_search_starts_folded(page.locator(search_box))                                   # Quackit CR-157: folded, one toggle
+                expect_search_starts_open(page.locator(search_box))                                     # Quackit CR-279: open on a wide screen, one toggle
                 with page.expect_response(lambda r: answer in r.url and 'q=' + token in r.url):          # the search's own answer
                     unfold(page.locator(search_box)).fill(token)
                 search_toggle(page.locator(search_box)).click()                                          # folded with a term in force:
