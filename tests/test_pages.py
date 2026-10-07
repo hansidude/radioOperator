@@ -257,7 +257,7 @@ class Pages(unittest.TestCase):
         self.assertIn('<div class="dc-record-grid-cell dc-record-grid-count" data-column="count" title="Result 1 of ', page)   # numbered from 1
         self.assertIn('<span class="dc-record-grid-count-head">#</span>', page)
         self.assertIsNotNone(BeautifulSoup(page, 'html.parser').select_one('#roRecordView > aside#roLogPanel.dc-record-panel[aria-label="Log ons: filters and index"][data-open="0"][data-dc-collapse="roLogPanel"]'))
-        self.assertIn('</aside><div id="roLiveRecords">', page)
+        self.assertLess(page.index('</aside>'), page.index('<div id="roLiveRecords">'))   # the panel (and its Panel filters popup, record_panel) before the live records
         self.assertIn('<title>Radio Logs</title>', page)                                           # the program's own menu
         for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):
             self.assertEqual(page.count('href="%s"' % href), 1, href)
@@ -444,7 +444,9 @@ class Pages(unittest.TestCase):
         page = self.a.get('/logon/%d' % d).get_data(as_text=True)
         self.assertIn('data-status="discarded"', page)
         self.assertEqual(L.get(Connection(Path(self.tmp.name) / 'test.db').cursor(), d)['discardReason'], 'hit New by mistake')
-        rows = lambda status: self.a.get('/logons?f=1&status=' + status).get_data(as_text=True).split('id="radioRecords"')[1]
+        # The grid's own element (' id="radioRecords"'): the shared sort wrapper's data-dc-sorted-grid="radioRecords" ends
+        # in the same letters and comes before it.
+        rows = lambda status: self.a.get('/logons?f=1&status=' + status).get_data(as_text=True).split(' id="radioRecords"')[1]
         self.assertIn('aria-label="Discarded"', rows('discarded'))                             # trashed has its own filter
         self.assertIn('ro-record-card discarded', rows('discarded'))
         self.assertNotIn('aria-label="Discarded"', rows('closed'))                              # and is never Closed

@@ -110,9 +110,12 @@ def main(engine='chromium'):
             # Test the rendered artwork, not just icon classes or loaded assets.
             # This includes the real navbar, shared tools, help and record pages.
             page.wait_for_function('!!window.dcEmoji')
-            missing = page.locator('.bi').evaluate_all("""icons => icons.filter(icon =>
-              !getComputedStyle(icon, '::before').backgroundImage.includes('/noto-emoji-2.051/svg/'))
-              .map(icon => icon.className)""")
+            # A legacy icon ui_symbols.js aliases to a field symbol (bi-wallet2 = hub) carries its artwork on the .dc-emoji
+            # span it is given, not on ::before (Quackit's own check reads it the same way).
+            missing = page.locator('.bi').evaluate_all("""icons => icons.filter(icon => {
+              const emoji = icon.querySelector('.dc-emoji');
+              return !getComputedStyle(emoji || icon, emoji ? null : '::before').backgroundImage.includes('/noto-emoji-2.051/svg/');
+            }).map(icon => icon.className)""")
             assert not missing, ('Icons bypass bundled artwork', page.url, missing)
             missing = page.evaluate(r"""() => {
               const missing = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
