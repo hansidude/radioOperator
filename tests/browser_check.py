@@ -1188,7 +1188,7 @@ def main(engine='chromium'):
                     site_menu.click()
                     expect(page.locator('#navbarNav')).to_have_class(re.compile(r'\bshow\b'))
                     names = [n.strip().lower() for n in page.locator('#appPageMenu .app-page-menu-heading:visible').all_inner_texts()]
-                    assert names == ['menu', 'page', 'filters', 'view'], names
+                    assert names == ['menu', 'filters', 'view'], names   # Quackit CR-276: the log's Page entry has nothing showing on a phone, so ☰ leaves it out
                     page.locator('#appPageMenu .app-page-menu-heading', has_text='Filters').click()
                     expect(page.locator('#roStatusCombo')).to_be_in_viewport()
                     expect(page.locator('#roSearch')).to_be_hidden()
