@@ -19,6 +19,12 @@ FOLDED_HEADINGS = ('xpath=ancestor::*[contains(concat(" ", normalize-space(@clas
 SEARCH_PART = 'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " dc-search-part ")][1]'
 
 
+def search_clear(page, field):
+    """Quackit CR-301: the one clear of the Search part holding `field` (a selector), the x joined to its Search button
+    (the fields' own Reset x is not shown inside a Search part): Quackit's tools/browser_editor_check.py search_clear()."""
+    return page.locator('.dc-search-part:has(%s) > [data-dc-search-clear]' % field)
+
+
 def unfold(locator):
     """Open what folds this control, as a user would, and return it: Quackit's tools/browser_editor_check.py unfold().
     Quackit CR-157: filter_row's Search part starts folded at every width behind its one heading button; on a phone
@@ -834,7 +840,7 @@ def main(engine='chromium'):
                 unfold(page.locator('#roSearch')).fill('NO-MATCH-' + token)                         # Quackit CR-157: opened first
             expect(page.locator('#radioRecords')).to_have_text('0 drafts')
             with page.expect_response(rows_for(q='', status='draft')):
-                page.get_by_role('button', name='Reset search', exact=True).click()
+                search_clear(page, '#roSearch').click()
             expect(page.locator('#roSearch')).to_have_value('')
             expect(page.locator('#roStatus')).to_have_value('draft')
             expect(row).to_have_count(1)
@@ -993,7 +999,7 @@ def main(engine='chromium'):
                     expect(page.locator('#roMatched [data-matched="logons"]')).to_have_count(0)
                     expect(page.locator('#roFoundPanel #roStatusCombo')).to_be_visible()
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
-                        unfold(page.locator('#roFindAll-reset')).click()
+                        search_clear(page, '#roFindAll').click()
                     expect(page.locator('#roStatus')).to_have_value('closed')
                     with page.expect_response(lambda r: answer in r.url and 'status=closed' in r.url):
                         unfold(page.locator('#roFindAll')).fill(token)
