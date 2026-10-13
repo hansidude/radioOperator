@@ -261,6 +261,9 @@ def main(engine='chromium'):
             check_symbol_artwork()
             for icon in page.locator('[data-help-icon]').all():
                 assert icon.locator('i, span').count() > 0, 'Help icon not filled: %s' % icon.get_attribute('data-help-icon')
+            width_cell = page.locator('[data-help-icon="[data-dc-page-width]"]')                  # the icon only, not Page tools' "Full width" word
+            expect(width_cell.locator('i.bi')).to_have_count(1)
+            expect(width_cell).to_have_text('')
             page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
             expect(page.locator('#roHelpView')).to_have_class(re.compile(r'\bdc-record-cards\b'))
             page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
@@ -637,7 +640,9 @@ def main(engine='chromium'):
             failing_search = re.compile(r'/api/logons/members')
             page.route(failing_search, lambda route: route.fulfill(status=500, body='verification failure'))
             page.locator('#roPickMember').click()
-            expect(page.locator('#spResults [data-sp-error]')).to_have_text('Search failed: HTTP 500 from /api/logons/members?q=')
+            # Quackit CR-322 (7b09ac3c, controls.js search): the shared problem notice, words first, the reason in brackets
+            problem = page.locator('#spResults #spSearchProblem[data-dc-message="notice"][data-dc-tone="problem"][role="alert"]')
+            expect(problem).to_have_text('The search failed. Type again to retry. (HTTP 500 from /api/logons/members?q=)')
             page.unroute(failing_search)
             page.keyboard.press('Escape')
             expect(page.locator('#searchPicker')).to_be_hidden()
@@ -1325,14 +1330,15 @@ def main(engine='chromium'):
             expect(label.locator('.dc-record-grid-label-text')).to_be_hidden()
             expect(label.locator('.dc-record-grid-symbol')).to_be_visible()
             expect(grid_rows.first.locator('[data-column="member"] .dc-record-grid-value')).to_be_visible()
-            assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") == '0', 'Emoji only is not remembered'
+            # Quackit CR-403 (e17bb078, record_view.js pageKey): kept per kind of page, <choice>@<route rule>#<element>
+            assert page.evaluate("localStorage.getItem('dc-record-names@/logons#roRecordView')") == '0', 'Emoji only is not remembered'
             page.screenshot(path=str(ARTIFACTS / ('radio-cards-emoji-%s.png' % engine)), full_page=True)
             page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()                                 # rows: no heading of names
             expect(page.locator('#radioRecords .dc-record-grid-head')).to_have_css('position', 'absolute')
             page.locator('[data-dc-record-view="cards"][aria-controls="roRecordView"]').click()
             names_button.click()                                                                   # names back
             expect(label.locator('.dc-record-grid-label-text')).to_be_visible()
-            assert page.evaluate("localStorage.getItem('dc-record-names:' + location.pathname + '#roRecordView')") is None
+            assert page.evaluate("localStorage.getItem('dc-record-names@/logons#roRecordView')") is None
             gap = page.locator('[data-record="%s"] [data-column="pob"]' % layout_records[0])      # the sparse draft
             expect(gap.locator('.dc-record-grid-missing')).to_have_text('?')                     # symbol and ?, not gone
             expect(gap.locator('.dc-record-grid-symbol')).to_be_visible()

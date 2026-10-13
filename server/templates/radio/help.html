@@ -165,6 +165,9 @@
     var button = document.querySelector(slot.hasAttribute('data-help-navbar') ? '.navbar ' + icon + ', #appMainMenu ' + icon : '.ro-help-demo ' + icon);
     if (!button) throw new Error('Help: no button matches ' + slot.getAttribute('data-help-icon'));
     slot.innerHTML = button.innerHTML;
+    // Only the icon: the main menu's Page tools item also carries its name (Quackit page_width_button word=True,
+    // data-dc-page-width-word), and the cell names it already.
+    slot.querySelectorAll('[data-dc-page-width-word]').forEach(function (word) { word.remove(); });
     slot.title = button.title;
   });
 })();
