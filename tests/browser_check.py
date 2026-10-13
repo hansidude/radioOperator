@@ -27,12 +27,50 @@ def search_clear(page, field):
 
 def unfold(locator):
     """Open what folds this control, as a user would, and return it: Quackit's tools/browser_editor_check.py unfold().
-    Quackit CR-157: filter_row's Search part starts folded at every width behind its one heading button; on a phone
-    (CR-90) the ☰ menu's Filters entry folds it too, and its heading comes first (document order), so ☰ is opened
-    first by the caller there. An open fold is left open; a control under no fold is returned as it is."""
+    Quackit CR-157: filter_row's Search part starts folded behind its one heading button; Quackit CR-402: the page's
+    controls are its local homes, in the page at every width and never behind a menu, so that heading is the only fold.
+    An open fold is left open; a control under no fold is returned as it is."""
     for heading in locator.locator(FOLDED_HEADINGS).element_handles():
         heading.click()
     return locator
+
+
+def wait_for_focus_back(page):
+    """A closing focus surface (Quackit record_view.js dcFocus: the main menu) goes Back over its own history entry; wait
+    until it has arrived, so the next opening or scroll is not undone by it: Quackit's tools/browser_quackit/menus.py."""
+    page.wait_for_function("""() => !document.documentElement.classList.contains('dc-focus-open')
+        && !(history.state && history.state.dcFocus && history.state.dcFocus.role === 'entry')""")
+
+
+def open_main_menu(page):
+    """Quackit CR-402: open the one main menu as a user would, the frame's Menu button (#appMenuButton); it has the screen
+    and says so on the button (aria-expanded): Quackit's tools/browser_quackit/menus.py open_main_menu(). Returns the menu."""
+    button, menu = page.locator('#appMenuButton'), page.locator('#appMainMenu')
+    expect(button).to_be_visible()
+    assert not menu.is_visible(), 'Menu is open already: a check opened it twice'
+    wait_for_focus_back(page)
+    button.click()
+    expect(menu).to_be_visible()
+    expect(button).to_have_attribute('aria-expanded', 'true')
+    return menu
+
+
+def close_main_menu(page):
+    """Quackit CR-402: put away the open main menu (Escape, its focus surface's own key) and wait for its Back."""
+    page.keyboard.press('Escape')
+    expect(page.locator('#appMainMenu')).to_be_hidden()
+    expect(page.locator('#appMenuButton')).to_have_attribute('aria-expanded', 'false')
+    wait_for_focus_back(page)
+
+
+# Quackit CR-402: the global frame's line, what it holds (Menu, the page's identity, Messages, nothing else) and whether
+# it is one line: Quackit's tools/browser_quackit/menus.py frame_line().
+FRAME_LINE = """() => { const line = document.querySelector('.navbar.fixed-top .app-navbar-primary');
+    const shown = [...line.children].filter(e => e.getClientRects().length);
+    const name = e => e.id === 'appMenuButton' ? 'Menu' : e.classList.contains('app-navbar-title') ? 'identity'
+        : e.id === 'dcMessageArea' ? 'Messages' : (e.id || e.className || e.tagName);
+    const boxes = shown.map(e => e.getBoundingClientRect());
+    return {parts: shown.map(name), one_line: boxes.every(b => b.top < boxes[0].bottom - 4 && b.bottom > boxes[0].top + 4)}; }"""
 
 
 def search_toggle(field):
@@ -184,20 +222,35 @@ def main(engine='chromium'):
             assert '?v=' in href, 'New grid markup must not reuse the cached stylesheet URL'
             script = page.locator('script[src*="/js/record_view.js"]').get_attribute('src')
             assert '?v=' in script, 'New view buttons must not reuse the cached script URL'
-            # Members and public vessels, reached from the log's navbar. The Member No. on a log on has to be one.
-            page.locator('.navbar a[href="/members"]').first.click()
+            # Members and public vessels, reached from Radio Logs' own section of the one main menu (Quackit CR-402: the
+            # frame's Menu, the mounted application's section first). The Member No. on a log on has to be one.
+            open_main_menu(page).locator('[data-app-menu-section="application"] a[href="/members"]').click()
             page.wait_for_url(re.compile('/members$'))
+            wait_for_focus_back(page)
             expect(page.locator('.entity-nav a[href="/vessels"]')).to_have_count(0)           # Public vessels is on the menu, not the Members page
             expect(page).to_have_title('Radio Logs')                                              # Radio Logs' own program menu
-            menu = page.locator('#navbarNav .navbar-nav')
-            for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help', '/logout'):
+            assert page.evaluate(FRAME_LINE)['parts'] == ['Menu', 'identity', 'Messages'], page.evaluate(FRAME_LINE)
+            expect(page.locator('#navbarNav, #appPageMenu, .navbar-toggler, .app-navbar-actions')).to_have_count(0)   # no second menu left
+            main_menu = open_main_menu(page)
+            menu = main_menu.locator('[data-app-menu-section="application"]')
+            expect(menu.locator('.app-main-menu-label')).to_contain_text('Radio Logs')               # labelled with the program's title
+            for href in ('/logons/new', '/members', '/vessels', '/radio/search', '/radio/help'):
                 expect(menu.locator('a[href="%s"]' % href)).to_have_count(1)
-            expect(menu.locator('a[href="/myTasks"]')).to_have_count(0)                            # none of Quackit's menu
-            expect(page.locator('#contextNavToggle')).to_have_count(0)
+                expect(menu.locator('a[href="%s"]' % href)).to_be_visible()
+            expect(menu.locator('a[href="/myTasks"]')).to_have_count(0)                            # none of Quackit's entries in Radio's section
+            sections = main_menu.locator('[data-app-menu-section]').evaluate_all('nodes => nodes.map(n => n.dataset.appMenuSection)')
+            assert sections[0] == 'application' and sections[-2:] == ['page-tools', 'account'], sections   # Radio's first, Page tools and Account last
+            # Quackit CR-402 Q2: hosted, Radio adds no Log out of its own; the one Log Out is the shared Account section's.
+            expect(menu.locator('a[href="/logout"]')).to_have_count(0)
+            expect(main_menu.locator('a[href="/logout"]')).to_have_count(1)
+            expect(main_menu.locator('[data-app-menu-section="account"] a[href="/logout"]')).to_contain_text('Log Out')
+            expect(page.locator('#contextNavToggle')).to_have_count(0)                             # Radio's layout leaves the Context Navigator out
+            close_main_menu(page)
+            expect(page.locator('#appMenuButton')).to_be_focused()                                 # the focus goes back to Menu
             expect(page.locator('.navbar-brand')).to_have_attribute('href', '/logons')
             expect(page.locator('.navbar-brand > i')).to_have_count(1)                               # Quackit's home icon, once
             expect(page.locator('.navbar-brand > i')).to_have_class(re.compile(r'\bbi-house\b'))
-            page.locator('#navbarNav a[href="/radio/help"]').click()                               # Help: the real controls, tried on a sample
+            open_main_menu(page).locator('[data-app-menu-section="application"] a[href="/radio/help"]').click()   # Help: the real controls, tried on a sample
             page.wait_for_url(re.compile('/radio/help$'))
             check_symbol_artwork()
             for icon in page.locator('[data-help-icon]').all():
@@ -207,12 +260,19 @@ def main(engine='chromium'):
             page.locator('#roHelpToolbar [data-dc-record-view="cards"]').click()
             page.screenshot(path=str(ARTIFACTS / ('radio-help-%s.png' % engine)))
             visit('/myTasks')                                                                       # Quackit's own pages keep Quackit's menu
-            expect(page.locator('#navbarNav a[href="/radio/help"]')).to_have_count(0)
-            expect(page.locator('#navbarNav a[href="/logons"]')).to_have_count(1)
-            expect(page.locator('#contextNavToggle')).to_have_count(1)
+            main_menu = open_main_menu(page)
+            expect(main_menu.locator('[data-app-menu-section="application"]')).to_have_count(0)    # no mounted application's section
+            expect(main_menu.locator('a[href="/radio/help"]')).to_have_count(0)
+            expect(main_menu.locator('[data-app-menu-section="apps"] a[href="/logons"]')).to_be_visible()   # RadioLogs among Quackit's apps
+            expect(main_menu.locator('[data-app-menu-section="page-tools"] #contextNavToggle')).to_be_visible()
+            close_main_menu(page)
             expect(page).to_have_title('QUACKIT')
             page.goto(URL + '/members')
-            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_have_attribute('title', 'Usual page width')   # Members starts wide
+            # Members starts wide: one width button shows, the page's own, offering the usual width back; the shell's copy,
+            # Menu's page tool (Quackit CR-402), says the same while it hides itself behind it (Quackit CR-77)
+            expect(page.locator('[data-dc-page-width]:visible')).to_have_count(1)
+            expect(page.locator('[data-dc-page-width]:visible')).to_have_attribute('title', 'Usual page width')
+            expect(page.locator('#appMainMenu [data-dc-page-width-shell]')).to_have_attribute('title', 'Usual page width')
             page.locator('a[href="/members/new"]').click()
             page.wait_for_url(re.compile('/members/new$'))
             usual_width('#ro-member-details', 'New member')
@@ -386,9 +446,15 @@ def main(engine='chromium'):
                                             storage_state=context.storage_state())
                 p = phone.new_page()
                 p.goto(URL + '/logons/new')
+                # Quackit CR-402: a phone's navbar is in the page under its fixed frame line; wait until the page is placed:
+                # no body padding, --app-navh the line's bottom, the page under the whole navbar (Quackit's phone check)
                 p.wait_for_function("""() => {
-                    const nav=document.querySelector('.navbar.fixed-top');
-                    return Math.abs(parseFloat(getComputedStyle(document.body).paddingTop)-Math.ceil(nav.getBoundingClientRect().bottom))<=1;
+                    const line=document.querySelector('.navbar .app-navbar-primary').getBoundingClientRect();
+                    const nav=document.querySelector('.navbar.fixed-top').getBoundingClientRect();
+                    const page=document.querySelector('[data-dc-page]').getBoundingClientRect();
+                    const navh=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-navh'));
+                    return parseFloat(getComputedStyle(document.body).paddingTop)===0 && Math.abs(navh-Math.ceil(line.bottom))<=1
+                        && page.top>=nav.bottom-1;
                 }""")
                 p.locator('#roPickMember').click()
                 boxes = p.evaluate('''() => [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')]
@@ -570,8 +636,9 @@ def main(engine='chromium'):
             page.keyboard.press('Escape')
             expect(page.locator('#searchPicker')).to_be_hidden()
             visit('/logons')
-            page.locator('.navbar a[href="/radio/search"]').first.click()                          # the Search page, from the log
+            open_main_menu(page).locator('[data-app-menu-section="application"] a[href="/radio/search"]').click()   # the Search page, from the log's Menu
             page.wait_for_url(re.compile('/radio/search$'))
+            wait_for_focus_back(page)
             expect(page.locator('#roFindAll')).to_be_visible()                                     # CR-236: Search opens ready to type
             with page.expect_response(lambda r: '/radio/search?' in r.url):
                 unfold(page.locator('#roFindAll')).fill(token)
@@ -589,9 +656,11 @@ def main(engine='chromium'):
             list_beside_panel('#roFoundPanel', '#roFound', 'Search')
             width_button = page.locator('[data-dc-page-width]:visible')                                   # contained or full width, not remembered;
             # view_controls carries the same control after the view buttons (Quackit CR-59); exactly one width
-            # button shows, the page's own, the shell's navbar copy hiding itself behind it (Quackit CR-77)
+            # button shows, the page's own, the shell's copy (Menu's page tool, Quackit CR-402) hiding itself behind it
+            # even with Menu open (Quackit CR-77)
             expect(page.locator('[data-dc-page-width]')).to_have_count(2)
-            expect(page.locator('.app-navbar-actions [data-dc-page-width]')).to_be_hidden()
+            expect(open_main_menu(page).locator('[data-dc-page-width-shell]')).to_be_hidden()
+            close_main_menu(page)
             expect(width_button).to_have_attribute('title', 'Full width')
             # Quackit CR-83: the view buttons head their own View group at the navbar's right end, as the register's
             # do, so the width button and the panel button after it end the line instead of sitting among the search
@@ -1185,25 +1254,34 @@ def main(engine='chromium'):
                     # Bootstrap sets scroll-behavior: smooth; an instant scroll is where it says it is when read.
                     page.evaluate("window.scrollTo({top: document.documentElement.scrollHeight, behavior: 'instant'})")
                     assert page.evaluate('window.scrollY') > 0, 'The 390px list did not scroll; the check proves nothing'
-                    # A phone's navbar is one line; its controls wait under the host's one menu, ☰ (Quackit CR-51/52, CR-90):
-                    # the site list folded under MENU (Quackit CR-113), then the page's entries folded to their names,
-                    # Filters holding its Search part.
-                    site_menu = page.get_by_role('button', name='Toggle navigation', exact=True)
-                    expect(site_menu).to_be_in_viewport()
-                    expect(page.get_by_role('button', name='Page menu', exact=True)).to_be_hidden()
-                    site_menu.click()
-                    expect(page.locator('#navbarNav')).to_have_class(re.compile(r'\bshow\b'))
-                    names = [n.strip().lower() for n in page.locator('#appPageMenu .app-page-menu-heading:visible').all_inner_texts()]
-                    assert names == ['menu', 'filters', 'view'], names   # Quackit CR-276: the log's Page entry has nothing showing on a phone, so ☰ leaves it out
-                    page.locator('#appPageMenu .app-page-menu-heading', has_text='Filters').click()
-                    expect(page.locator('#roStatusCombo')).to_be_in_viewport()
-                    expect(page.locator('#roSearch')).to_be_hidden()
-                    page.locator('#appPageMenu [data-navbar-menu="Search"] > .app-page-menu-heading').click()
-                    expect(page.locator('#roSearch')).to_be_in_viewport()
-                    site_menu.click()
-                    expect(page.locator('#roSearch')).to_be_hidden()
-                    expect(page.locator('#navbarNav')).not_to_have_class(re.compile(r'\bshow\b'))
+                    # Quackit CR-402: a phone's frame is one fixed line, [Menu] the log's identity [Messages], so Menu is one
+                    # tap away at the list's end; the page's controls are its local homes in the page under that line
+                    # (Filters, then View last), never behind Menu, and the navbar scrolls with the page.
+                    frame = page.evaluate(FRAME_LINE)
+                    assert frame['parts'] == ['Menu', 'identity', 'Messages'] and frame['one_line'], frame
+                    expect(page.locator('#navbarNav, #appPageMenu, .navbar-toggler, .app-navbar-actions')).to_have_count(0)
+                    assert page.locator('.navbar.fixed-top').evaluate('e => getComputedStyle(e).position') == 'static', 'the phone navbar is in the page'
+                    assert page.locator('.navbar .app-navbar-primary').evaluate('e => getComputedStyle(e).position') == 'fixed', 'the phone frame line is fixed'
+                    expect(page.locator('#appMenuButton')).to_be_in_viewport()
+                    main_menu = open_main_menu(page)
+                    expect(main_menu.locator('[data-app-menu-section="application"] a[href="/logons/new"]')).to_be_in_viewport()
+                    expect(main_menu.locator('#roFilters, #roSearch, #roStatusCombo, [data-navbar-view]')).to_have_count(0)   # the page's controls stay in the page
+                    close_main_menu(page)
+                    expect(page.locator('#appMenuButton')).to_be_focused()
                     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
+                    homes = page.locator('#appNavbarControls').evaluate(
+                        "host => [...host.children].map(e => e.dataset.navbarHome || e.dataset.navbarMenu || e.getAttribute('aria-label'))")
+                    assert 'Filters' in homes and homes[-1] == 'view' and homes.index('Filters') < homes.index('view'), ('Filters, then View last', homes)
+                    expect(page.locator('#appNavbarControls [data-navbar-menu="Filters"] #roFilters')).to_have_count(1)
+                    expect(page.locator('#roStatusCombo')).to_be_in_viewport()                       # the filters show with no menu
+                    line = page.locator('.navbar .app-navbar-primary').evaluate('e => e.getBoundingClientRect().bottom')
+                    top = page.locator('#roFilters').evaluate('e => e.getBoundingClientRect().top')
+                    assert top >= line - 1, 'The filters start under the frame line: %s < %s' % (top, line)
+                    expect(page.locator('#roSearch')).to_be_hidden()                                   # the Search part folds on a phone (CR-157)
+                    search_toggle(page.locator('#roSearch')).click()
+                    expect(page.locator('#roSearch')).to_be_in_viewport()
+                    search_toggle(page.locator('#roSearch')).click()
+                    expect(page.locator('#roSearch')).to_be_hidden()
                     nav = page.locator('.navbar.fixed-top').evaluate('el => el.getBoundingClientRect().bottom')
                     first = page.locator('.dc-record-grid-row').first.evaluate('el => el.getBoundingClientRect().top')
                     assert first >= nav - 1, 'The first record starts under the navbar: %s < %s' % (first, nav)
