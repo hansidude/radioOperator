@@ -27,7 +27,7 @@ def install_standalone_ui(app):
                  '../static/css/search_controls.css', '../static/js/ui_symbols.js',
                  '../static/fonts/RobotoMono.woff2', '../static/vendor/noto-emoji-2.051/Noto-COLRv1.ttf',
                  '../static/vendor/noto-emoji-2.051/svg/emoji_u1f50e.svg',
-                 '../static/js/search_controls.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
+                 '../static/js/search_controls.js', '../static/js/bulk_edit.js', '../static/js/record_view.js', '../static/js/auto_grow.js',
                  '../static/vendor/htmx-1.9.10/htmx.min.js', '../static/js/htmx_errors.js',
                  '../static/vendor/jquery-3.6.0/jquery.min.js'):
         if not (templates / name).is_file():

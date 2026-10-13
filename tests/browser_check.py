@@ -5,14 +5,20 @@ from datetime import date, timedelta
 import os
 from pathlib import Path
 import re
+import sys
 import time
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
-from playwright.sync_api import sync_playwright, expect
 
-URL = os.environ.get('RADIO_URL', 'http://localhost:80').rstrip('/')
-if URL not in ('http://localhost:80', 'http://host.docker.internal:80'):
-    raise SystemExit('Use quackit/verify radio; only the port 80 dev stack is supported.')
+# Quackit CR-413: the site Quackit's ./verify radio allocated to this run from its pool (CR-404), checked by the runner's
+# own owner (Quackit's tools/verify.py allocated_sites: QUACKIT_SITES, RADIO_URL the first, each a pool site 81 to 89;
+# never port 80 or 8080, never a site outside the run's allocation). It raises SystemExit naming what it got.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
+from verify import allocated_sites   # noqa: E402
+URL = allocated_sites()[0]
+# Quackit CR-410: the owner's two screens, from their one owner (Quackit's tools/browser_quackit/common.py).
+from browser_quackit.common import DESKTOP, PHONE, SCREENS, screen_name   # noqa: E402
+from playwright.sync_api import sync_playwright, expect   # noqa: E402
 ARTIFACTS = Path('/artifacts')
 FOLDED_HEADINGS = ('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " app-page-menu-folded ")]'
                    '/button[contains(@class, "app-page-menu-heading")]')
@@ -116,7 +122,7 @@ def main(engine='chromium'):
     overdue_record = None
     with sync_playwright() as pw:
         browser = getattr(pw, engine).launch()
-        context = browser.new_context(viewport={'width': 1920, 'height': 1080})
+        context = browser.new_context(viewport=DESKTOP)
         # Model an existing browser holding the old unversioned stylesheet. New
         # markup must request a new URL, rather than relying on a hard refresh.
         # The same for the view buttons' script: an old copy without the size buttons, as a browser that
@@ -189,7 +195,7 @@ def main(engine='chromium'):
                 what, p, l, page.evaluate("() => [document.getElementById('roFound').closest('.container-fluid').className, innerWidth, document.documentElement.clientWidth]"))
 
         def usual_width(inside, what):
-            # Quackit's usual ~1200px page width (layout's mySpacing), measured at the 1920px viewport.
+            # Quackit's usual ~1200px page width (layout's mySpacing), measured at the desktop screen (DESKTOP).
             width = page.evaluate("s => document.querySelector(s).closest('.container-fluid.mySpacing').getBoundingClientRect().width", inside)
             assert 900 < width < 1300, '%s is not at the usual ~1200px page width: %s' % (what, width)
 
@@ -408,10 +414,10 @@ def main(engine='chromium'):
             visit('/members?q=' + token)
             expect(page.locator('#radioMembers .dc-record-grid-row')).to_have_count(1)
             expect(page.locator('#radioMembers')).to_contain_text(vessel)
-            for width in (1920, 390):
-                page.set_viewport_size({'width': width, 'height': 800})
-                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Members overflow at %spx' % width
-            page.set_viewport_size({'width': 1920, 'height': 1080})
+            for screen in SCREENS:
+                page.set_viewport_size(screen)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Members overflow on the %s' % screen_name(screen)
+            page.set_viewport_size(DESKTOP)
             visit('/vessels')
             expect(page.locator('.entity-nav a[href="/members"]')).to_have_count(0)           # Members is on the menu, not this page
             visit('/vessels/new')
@@ -442,7 +448,7 @@ def main(engine='chromium'):
             def pick(text):
                 page.locator('#spResults .dc-record-grid-row', has_text=text).first.click()
             if engine == 'chromium':                                                                # a phone: tapping a box must not zoom
-                phone = browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True,
+                phone = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True,
                                             storage_state=context.storage_state())
                 p = phone.new_page()
                 p.goto(URL + '/logons/new')
@@ -778,7 +784,7 @@ def main(engine='chromium'):
             list_beside_panel('#roFoundPanel', '#roFound', 'Search on a narrower screen')            # the page makes room instead
             panel_button.click()
             expect(panel).to_be_hidden()
-            page.set_viewport_size({'width': 1920, 'height': 1080})
+            page.set_viewport_size(DESKTOP)
             page.reload()                                                                          # remembered
             expect(page.locator('#roFoundPanel')).to_be_hidden()
             page.locator('[data-dc-record-panel]:visible').click()
@@ -1078,11 +1084,11 @@ def main(engine='chromium'):
                     else:
                         page.locator('.dc-record-panel-badge[data-dc-filter-value="all"]').click()   # the All badge; Clear filter above it does the same (CR-64)
                 expect(page.locator(target + ' [data-record="%s"]' % trashed_id)).to_have_count(1)
-                for width in (1920,390):
-                    page.set_viewport_size({'width':width,'height':1080 if width>767 else 844})
-                    page.screenshot(path=str(ARTIFACTS / ('radio-status-' + ('search' if 'radio/search' in path else 'log') + '-' + str(width) + '-' + engine + '.png')),full_page=True)
+                for screen in SCREENS:
+                    page.set_viewport_size(screen)
+                    page.screenshot(path=str(ARTIFACTS / ('radio-status-' + ('search' if 'radio/search' in path else 'log') + '-' + screen_name(screen) + '-' + engine + '.png')),full_page=True)
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
-                page.set_viewport_size({'width':1920,'height':1080})
+                page.set_viewport_size(DESKTOP)
                 page.locator('[data-dc-record-panel]:visible').click()
             # Review density with sparse and populated rows, like the owner's
             # i_like_this.png, rather than accepting a single tall record.
@@ -1288,7 +1294,7 @@ def main(engine='chromium'):
                 if width in (1920, 1328, 960, 900, 390):
                     page.screenshot(path=str(ARTIFACTS / ('radio-list-%s-%s.png' % (engine, width))), full_page=True)
             # Chosen views on a desktop: cards on one line, a line per field, wrapped rows; a refresh keeps them.
-            page.set_viewport_size({'width': 1920, 'height': 1080})
+            page.set_viewport_size(DESKTOP)
             # The table opens with Paragraphs on: long values wrap in full rather than ending in an ellipsis.
             expect(page.locator('[data-dc-record-view="paragraphs"][aria-controls="roRecordView"]')).to_have_attribute('aria-pressed', 'true')
             long_name = page.locator('#radioRecords [data-column="vesselName"] .dc-record-grid-value', has_text='A very long vessel name')
@@ -1343,7 +1349,7 @@ def main(engine='chromium'):
             page.locator('[data-dc-record-view="paragraphs"][aria-controls="roRecordView"]').click()
             expect(value).to_have_css('white-space', 'nowrap')
             got = heights()                                                                 # Paragraphs off: the paper's one-line rows
-            assert max(got) <= 36, 'Rows with Paragraphs off are not one line at 1920px: %s' % got
+            assert max(got) <= 36, 'Rows with Paragraphs off are not one line on the desktop screen: %s' % got
             expect(view).to_have_class('')                                                    # (Cards off, Paragraphs off)
             visit('/logon/%s' % record)
             page.locator('#logonViewTabs [data-entity-tab="history"]').click()                                    # a tab puts #history in the address
@@ -1460,8 +1466,8 @@ def main(engine='chromium'):
             # Owner, issue l: each identity field's emoji and words open its actual member or vessel.
             member_href = urlsplit(member_page).path
             vessel_href = member_href + '/vessels/' + str(kept_id)
-            for width in (1920, 390):
-                page.set_viewport_size({'width': width, 'height': 1080})
+            for screen in SCREENS:
+                page.set_viewport_size(screen)
                 for column, target in (('member', member_href), ('vesselName', vessel_href),
                                        ('rego', vessel_href), ('mobile', member_href)):
                     visit('/logons?f=1&status=all&dayOn=0&q=' + token)
@@ -1469,12 +1475,12 @@ def main(engine='chromium'):
                     field = linked_row.locator('[data-column="%s"]' % column)
                     expect(field).to_have_attribute('href', target)
                     # On desktop the field's words open it (its emoji shows beside them, Quackit CR-154).
-                    symbol = '.dc-record-grid-symbol' if width == 390 else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value')
+                    symbol = '.dc-record-grid-symbol' if screen == PHONE else ('.dc-record-symbol [role="img"]' if column == 'member' else '.dc-record-grid-value')
                     field.locator(symbol).click()
                     page.wait_for_url(re.compile(re.escape(target) + r'(?:#details)?$'))
                 visit('/logons?f=1&status=all&dayOn=0&q=' + token)
-                page.locator('[data-record="%s"]' % old_logon.json()['id']).screenshot(path=str(ARTIFACTS / ('radio-linked-fields-%s-%s.png' % (width, engine))))
-            page.set_viewport_size({'width': 1920, 'height': 1080})
+                page.locator('[data-record="%s"]' % old_logon.json()['id']).screenshot(path=str(ARTIFACTS / ('radio-linked-fields-%s-%s.png' % (screen_name(screen), engine))))
+            page.set_viewport_size(DESKTOP)
             page.goto(URL + member_href + '#vessels')
             kept.locator('a[title="Open vessel"]').click()
             page.wait_for_url(re.compile(r'/member/[0-9]+/vessels/%d$' % kept_id))           # its confirm: the page's accept-all handler
@@ -1533,16 +1539,16 @@ def main(engine='chromium'):
                 response = context.request.post(URL + '/logon/%s/%s' % (record, action),
                                                 form={'reason': 'other' if watching else 'Verification cleanup'})
                 if not response.ok:
-                    print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (record, response.status))
+                    print('Fixture %s cleanup failed: HTTP %s. Close it on %s.' % (record, response.status, URL))
             if overdue_record:
                 response = context.request.post(URL + '/logon/%s/logoff' % overdue_record, form={'reason': 'other'})
                 if not response.ok:
-                    print('Fixture %s cleanup failed: HTTP %s. Log it off on port 80.' % (overdue_record, response.status))
+                    print('Fixture %s cleanup failed: HTTP %s. Log it off on %s.' % (overdue_record, response.status, URL))
             for fixture_id in layout_records:
                 response = context.request.post(URL + '/logon/%s/discard' % fixture_id,
                                                 form={'reason': 'Layout verification complete ' + token})
                 if not response.ok:
-                    print('Fixture %s cleanup failed: HTTP %s. Close it on port 80.' % (fixture_id, response.status))
+                    print('Fixture %s cleanup failed: HTTP %s. Close it on %s.' % (fixture_id, response.status, URL))
             context.tracing.stop(path=str(ARTIFACTS / ('radio-trace-%s.zip' % engine)))
             browser.close()
             print('%s browser finished in %.1fs' % (engine, time.monotonic() - started), flush=True)
