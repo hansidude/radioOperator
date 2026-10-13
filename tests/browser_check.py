@@ -827,7 +827,9 @@ def main(engine='chromium'):
             page.locator('#radioFoundMembers a[title^="Open member"]').first.click()               # a row opens its record
             page.wait_for_url(re.compile(r'/member/[0-9]+$'))
             visit('/logons')
-            page.locator('a[href="/logons/new"]').click()
+            open_main_menu(page).locator('[data-app-menu-section="application"] a[href="/logons/new"]').click()   # New log on, from the log's Menu (Quackit CR-402)
+            page.wait_for_url(re.compile('/logons/new$'))
+            wait_for_focus_back(page)
             expect(page.locator('#saveStatus')).to_have_text('Not saved')
             expect(page.locator('#ro-logon-entry .ro-entry-shell > .ro-primary-actions [data-save-record]')).to_be_visible()
             expect(page.locator('#ro-logon-entry .capture-row')).to_have_count(5)
