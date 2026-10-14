@@ -1277,10 +1277,24 @@ def main(engine='chromium'):
                     assert page.locator('.navbar .app-navbar-primary').evaluate('e => getComputedStyle(e).position') == 'fixed', 'the phone frame line is fixed'
                     expect(page.locator('#appMenuButton')).to_be_in_viewport()
                     main_menu = open_main_menu(page)
+                    # Quackit CR-418: every phone opening starts collapsed, including Radio's own section.
+                    sections = main_menu.locator('[data-app-menu-section]')
+                    expect(sections).to_have_count(3)       # CR-420: only Radio, Page tools and Account
+                    for section in sections.all():
+                        expect(section).to_have_class(re.compile(r'\bcollapsed\b'))
+                        expect(section.locator('.app-main-menu-label')).to_have_attribute('aria-expanded', 'false')
+                        expect(section.locator('[data-app-menu-content]')).to_be_hidden()
+                    application = main_menu.locator('[data-app-menu-section="application"]')
+                    application.locator('.app-main-menu-label').click()   # the shared fold control, as an operator would
+                    expect(application.locator('.app-main-menu-label')).to_have_attribute('aria-expanded', 'true')
                     expect(main_menu.locator('[data-app-menu-section="application"] a[href="/logons/new"]')).to_be_in_viewport()
                     expect(main_menu.locator('#roFilters, #roSearch, #roStatusCombo, [data-navbar-view]')).to_have_count(0)   # the page's controls stay in the page
                     close_main_menu(page)
                     expect(page.locator('#appMenuButton')).to_be_focused()
+                    main_menu = open_main_menu(page)       # an opened section is never remembered on a phone
+                    expect(main_menu.locator('[data-app-menu-section="application"] .app-main-menu-label')).to_have_attribute('aria-expanded', 'false')
+                    expect(main_menu.locator('[data-app-menu-section="application"] a[href="/logons/new"]')).to_be_hidden()
+                    close_main_menu(page)
                     page.evaluate("window.scrollTo({top: 0, behavior: 'instant'})")
                     homes = page.locator('#appNavbarControls').evaluate(
                         "host => [...host.children].map(e => e.dataset.navbarHome || e.dataset.navbarMenu || e.getAttribute('aria-label'))")
